@@ -1,0 +1,36 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('ferro', {
+  versions: () => ipcRenderer.invoke('ferro:versions'),
+  instances: () => ipcRenderer.invoke('ferro:instances'),
+  createInstance: (data) => ipcRenderer.invoke('ferro:createInstance', data),
+  fabricLoaders: (mcVersion) => ipcRenderer.invoke('ferro:fabricLoaders', mcVersion),
+  modSearch: (data) => ipcRenderer.invoke('ferro:modSearch', data),
+  mods: (data) => ipcRenderer.invoke('ferro:mods', data),
+  modInstall: (data) => ipcRenderer.invoke('ferro:modInstall', data),
+  modRemove: (data) => ipcRenderer.invoke('ferro:modRemove', data),
+  modToggle: (data) => ipcRenderer.invoke('ferro:modToggle', data),
+  packSearch: (data) => ipcRenderer.invoke('ferro:packSearch', data),
+  packVersions: (data) => ipcRenderer.invoke('ferro:packVersions', data),
+  packInstall: (data) => ipcRenderer.invoke('ferro:packInstall', data),
+  clientId: () => ipcRenderer.invoke('ferro:clientId'),
+  setClientId: (data) => ipcRenderer.invoke('ferro:setClientId', data),
+  authStatus: () => ipcRenderer.invoke('ferro:authStatus'),
+  authStart: () => ipcRenderer.invoke('ferro:authStart'),
+  authPoll: (data) => ipcRenderer.invoke('ferro:authPoll', data),
+  authLogout: () => ipcRenderer.invoke('ferro:authLogout'),
+  authBrowser: () => ipcRenderer.invoke('ferro:authBrowser'),
+  authWindow: () => ipcRenderer.invoke('ferro:authWindow'),
+  authBrowserCancel: () => ipcRenderer.invoke('ferro:authBrowserCancel'),
+  authWindowCancel: () => ipcRenderer.invoke('ferro:authWindowCancel'),
+  onAuthResult: (cb) => {
+    ipcRenderer.on('ferro:auth-done', (_, d) => cb(null, d));
+    ipcRenderer.on('ferro:auth-error', (_, e) => cb(e, null));
+  },
+  java: () => ipcRenderer.invoke('ferro:java'),
+  launch: (data) => ipcRenderer.invoke('ferro:launch', data),
+  stop: () => ipcRenderer.invoke('ferro:stop'),
+  status: () => ipcRenderer.invoke('ferro:status'),
+  updateSettings: (data) => ipcRenderer.invoke('ferro:updateSettings', data),
+  onLog: (cb) => ipcRenderer.on('ferro:log', (_, t) => cb(t)),
+});

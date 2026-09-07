@@ -1,0 +1,56 @@
+{
+  "name": "ferro-launcher",
+  "version": "0.1.0",
+  "description": "FerroLauncher - Launcher de Minecraft hecho desde 0",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "vite build",
+    "dist": "npm run build && electron-builder --win nsis portable",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "adm-zip": "^0.6.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "electron": "^36.0.0",
+    "electron-builder": "^25.1.8",
+    "vite": "^6.0.3",
+    "wait-on": "^8.0.3"
+  },
+  "allowScripts": {
+    "electron@36.9.5": true,
+    "esbuild@0.25.12": true
+  },
+  "build": {
+    "appId": "com.ferro.launcher",
+    "productName": "FerroLauncher",
+    "directories": { "output": "release" },
+    "files": [
+      "electron/**/*",
+      "core/**/*",
+      "dist/**/*",
+      "build/**/*",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "FerroLauncher"
+    },
+    "portable": { "artifactName": "FerroLauncher-portable.exe" }
+  }
+}

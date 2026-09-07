@@ -20,7 +20,8 @@ const MC_PROFILE = 'https://api.minecraftservices.com/minecraft/profile';
 function authPaths(baseDir) {
   return {
     config: path.join(baseDir, 'ferro-config.json'),
-    account: path.join(baseDir, 'account.json'),
+    account: path.join(baseDir, 'account.json'), // legado v1 (se migra solo)
+    accounts: path.join(baseDir, 'accounts.json'),
   };
 }
 
@@ -131,18 +132,70 @@ async function fetchProfile(mcToken) {
   return { uuid: p.id, name: p.name, skins: p.skins || [], capes: p.capes || [] };
 }
 
-function saveAccount(baseDir, account) {
-  const p = authPaths(baseDir).account;
+function loadStore(baseDir) {
+  const p = authPaths(baseDir);
+  let store = readJson(p.accounts, null);
+  if (!store) {
+    // Migra el formato v1 (una cuenta) al multi-cuenta
+    const old = readJson(p.account, null);
+    store = { active: null, accounts: {} };
+    if (old?.profile?.uuid) {
+      store.accounts[old.profile.uuid] = old;
+      store.active = old.profile.uuid;
+    }
+    try { fs.mkdirSync(path.dirname(p.accounts), { recursive: true }); fs.writeFileSync(p.accounts, JSON.stringify(store, null, 2)); } catch {}
+  }
+  store.accounts = store.accounts || {};
+  return store;
+}
+
+function writeStore(baseDir, store) {
+  const p = authPaths(baseDir).accounts;
   fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, JSON.stringify({ ...account, savedAt: Date.now() }, null, 2));
+  fs.writeFileSync(p, JSON.stringify(store, null, 2));
+}
+
+function saveAccount(baseDir, account) {
+  const store = loadStore(baseDir);
+  const withStamp = { ...account, savedAt: Date.now() };
+  store.accounts[account.profile.uuid] = withStamp;
+  store.active = account.profile.uuid;
+  writeStore(baseDir, store);
 }
 
 function loadAccount(baseDir) {
-  return readJson(authPaths(baseDir).account, null);
+  const store = loadStore(baseDir);
+  return (store.active && store.accounts[store.active]) || null;
+}
+
+function listAccounts(baseDir) {
+  const store = loadStore(baseDir);
+  return Object.values(store.accounts).map((a) => ({
+    uuid: a.profile?.uuid, name: a.profile?.name, active: a.profile?.uuid === store.active,
+  }));
+}
+
+function setActive(baseDir, uuid) {
+  const store = loadStore(baseDir);
+  if (!store.accounts[uuid]) throw new Error('Cuenta no encontrada');
+  store.active = uuid;
+  writeStore(baseDir, store);
+  return true;
+}
+
+function removeAccount(baseDir, uuid) {
+  const store = loadStore(baseDir);
+  delete store.accounts[uuid];
+  if (store.active === uuid) store.active = Object.keys(store.accounts)[0] || null;
+  writeStore(baseDir, store);
+  return true;
 }
 
 function clearAccount(baseDir) {
-  try { fs.unlinkSync(authPaths(baseDir).account); } catch {}
+  const store = loadStore(baseDir);
+  if (store.active) delete store.accounts[store.active];
+  store.active = Object.keys(store.accounts)[0] || null;
+  writeStore(baseDir, store);
 }
 
 // Completa el login tras el device flow: Xbox -> Minecraft -> perfil -> guarda
@@ -175,6 +228,7 @@ async function validAccount(baseDir, clientId) {
 module.exports = {
   getClientId, setClientId, deviceStart, devicePollOnce,
   completeLogin, validAccount, loadAccount, clearAccount,
+  listAccounts, setActive, removeAccount,
   browserLogin, exchangeCode, authorizeUrl, NATIVE_REDIRECT, SCOPE,
 };
 

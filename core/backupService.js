@@ -1,0 +1,87 @@
+const fs = require('fs');
+const path = require('path');
+const AdmZip = require('adm-zip');
+
+function backupsDir(baseDir, instanceName) {
+  return path.join(baseDir, 'backups', instanceName);
+}
+
+function stampName(name) {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${name}-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.ferro`;
+}
+
+function exportInstance(instanceDir, destZip, onLog) {
+  fs.mkdirSync(path.dirname(destZip), { recursive: true });
+  const zip = new AdmZip();
+  zip.addLocalFolder(instanceDir);
+  zip.writeZip(destZip);
+  onLog && onLog(`[ferro] exportado ${(fs.statSync(destZip).size / 1048576).toFixed(1)} MB\n`);
+  return destZip;
+}
+
+function readPackName(zipPath) {
+  try {
+    const zip = new AdmZip(zipPath);
+    const e = zip.getEntry('ferro.json');
+    if (e) return JSON.parse(zip.readAsText(e)).name || null;
+  } catch {}
+  return null;
+}
+
+function uniqueDir(instancesDir, base) {
+  let name = base, i = 2;
+  while (fs.existsSync(path.join(instancesDir, name))) name = `${base} (${i++})`;
+  return name;
+}
+
+function importPack(zipPath, instancesDir, onLog) {
+  if (!fs.existsSync(zipPath)) throw new Error('Archivo no encontrado');
+  const name = uniqueDir(instancesDir, (readPackName(zipPath) || path.basename(zipPath, '.ferro')).replace(/[^\w\-. ]+/g, '_').trim() || 'Instancia');
+  const dest = path.join(instancesDir, name);
+  fs.mkdirSync(dest, { recursive: true });
+  new AdmZip(zipPath).extractAllTo(dest, true);
+  // Normaliza el nombre interno
+  try {
+    const cfgPath = path.join(dest, 'ferro.json');
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    cfg.name = name;
+    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+  } catch {}
+  onLog && onLog(`[ferro] importada como ${name}\n`);
+  return name;
+}
+
+function listBackups(baseDir, instanceName) {
+  const dir = backupsDir(baseDir, instanceName);
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
+    .filter((f) => f.endsWith('.ferro'))
+    .map((f) => ({ file: f, path: path.join(dir, f), size: fs.statSync(path.join(dir, f)).size, mtime: fs.statSync(path.join(dir, f)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime);
+}
+
+function createBackup(baseDir, instanceDir, instanceName, onLog) {
+  const dest = path.join(backupsDir(baseDir, instanceName), stampName(instanceName));
+  return { file: path.basename(exportInstance(instanceDir, dest, onLog)), path: dest };
+}
+
+function restoreBackup(baseDir, instancesDir, instanceName, file, onLog) {
+  const src = path.join(backupsDir(baseDir, instanceName), path.basename(file));
+  if (!src.startsWith(backupsDir(baseDir, instanceName))) throw new Error('Ruta no válida');
+  const dest = path.join(instancesDir, instanceName);
+  fs.rmSync(dest, { recursive: true, force: true });
+  fs.mkdirSync(dest, { recursive: true });
+  new AdmZip(src).extractAllTo(dest, true);
+  onLog && onLog(`[ferro] ${instanceName} restaurada desde ${file}\n`);
+  return true;
+}
+
+function deleteBackup(baseDir, instanceName, file) {
+  const p = path.join(backupsDir(baseDir, instanceName), path.basename(file));
+  fs.unlinkSync(p);
+  return true;
+}
+
+module.exports = { exportInstance, importPack, listBackups, createBackup, restoreBackup, deleteBackup };

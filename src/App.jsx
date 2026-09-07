@@ -14,23 +14,38 @@ export default function App() {
   const [loaderVersion, setLoaderVersion] = useState('');
   const [modQuery, setModQuery] = useState('fabric api');
   const [modHits, setModHits] = useState([]);
+  const [modTotal, setModTotal] = useState(0);
+  const [fVersion, setFVersion] = useState('1.21.1');
+  const [fLoader, setFLoader] = useState('fabric');
+  const [fSort, setFSort] = useState('relevance');
   const [mods, setMods] = useState([]);
   const [modsFor, setModsFor] = useState('');
   const [searching, setSearching] = useState(false);
   const [installingId, setInstallingId] = useState(null);
   const [installedIds, setInstalledIds] = useState([]);
   const [packMc, setPackMc] = useState('1.21.1');
+  const [packLoader, setPackLoader] = useState('');
+  const [packSort, setPackSort] = useState('relevance');
+  const [packTotal, setPackTotal] = useState(0);
   const [packQuery, setPackQuery] = useState('fabulously optimized');
   const [packHits, setPackHits] = useState([]);
   const [packVers, setPackVers] = useState({});
   const [packBusy, setPackBusy] = useState(null);
   const [clientId, setClientId] = useState('');
   const [account, setAccount] = useState(null);
+  const [accts, setAccts] = useState([]);
   const [authStep, setAuthStep] = useState(null);
   const [browserWaiting, setBrowserWaiting] = useState(false);
   const [pollCount, setPollCount] = useState(0);
   const [appVer, setAppVer] = useState('');
   const [upd, setUpd] = useState({ state: 'idle' });
+  const [skinInfo, setSkinInfo] = useState(null);
+  const [skinName, setSkinName] = useState('');
+  const [skinUrl, setSkinUrl] = useState('');
+  const [skinVariant, setSkinVariant] = useState('classic');
+  const [skinBusy, setSkinBusy] = useState(false);
+  const [bkFor, setBkFor] = useState('');
+  const [bkList, setBkList] = useState([]);
   const pollRef = useRef(null);
   const [launchInstance, setLaunchInstance] = useState('');
   const [log, setLog] = useState('[ferro] listo\n');
@@ -54,6 +69,7 @@ export default function App() {
       setInstances(inst);
       if (inst[0] && !launchInstance) setLaunchInstance(inst[0].name);
       if (inst[0] && !modsFor) setModsFor(inst[0].name);
+      if (inst[0] && !bkFor) { setBkFor(inst[0].name); loadBackups(inst[0].name); }
       setJava(await window.ferro.java());
       try { setAccount(await window.ferro.authStatus()); } catch {}
     } catch (e) {
@@ -67,14 +83,28 @@ export default function App() {
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
+  const loadBackups = async (name) => {
+    if (!name) return;
+    try { setBkList(await window.ferro.backups({ instanceName: name })); }
+    catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
   useEffect(() => { if (tab === 'mods' && modsFor) loadMods(modsFor); }, [modsFor]);
+
+  useEffect(() => {
+    const inst = instances.find((i) => i.name === modsFor);
+    if (inst) {
+      setFVersion(inst.versionId);
+      if (inst.type !== 'vanilla') setFLoader(inst.type);
+    }
+  }, [modsFor]);
 
   const doSearch = async () => {
     setSearching(true);
     try {
-      const inst = instances.find((i) => i.name === modsFor);
-      const hits = await window.ferro.modSearch({ query: modQuery, mcVersion: inst?.versionId || versionId, loader: ['quilt','forge','neoforge'].includes(inst?.type) ? inst.type : 'fabric' });
-      setModHits(hits);
+      const r = await window.ferro.modSearch({ query: modQuery, mcVersion: fVersion, loader: fLoader, sort: fSort });
+      setModHits(r.hits || r);
+      setModTotal(r.total || (r.hits || r).length);
       setInstalledIds([]);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
     finally { setSearching(false); }
@@ -94,13 +124,18 @@ export default function App() {
   };
 
   const doPackSearch = async () => {
-    try { setPackHits(await window.ferro.packSearch({ query: packQuery, mcVersion: packMc })); setPackVers({}); }
+    try {
+      const r = await window.ferro.packSearch({ query: packQuery, mcVersion: packMc, loader: packLoader || undefined, sort: packSort });
+      setPackHits(r.hits || r);
+      setPackTotal(r.total || (r.hits || r).length);
+      setPackVers({});
+    }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
   const doPackVers = async (projectId) => {
     try {
-      const vers = await window.ferro.packVersions({ projectId, mcVersion: packMc });
+      const vers = await window.ferro.packVersions({ projectId, mcVersion: packMc, loader: packLoader || undefined });
       setPackVers((p) => ({ ...p, [projectId]: vers }));
     }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -123,10 +158,35 @@ export default function App() {
     try {
       setClientId(await window.ferro.clientId() || '');
       setAccount(await window.ferro.authStatus());
+      setAccts(await window.ferro.accounts());
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
   const stopPoll = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+
+  const loadSkin = async (name) => {
+    try { setSkinInfo(await window.ferro.skin({ name: name ?? skinName ?? username ?? 'Ferro' })); }
+    catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const applySkin = async () => {
+    if (skinBusy) return;
+    setSkinBusy(true);
+    try {
+      const r = await window.ferro.skinApply({ variant: skinVariant, url: skinUrl });
+      setSkinInfo({ online: true, ...r });
+      setLog((l) => l + `[ferro] skin actualizada (${skinVariant})\n`);
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+    finally { setSkinBusy(false); }
+  };
+
+  const resetSkin = async () => {
+    try {
+      await window.ferro.skinReset();
+      setLog((l) => l + '[ferro] skin restablecida\n');
+      loadSkin();
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
   useEffect(() => stopPoll, []);
 
   useEffect(() => {
@@ -275,6 +335,7 @@ export default function App() {
         <button className={tab==='mods'?'active':''} onClick={()=>{setTab('mods'); if(modsFor) loadMods(modsFor);}}>🧩 Mods</button>
         <button className={tab==='packs'?'active':''} onClick={()=>setTab('packs')}>🎁 Modpacks</button>
         <button className={tab==='cuenta'?'active':''} onClick={()=>{setTab('cuenta'); loadAuth();}}>👤 Cuenta</button>
+        <button className={tab==='skin'?'active':''} onClick={()=>{setTab('skin'); loadSkin();}}>🎨 Skin</button>
         <button className={tab==='ajustes'?'active':''} onClick={()=>setTab('ajustes')}>⚙️ Ajustes</button>
         <div className="ver">v0.3.0 · ajustes + consola</div>
       </div>
@@ -314,7 +375,7 @@ export default function App() {
           <div className="card">
             <h2>Versiones release (Mojang)</h2>
             <div className="grid">
-              {versions.map((v)=><div key={v.id} className="card"><b>{v.id}</b> <span className="pill">{v.type}</span><div style={{fontSize:12, opacity:.7}}>{new Date(v.releaseTime).toLocaleDateString()}</div></div>)}
+              {versions.map((v)=><div key={v.id} className="card"><div className="card-title">{v.id}</div><div className="meta"><span className="pill">{v.type}</span><span className="pill">{new Date(v.releaseTime).toLocaleDateString()}</span></div></div>)}
             </div>
           </div>
         )}
@@ -342,7 +403,24 @@ export default function App() {
             </div>
             <h3>Instaladas ({instances.length})</h3>
             <div className="grid">
-              {instances.map((i)=><div key={i.name} className="card"><b>{i.name}</b><div className="pill">{i.versionId}{i.type==='vanilla' ? '' : ` + ${i.type} ${i.loaderVersion||''}`}</div><div className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</div><div className="row"><button className="ghost" onClick={()=>editSettings(i.name)}>⚙ Ajustes</button></div></div>)}
+              {instances.map((i)=><div key={i.name} className="card"><div className="card-title" title={i.name}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}{i.type==='vanilla' ? '' : ` + ${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span></div><div className="actions"><button className="ghost" onClick={()=>editSettings(i.name)}>⚙ Ajustes</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}>Exportar</button></div></div>)}
+            </div>
+            <div className="row" style={{marginTop:12}}>
+              <button className="primary" onClick={async()=>{const n=await window.ferro.importInstance(); if(n){setLog((l)=>l+`[ferro] importada ${n}\n`); refresh();}}}>Importar .ferro</button>
+            </div>
+            <h3>Copias de {bkFor || '…'}</h3>
+            <div className="row">
+              <select value={bkFor} onChange={(e)=>{setBkFor(e.target.value); loadBackups(e.target.value);}}>
+                {instances.map((i)=><option key={i.name} value={i.name}>{i.name}</option>)}
+              </select>
+              <button className="ghost" onClick={async()=>{await window.ferro.backupCreate({instanceName:bkFor}); loadBackups(bkFor);}} disabled={!bkFor}>Crear copia</button>
+            </div>
+            {bkList.length===0 && <p style={{opacity:.6}}>Sin copias todavía.</p>}
+            <div className="grid" style={{marginTop:10}}>
+              {bkList.map((b)=><div key={b.file} className="card"><div className="card-title" title={b.file}>{b.file}</div><div className="meta"><span className="pill">{(b.size/1048576).toFixed(1)} MB</span></div><div className="actions">
+                <button className="ghost" onClick={async()=>{await window.ferro.backupRestore({instanceName:bkFor, file:b.file});}}>Restaurar</button>
+                <button className="ghost danger" onClick={async()=>{await window.ferro.backupDelete({instanceName:bkFor, file:b.file}); loadBackups(bkFor);}}>Eliminar</button>
+              </div></div>)}
             </div>
             {settingsFor && (
               <>
@@ -370,11 +448,27 @@ export default function App() {
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' '+i.type})</option>)}
               </select>
               <input value={modQuery} onChange={(e)=>setModQuery(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter') doSearch();}} placeholder="Buscar mod..." />
+              <select value={fVersion} onChange={(e)=>setFVersion(e.target.value)} title="Versión de Minecraft">
+                {versions.map((v)=><option key={v.id} value={v.id}>{v.id}</option>)}
+              </select>
+              <select value={fLoader} onChange={(e)=>setFLoader(e.target.value)} title="Loader">
+                <option value="fabric">Fabric</option>
+                <option value="quilt">Quilt</option>
+                <option value="forge">Forge</option>
+                <option value="neoforge">NeoForge</option>
+              </select>
+              <select value={fSort} onChange={(e)=>setFSort(e.target.value)} title="Orden">
+                <option value="relevance">Relevancia</option>
+                <option value="downloads">Descargas</option>
+                <option value="follows">Seguidores</option>
+                <option value="newest">Novedades</option>
+                <option value="updated">Actualizados</option>
+              </select>
               <button className="primary" onClick={doSearch} disabled={searching || !modsFor}>{searching ? 'Buscando…' : 'Buscar'}</button>
               <button className="ghost" onClick={()=>loadMods(modsFor)} disabled={!modsFor}>Ver instalados</button>
             </div>
-            {!modsFor && <p>Crea primero una instancia Fabric o Quilt en 📦 Instancias.</p>}
-            <h3>Resultados</h3>
+            {!modsFor && <p>Crea primero una instancia con loader (Fabric, Quilt, Forge o NeoForge) en 📦 Instancias.</p>}
+            <h3>Resultados{modTotal>0 && ` (${modTotal.toLocaleString()})`} · {fVersion} · {fLoader}</h3>
             {modHits.length===0 && <p style={{opacity:.6}}>Sin resultados todavía — busca algo arriba.</p>}
             <div className="grid">
               {modHits.map((m)=>{
@@ -384,8 +478,8 @@ export default function App() {
                 <div key={m.id} className="card">
                   <div className="mod-head">{m.icon && <img className="mod-icon" src={m.icon} alt="" />}<b>{m.title}</b></div>
                   <div className="desc">{m.description?.slice(0,120)}</div>
-                  <div className="row">
-                    <span className="pill">⬇ {m.downloads?.toLocaleString?.() || m.downloads}</span>
+                  <div className="meta"><span className="pill">⬇ {m.downloads?.toLocaleString?.() || m.downloads}</span>{m.updated && <span className="pill">↻ {new Date(m.updated).toLocaleDateString()}</span>}{m.client==='required' && <span className="pill green">cliente</span>}</div>
+                  <div className="actions">
                     <button className={done ? 'ghost ok' : 'ghost'} disabled={busy || done || !modsFor} onClick={()=>doInstall(m.id, m.title)}>
                       {busy ? <><span className="spinner" />Instalando…</> : done ? '✓ Instalado' : 'Instalar'}
                     </button>
@@ -395,9 +489,9 @@ export default function App() {
             </div>
             <h3>Instalados ({mods.length})</h3>
             <div className="grid">
-              {mods.map((m)=><div key={m.file} className="card"><b>{m.file}</b><div className="pill">{(m.size/1048576).toFixed(1)} MB{m.disabled?' · desactivado':''}</div><div className="row">
+              {mods.map((m)=><div key={m.file} className="card"><div className="card-title" title={m.file}>{m.file}</div><div className="meta"><span className="pill">{(m.size/1048576).toFixed(1)} MB{m.disabled?' · desactivado':''}</span></div><div className="actions">
                 <button className="ghost" onClick={async()=>{await window.ferro.modToggle({instanceName:modsFor, file:m.file, disable:!m.disabled}); loadMods(modsFor);}}>{m.disabled?'Activar':'Desactivar'}</button>
-                <button className="ghost" onClick={async()=>{await window.ferro.modRemove({instanceName:modsFor, file:m.file}); loadMods(modsFor);}}>Quitar</button>
+                <button className="ghost danger" onClick={async()=>{await window.ferro.modRemove({instanceName:modsFor, file:m.file}); loadMods(modsFor);}}>Quitar</button>
               </div></div>)}
             </div>
           </div>
@@ -410,21 +504,35 @@ export default function App() {
                 {versions.map((v)=><option key={v.id} value={v.id}>{v.id}</option>)}
               </select>
               <input value={packQuery} onChange={(e)=>setPackQuery(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter') doPackSearch();}} placeholder="Buscar modpack..." />
+              <select value={packLoader} onChange={(e)=>setPackLoader(e.target.value)} title="Loader">
+                <option value="">Todos</option>
+                <option value="fabric">Fabric</option>
+                <option value="quilt">Quilt</option>
+                <option value="forge">Forge</option>
+                <option value="neoforge">NeoForge</option>
+              </select>
+              <select value={packSort} onChange={(e)=>setPackSort(e.target.value)} title="Orden">
+                <option value="relevance">Relevancia</option>
+                <option value="downloads">Descargas</option>
+                <option value="follows">Seguidores</option>
+                <option value="newest">Novedades</option>
+                <option value="updated">Actualizados</option>
+              </select>
               <button className="primary" onClick={doPackSearch}>Buscar</button>
             </div>
-            <p style={{opacity:.65}}>Crea una instancia Fabric nueva con el MC + loader que pida el pack y descarga sus {` `}mods y configs. El progreso sale en ▶ Jugar.</p>
+            <p style={{opacity:.65}}>{packTotal>0 ? `${packTotal.toLocaleString()} resultados · ` : ''}{packMc}{packLoader ? ` · ${packLoader}` : ''}. Crea una instancia nueva con el MC + loader que pida el pack. El progreso sale en ▶ Jugar.</p>
             <div className="grid">
               {packHits.map((p)=>(
                 <div key={p.id} className="card">
                   <div className="mod-head">{p.icon && <img className="mod-icon" src={p.icon} alt="" />}<b>{p.title}</b></div>
                   <div className="desc">{p.description?.slice(0,120)}</div>
-                  <div className="row">
-                    <span className="pill">⬇ {p.downloads?.toLocaleString?.() || p.downloads}</span>
-                    <button className="ghost" onClick={()=>doPackVers(p.id)}>Versiones</button>
-                  </div>
+                  <div className="meta"><span className="pill">⬇ {p.downloads?.toLocaleString?.() || p.downloads}</span>{p.updated && <span className="pill">↻ {new Date(p.updated).toLocaleDateString()}</span>}</div>
+                  <div className="actions"><button className="ghost" onClick={()=>doPackVers(p.id)}>Versiones</button></div>
                   {(packVers[p.id]||[]).map((v)=>(
-                    <div className="row" key={v.id} style={{marginTop:8}}>
+                    <div className="meta" key={v.id}>
                       <span className="pill">{v.number}</span>
+                      {(v.loaders||[]).map((ld)=><span className="pill" key={ld}>{ld}</span>)}
+                      {(v.game||[]).slice(0,3).map((g)=><span className="pill" key={g}>{g}</span>)}
                       <button className="ghost" disabled={!!packBusy} onClick={()=>doPackInstall(p, v)}>
                         {packBusy===v.id ? <><span className="spinner" />Instalando…</> : 'Instalar'}
                       </button>
@@ -443,9 +551,18 @@ export default function App() {
               <input value={clientId} onChange={(e)=>setClientId(e.target.value)} placeholder="Client ID (por defecto el oficial)" style={{minWidth:300}} />
               <button className="ghost" onClick={async()=>{await window.ferro.setClientId({ clientId }); setLog((l)=>l+'[ferro] client ID guardado\n');}}>Guardar</button>
             </div>
+            <h3>Cuentas ({accts.length})</h3>
+            {accts.length===0 && <p style={{opacity:.6}}>Sin cuentas. Inicia sesión abajo para añadir la primera.</p>}
+            <div className="grid">
+              {accts.map((a)=><div key={a.uuid} className="card"><div className="card-title">{a.name}</div><div className="meta">{a.active && <span className="pill green">✓ activa</span>}</div><div className="actions">
+                {!a.active && <button className="ghost" onClick={async()=>{await window.ferro.authSelect({uuid:a.uuid}); loadAuth();}}>Usar</button>}
+                <button className="ghost danger" onClick={async()=>{await window.ferro.authRemove({uuid:a.uuid}); loadAuth();}}>Quitar</button>
+              </div></div>)}
+            </div>
             <h3>Estado</h3>
             {account
-              ? <div className="row"><span className="pill green">✓ {account.name}</span><button className="ghost danger" onClick={doLogout}>Cerrar sesión</button></div>
+              ? <><div className="row"><span className="pill green">✓ {account.name}</span><button className="ghost danger" onClick={doLogout}>Cerrar sesión</button></div>
+                {!browserWaiting && !authStep && <p style={{marginTop:10}}><button className="ghost" onClick={doBrowserAuth}>Añadir otra cuenta</button></p>}</>
               : browserWaiting
                 ? <div className="card">
                     <p><span className="spinner" />Completa el login en la ventana de Microsoft y acepta los permisos…</p>
@@ -468,6 +585,36 @@ export default function App() {
                       <button className="ghost" onClick={()=>{stopPoll(); setAuthStep(null);}}>Cancelar</button>
                     </div>
                   </div>)}
+          </div>
+        )}
+        {tab==='skin' && (
+          <div className="card">
+            <h2>Apariencia</h2>
+            <div className="row">
+              <input value={skinName} onChange={(e)=>setSkinName(e.target.value)} placeholder="Nombre (offline)" />
+              <button className="ghost" onClick={()=>loadSkin()}>Ver</button>
+              {skinInfo?.online && <span className="pill green">✓ sesión online</span>}
+            </div>
+            {!skinInfo && <p style={{opacity:.65}}>Pulsa Ver para cargar la skin.</p>}
+            {skinInfo?.note && <p style={{opacity:.65}}>{skinInfo.note}</p>}
+            {skinInfo?.renders && (
+              <div className="row" style={{alignItems:'flex-start', marginTop:12}}>
+                <div className="card" style={{margin:0}}><div className="card-title">{skinInfo.name}</div><div className="meta"><span className="pill">{skinInfo.variant || 'classic'}</span>{skinInfo.cape && <span className="pill">🧥 {skinInfo.cape.alias || 'capa'}</span>}</div><img src={skinInfo.renders.face} alt="cara" width={64} height={64} style={{borderRadius:12}} /></div>
+                <div className="card" style={{margin:0}}><div className="card-title">Cuerpo</div><img src={skinInfo.renders.full} alt="cuerpo" style={{maxHeight:280}} onError={(e)=>{e.currentTarget.src=`https://minotar.net/armor/body/${skinInfo.uuid}/150.png`;}} /></div>
+                {skinInfo.cape && <div className="card" style={{margin:0}}><div className="card-title">Capa</div><img src={skinInfo.cape.url} alt="capa" style={{maxHeight:200}} /></div>}
+              </div>
+            )}
+            <h3>Cambiar skin (online)</h3>
+            <p style={{opacity:.65}}>Pega la URL directa de la textura (p. ej. botón derecho → copiar enlace en minecraftskins o NameMC). Sin sesión no se puede aplicar.</p>
+            <div className="row">
+              <input value={skinUrl} onChange={(e)=>setSkinUrl(e.target.value)} placeholder="https://…/skin.png" style={{minWidth:280}} />
+              <select value={skinVariant} onChange={(e)=>setSkinVariant(e.target.value)}>
+                <option value="classic">Clásica (4px)</option>
+                <option value="slim">Delgada (3px)</option>
+              </select>
+              <button className="primary" onClick={applySkin} disabled={skinBusy || !skinUrl}>{skinBusy ? 'Aplicando…' : 'Aplicar'}</button>
+              <button className="ghost danger" onClick={resetSkin}>Restablecer</button>
+            </div>
           </div>
         )}
         {tab==='ajustes' && (

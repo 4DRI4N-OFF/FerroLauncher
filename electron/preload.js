@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld('ferro', {
   authStart: () => ipcRenderer.invoke('ferro:authStart'),
   authPoll: (data) => ipcRenderer.invoke('ferro:authPoll', data),
   authLogout: () => ipcRenderer.invoke('ferro:authLogout'),
+  accounts: () => ipcRenderer.invoke('ferro:accounts'),
+  authSelect: (data) => ipcRenderer.invoke('ferro:authSelect', data),
+  authRemove: (data) => ipcRenderer.invoke('ferro:authRemove', data),
   authBrowser: () => ipcRenderer.invoke('ferro:authBrowser'),
   authWindow: () => ipcRenderer.invoke('ferro:authWindow'),
   authBrowserCancel: () => ipcRenderer.invoke('ferro:authBrowserCancel'),
@@ -28,6 +31,15 @@ contextBridge.exposeInMainWorld('ferro', {
   checkUpdate: () => ipcRenderer.invoke('ferro:checkUpdate'),
   quitAndInstall: () => ipcRenderer.invoke('ferro:quitAndInstall'),
   onUpdate: (cb) => ipcRenderer.on('ferro:update', (_, d) => cb(d)),
+  skin: (data) => ipcRenderer.invoke('ferro:skin', data),
+  skinApply: (data) => ipcRenderer.invoke('ferro:skinApply', data),
+  skinReset: () => ipcRenderer.invoke('ferro:skinReset'),
+  exportInstance: (data) => ipcRenderer.invoke('ferro:exportInstance', data),
+  importInstance: () => ipcRenderer.invoke('ferro:importInstance'),
+  backups: (data) => ipcRenderer.invoke('ferro:backups', data),
+  backupCreate: (data) => ipcRenderer.invoke('ferro:backupCreate', data),
+  backupRestore: (data) => ipcRenderer.invoke('ferro:backupRestore', data),
+  backupDelete: (data) => ipcRenderer.invoke('ferro:backupDelete', data),
   onAuthResult: (cb) => {
     ipcRenderer.on('ferro:auth-done', (_, d) => cb(null, d));
     ipcRenderer.on('ferro:auth-error', (_, e) => cb(e, null));

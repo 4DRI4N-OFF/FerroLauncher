@@ -13,14 +13,20 @@ async function apiJson(url) {
   return res.json();
 }
 
-async function searchModpacks(query, mcVersion, limit = 12) {
-  const facets = JSON.stringify([[`versions:${mcVersion}`], ['project_type:modpack']]);
-  const url = `${API}/search?query=${encodeURIComponent(query)}&facets=${encodeURIComponent(facets)}&limit=${limit}`;
+async function searchModpacks(query, mcVersion, { loader = null, sort = 'relevance', limit = 24 } = {}) {
+  const facets = [[`versions:${mcVersion}`], ['project_type:modpack']];
+  if (loader) facets.push([`categories:${loader}`]);
+  const sorts = ['relevance', 'downloads', 'follows', 'newest', 'updated'];
+  const url = `${API}/search?query=${encodeURIComponent(query)}&facets=${encodeURIComponent(JSON.stringify(facets))}&limit=${limit}&index=${sorts.includes(sort) ? sort : 'relevance'}`;
   const data = await apiJson(url);
-  return (data.hits || []).map((h) => ({
-    id: h.project_id, slug: h.slug, title: h.title,
-    description: h.description, icon: h.icon_url, downloads: h.downloads,
-  }));
+  return {
+    total: data.total_hits || 0,
+    hits: (data.hits || []).map((h) => ({
+      id: h.project_id, slug: h.slug, title: h.title,
+      description: h.description, icon: h.icon_url,
+      downloads: h.downloads, updated: h.date_modified,
+    })),
+  };
 }
 
 async function packVersions(projectId, mcVersion, loader = ['fabric', 'forge', 'neoforge', 'quilt']) {

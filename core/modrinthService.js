@@ -11,15 +11,21 @@ async function apiJson(url) {
   return res.json();
 }
 
-async function searchMods(query, mcVersion, loader = 'fabric', limit = 12) {
-  const facets = JSON.stringify([[`versions:${mcVersion}`], [`categories:${loader}`], ['project_type:mod']]);
-  const url = `${API}/search?query=${encodeURIComponent(query)}&facets=${encodeURIComponent(facets)}&limit=${limit}`;
+const SORTS = ['relevance', 'downloads', 'follows', 'newest', 'updated'];
+
+async function searchMods(query, mcVersion, loader = 'fabric', { sort = 'relevance', limit = 24 } = {}) {
+  const facets = [[`versions:${mcVersion}`], [`categories:${loader}`], ['project_type:mod']];
+  const url = `${API}/search?query=${encodeURIComponent(query)}&facets=${encodeURIComponent(JSON.stringify(facets))}&limit=${limit}&index=${SORTS.includes(sort) ? sort : 'relevance'}`;
   const data = await apiJson(url);
-  return (data.hits || []).map((h) => ({
-    id: h.project_id, slug: h.slug, title: h.title,
-    description: h.description, icon: h.icon_url,
-    downloads: h.downloads, versions: h.versions,
-  }));
+  return {
+    total: data.total_hits || 0,
+    hits: (data.hits || []).map((h) => ({
+      id: h.project_id, slug: h.slug, title: h.title,
+      description: h.description, icon: h.icon_url,
+      downloads: h.downloads, updated: h.date_modified,
+      client: h.client_side, server: h.server_side,
+    })),
+  };
 }
 
 async function projectVersions(projectId, mcVersion, loader = 'fabric') {

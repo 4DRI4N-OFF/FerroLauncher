@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { getDataDir, dirs } = require('../core/constants');
@@ -19,6 +19,8 @@ function loaderApi(type) {
 const { searchMods, listMods, installMod, removeMod, toggleMod } = require('../core/modrinthService');
 const { searchModpacks, packVersions, getPackVersion, installMrpack } = require('../core/modpackService');
 const auth = require('../core/authService');
+const skins = require('../core/skinService');
+const backups = require('../core/backupService');
 
 function findInstance(d, name) {
   const inst = listInstances(d.instances).find((i) => i.name === name);
@@ -108,7 +110,7 @@ ipcMain.handle('ferro:loaders', async (_, { mcVersion, type }) => {
   return loaderApi(type).list(mcVersion);
 });
 
-ipcMain.handle('ferro:modSearch', async (_, { query, mcVersion, loader }) => searchMods(query || '', mcVersion, ['quilt', 'forge', 'neoforge'].includes(loader) ? loader : 'fabric'));
+ipcMain.handle('ferro:modSearch', async (_, { query, mcVersion, loader, sort }) => searchMods(query || '', mcVersion, ['quilt', 'forge', 'neoforge'].includes(loader) ? loader : 'fabric', { sort }));
 ipcMain.handle('ferro:mods', async (_, { instanceName }) => listMods(findInstance(getDirs(), instanceName).path));
 ipcMain.handle('ferro:modInstall', async (event, { instanceName, projectId }) => {
   const inst = findInstance(getDirs(), instanceName);
@@ -121,9 +123,9 @@ ipcMain.handle('ferro:modRemove', async (_, { instanceName, file }) => {
   return true;
 });
 ipcMain.handle('ferro:modToggle', async (_, { instanceName, file, disable }) => toggleMod(findInstance(getDirs(), instanceName).path, file, disable));
-ipcMain.handle('ferro:packSearch', async (_, { query, mcVersion }) => searchModpacks(query || '', mcVersion, 12));
-ipcMain.handle('ferro:packVersions', async (_, { projectId, mcVersion }) => {
-  const vers = await packVersions(projectId, mcVersion);
+ipcMain.handle('ferro:packSearch', async (_, { query, mcVersion, loader, sort }) => searchModpacks(query || '', mcVersion, { loader: ['fabric', 'forge', 'neoforge', 'quilt'].includes(loader) ? loader : null, sort }));
+ipcMain.handle('ferro:packVersions', async (_, { projectId, mcVersion, loader }) => {
+  const vers = await packVersions(projectId, mcVersion, ['fabric', 'forge', 'neoforge', 'quilt'].includes(loader) ? [loader] : undefined);
   return vers.map((v) => ({ id: v.id, number: v.version_number, type: v.version_type, loaders: v.loaders, game: v.game_versions, files: v.files?.length || 0 }));
 });
 ipcMain.handle('ferro:packInstall', async (_, { name, projectId, packVersionId, mcVersion }) => {
@@ -164,6 +166,36 @@ ipcMain.handle('ferro:authPoll', async (_, { deviceCode }) => {
   return { status: 'done', name: acc.profile.name, uuid: acc.profile.uuid };
 });
 ipcMain.handle('ferro:authLogout', async () => { auth.clearAccount(getDirs().base); return true; });
+ipcMain.handle('ferro:accounts', async () => auth.listAccounts(getDirs().base));
+ipcMain.handle('ferro:authSelect', async (_, { uuid }) => auth.setActive(getDirs().base, uuid));
+ipcMain.handle('ferro:authRemove', async (_, { uuid }) => auth.removeAccount(getDirs().base, uuid));
+
+async function mcTokenOrThrow() {
+  const d = getDirs();
+  const acc = await auth.validAccount(d.base, auth.getClientId(d.base));
+  if (!acc) throw new Error('Inicia sesión Microsoft primero (👤 Cuenta)');
+  return acc;
+}
+ipcMain.handle('ferro:skin', async (_, { name }) => {
+  const d = getDirs();
+  const acc = await auth.validAccount(d.base, auth.getClientId(d.base)).catch(() => null);
+  if (acc) {
+    const res = await fetch('https://api.minecraftservices.com/minecraft/profile', { headers: { Authorization: `Bearer ${acc.mcToken}` } });
+    if (!res.ok) throw new Error(`Mojang HTTP ${res.status}`);
+    return { online: true, ...skins.summarize(await res.json()) };
+  }
+  const uuid = await skins.resolveUuid(name || 'Ferro');
+  if (!uuid) return { online: false, name: name || 'Ferro', uuid: null, renders: null, note: 'Sin sesión y nombre no premium: vista previa no disponible' };
+  return { online: false, name, uuid, renders: skins.renders(uuid), note: 'Vista previa (offline: el juego usará Steve/Alex)' };
+});
+ipcMain.handle('ferro:skinApply', async (_, { variant, url }) => {
+  const acc = await mcTokenOrThrow();
+  return skins.applySkin(acc.mcToken, { variant, url });
+});
+ipcMain.handle('ferro:skinReset', async () => {
+  const acc = await mcTokenOrThrow();
+  return skins.resetSkin(acc.mcToken);
+});
 
 let browserAuth = null;
 ipcMain.handle('ferro:authBrowser', async () => {
@@ -248,6 +280,34 @@ ipcMain.handle('ferro:authWindow', async () => {
 });
 
 ipcMain.handle('ferro:updateSettings', async (_, { instanceName, patch }) => updateInstanceSettings(getDirs().instances, instanceName, patch || {}));
+
+ipcMain.handle('ferro:exportInstance', async (_, { instanceName }) => {
+  const d = getDirs();
+  const inst = findInstance(d, instanceName);
+  const send = (t) => win && win.webContents.send('ferro:log', t);
+  const { filePath } = await dialog.showSaveDialog(win, { title: 'Exportar instancia', defaultPath: `${instanceName}.ferro`, filters: [{ name: 'Ferro pack', extensions: ['ferro'] }] });
+  if (!filePath) return null;
+  return backups.exportInstance(inst.path, filePath, send);
+});
+ipcMain.handle('ferro:importInstance', async () => {
+  const d = getDirs();
+  const send = (t) => win && win.webContents.send('ferro:log', t);
+  const { filePaths } = await dialog.showOpenDialog(win, { title: 'Importar instancia', filters: [{ name: 'Ferro pack', extensions: ['ferro'] }], properties: ['openFile'] });
+  if (!filePaths?.[0]) return null;
+  return backups.importPack(filePaths[0], d.instances, send);
+});
+ipcMain.handle('ferro:backups', async (_, { instanceName }) => backups.listBackups(getDirs().base, instanceName));
+ipcMain.handle('ferro:backupCreate', async (_, { instanceName }) => {
+  const d = getDirs();
+  const send = (t) => win && win.webContents.send('ferro:log', t);
+  return backups.createBackup(d.base, findInstance(d, instanceName).path, instanceName, send);
+});
+ipcMain.handle('ferro:backupRestore', async (_, { instanceName, file }) => {
+  const d = getDirs();
+  const send = (t) => win && win.webContents.send('ferro:log', t);
+  return backups.restoreBackup(d.base, d.instances, instanceName, file, send);
+});
+ipcMain.handle('ferro:backupDelete', async (_, { instanceName, file }) => backups.deleteBackup(getDirs().base, instanceName, file));
 ipcMain.handle('ferro:stop', async () => {
   if (!activeChild || activeChild.killed || activeChild.exitCode !== null) return false;
   const send = (t) => win && win.webContents.send('ferro:log', t);

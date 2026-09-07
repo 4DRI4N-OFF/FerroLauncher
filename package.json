@@ -69,7 +69,7 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "GlorkFX",
+      "owner": "4DRI4N-OFF",
       "repo": "FerroLauncher"
     }
   }

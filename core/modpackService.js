@@ -23,8 +23,8 @@ async function searchModpacks(query, mcVersion, limit = 12) {
   }));
 }
 
-async function packVersions(projectId, mcVersion, loader = 'fabric') {
-  const url = `${API}/project/${encodeURIComponent(projectId)}/version?game_versions=${encodeURIComponent(JSON.stringify([mcVersion]))}&loaders=${encodeURIComponent(JSON.stringify([loader]))}`;
+async function packVersions(projectId, mcVersion, loader = ['fabric', 'forge', 'neoforge', 'quilt']) {
+  const url = `${API}/project/${encodeURIComponent(projectId)}/version?game_versions=${encodeURIComponent(JSON.stringify([mcVersion]))}&loaders=${encodeURIComponent(JSON.stringify(loader))}`;
   return apiJson(url);
 }
 
@@ -72,7 +72,12 @@ async function installMrpack(instanceDir, mrpackUrl, onLog) {
     zip.extractEntryTo(e, instanceDir, false, true);
   }
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
-  return { name: index.name, mcVersion: deps.minecraft, loaderVersion: deps['fabric-loader'] || null, files: files.length };
+  const depEntries = [['fabric-loader', 'fabric'], ['quilt-loader', 'quilt'], ['forge', 'forge'], ['neoforge', 'neoforge']];
+  let loaderType = 'fabric', loaderVersion = null;
+  for (const [key, type] of depEntries) {
+    if (deps[key]) { loaderType = type; loaderVersion = deps[key]; break; }
+  }
+  return { name: index.name, mcVersion: deps.minecraft, loaderType, loaderVersion, files: files.length };
 }
 
 module.exports = { searchModpacks, packVersions, getPackVersion, installMrpack };

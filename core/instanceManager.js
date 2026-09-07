@@ -29,12 +29,13 @@ function createInstance(instancesDir, name, versionId, opts = {}) {
   const safe = name.replace(/[^\w\-. ]+/g, '_').trim() || 'Instancia';
   const dir = path.join(instancesDir, safe);
   fs.mkdirSync(dir, { recursive: true });
+  const type = ['fabric', 'quilt', 'forge', 'neoforge'].includes(opts.type) ? opts.type : 'vanilla';
   const cfg = withSettings({
     name: safe,
     versionId,
     createdAt: new Date().toISOString(),
-    type: opts.type === 'fabric' ? 'fabric' : 'vanilla',
-    ...(opts.type === 'fabric' ? { loaderVersion: opts.loaderVersion || null } : {}),
+    type,
+    ...(type !== 'vanilla' ? { loaderVersion: opts.loaderVersion || null } : {}),
   });
   fs.writeFileSync(path.join(dir, 'ferro.json'), JSON.stringify(cfg, null, 2));
   return { name: safe, path: dir, ...cfg };
@@ -55,4 +56,13 @@ function updateInstanceSettings(instancesDir, name, patch) {
   return withSettings({ name, path: dir, ...cfg });
 }
 
-module.exports = { ensureDirs, listInstances, createInstance, updateInstanceSettings, defaultSettings };
+module.exports = { ensureDirs, listInstances, createInstance, updateInstanceSettings, defaultSettings, setForgeProfile };
+
+function setForgeProfile(instancesDir, name, patch) {
+  const dir = path.join(instancesDir, name);
+  const cfgPath = path.join(dir, 'ferro.json');
+  const cfg = withSettings(JSON.parse(fs.readFileSync(cfgPath, 'utf8')));
+  Object.assign(cfg, patch);
+  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+  return cfg;
+}

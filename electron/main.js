@@ -1,13 +1,21 @@
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { getDataDir, dirs } = require('../core/constants');
-const { ensureDirs, listInstances, createInstance, updateInstanceSettings } = require('../core/instanceManager');
+const { ensureDirs, listInstances, createInstance, updateInstanceSettings, setForgeProfile } = require('../core/instanceManager');
 const { listVersions, getVersionDetails, downloadClientJar } = require('../core/mojangService');
 const { findJava, ensureJava } = require('../core/javaManager');
 const { resolveLibraries, launch } = require('../core/launcher');
 const { resolveNatives } = require('../core/nativesService');
 const { downloadAssets, downloadLoggingConfig } = require('../core/assetsService');
 const { listLoaders, getLoaderMeta, resolveFabricLibraries } = require('../core/fabricService');
+const quilt = require('../core/quiltService');
+const { listForge, forgeInstallerUrl, listNeoForge, neoInstallerUrl, runInstaller, downloadInstaller } = require('../core/forgeService');
+
+function loaderApi(type) {
+  if (type === 'quilt') return { list: quilt.listLoaders, meta: quilt.getLoaderMeta, resolve: quilt.resolveQuiltLibraries, label: 'quilt' };
+  return { list: listLoaders, meta: getLoaderMeta, resolve: resolveFabricLibraries, label: 'fabric' };
+}
 const { searchMods, listMods, installMod, removeMod, toggleMod } = require('../core/modrinthService');
 const { searchModpacks, packVersions, getPackVersion, installMrpack } = require('../core/modpackService');
 const auth = require('../core/authService');
@@ -52,9 +60,39 @@ function createWindow() {
 app.whenReady().then(() => {
   getDirs();
   createWindow();
+  initUpdater();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+
+// Auto-update desde GitHub Releases (solo en builds empaquetados)
+let updater = null;
+function initUpdater() {
+  if (!app.isPackaged) return;
+  try {
+    updater = require('electron-updater').autoUpdater;
+  } catch { return; }
+  updater.autoDownload = true;
+  const push = (state, data) => win && win.webContents.send('ferro:update', { state, ...(data || {}) });
+  updater.on('checking-for-update', () => push('checking'));
+  updater.on('update-available', (info) => push('available', { version: info?.version }));
+  updater.on('update-not-available', () => push('idle'));
+  updater.on('download-progress', (p) => push('downloading', { percent: p?.percent || 0 }));
+  updater.on('update-downloaded', (info) => push('downloaded', { version: info?.version }));
+  updater.on('error', (e) => push('error', { error: String((e && e.message) || e) }));
+  updater.checkForUpdates().catch(() => {});
+}
+
+ipcMain.handle('ferro:appVersion', async () => app.getVersion());
+ipcMain.handle('ferro:checkUpdate', async () => {
+  if (!app.isPackaged || !updater) return { state: 'dev', version: app.getVersion() };
+  await updater.checkForUpdates();
+  return true;
+});
+ipcMain.handle('ferro:quitAndInstall', async () => {
+  if (updater) updater.quitAndInstall(false, true);
+  return true;
+});
 
 ipcMain.handle('ferro:versions', async () => {
   const all = await listVersions();
@@ -64,14 +102,19 @@ ipcMain.handle('ferro:versions', async () => {
 ipcMain.handle('ferro:instances', async () => listInstances(getDirs().instances));
 ipcMain.handle('ferro:createInstance', async (_, { name, versionId, type, loaderVersion }) => createInstance(getDirs().instances, name, versionId, { type, loaderVersion }));
 ipcMain.handle('ferro:fabricLoaders', async (_, mcVersion) => listLoaders(mcVersion));
+ipcMain.handle('ferro:loaders', async (_, { mcVersion, type }) => {
+  if (type === 'forge') return (await listForge(mcVersion)).map((f) => ({ loader: f.version, tag: f.tag }));
+  if (type === 'neoforge') return (await listNeoForge(mcVersion)).map((v) => ({ loader: v, stable: true }));
+  return loaderApi(type).list(mcVersion);
+});
 
-ipcMain.handle('ferro:modSearch', async (_, { query, mcVersion }) => searchMods(query || '', mcVersion, 'fabric'));
+ipcMain.handle('ferro:modSearch', async (_, { query, mcVersion, loader }) => searchMods(query || '', mcVersion, ['quilt', 'forge', 'neoforge'].includes(loader) ? loader : 'fabric'));
 ipcMain.handle('ferro:mods', async (_, { instanceName }) => listMods(findInstance(getDirs(), instanceName).path));
 ipcMain.handle('ferro:modInstall', async (event, { instanceName, projectId }) => {
   const inst = findInstance(getDirs(), instanceName);
-  if (inst.type !== 'fabric') throw new Error('Los mods requieren instancia Fabric');
+  if (inst.type === 'vanilla') throw new Error('Los mods requieren instancia con loader');
   const send = (t) => win && win.webContents.send('ferro:log', t);
-  return installMod(inst.path, projectId, inst.versionId, 'fabric', send);
+  return installMod(inst.path, projectId, inst.versionId, inst.type, send);
 });
 ipcMain.handle('ferro:modRemove', async (_, { instanceName, file }) => {
   removeMod(findInstance(getDirs(), instanceName).path, file);
@@ -98,10 +141,10 @@ ipcMain.handle('ferro:packInstall', async (_, { name, projectId, packVersionId, 
   const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
   if (info.mcVersion) cfg.versionId = info.mcVersion;
   if (info.loaderVersion) cfg.loaderVersion = info.loaderVersion;
-  cfg.type = 'fabric';
+  cfg.type = info.loaderType || 'fabric';
   cfg.modpack = { projectId, packVersionId, packName: info.name };
   fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
-  send(`[ferro] modpack listo: ${info.files} archivos, MC ${cfg.versionId} + fabric ${cfg.loaderVersion}\n`);
+  send(`[ferro] modpack listo: ${info.files} archivos, MC ${cfg.versionId} + ${cfg.type} ${cfg.loaderVersion || ''}\n`);
   return { name: inst.name, ...cfg };
 });
 ipcMain.handle('ferro:java', async () => (await findJava()) || null);
@@ -225,41 +268,70 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
   const send = (t) => win && win.webContents.send('ferro:log', t);
 
   send(`[ferro] resolviendo ${inst.versionId}...\n`);
-  const details = await getVersionDetails(inst.versionId);
-  const requiredJava = details.javaVersion?.majorVersion || null;
-  if (requiredJava) send(`[ferro] esta versión pide Java ${requiredJava}\n`);
-  const clientJar = await downloadClientJar(details, d.versions, (p) => send(`[ferro] client ${(p*100).toFixed(0)}%\n`));
-  const cp = await resolveLibraries(details, d.libraries, (s) => send(`[ferro] lib ${s.done}/${s.total} ${s.lib}\n`));
-  const nativesDir = path.join(d.versions, details.id, 'natives-windows');
-  await resolveNatives(details, d.libraries, nativesDir, (s) => send(`[ferro] natives ${s.done}/${s.total}\n`));
-  await downloadAssets(details, d.assets, (s) => send(`[ferro] assets ${s.done}/${s.total}\n`));
-  const loggingPath = await downloadLoggingConfig(details, d.base || d.versions);
-  // Fabric: resuelve loader + intermediary y pisa mainClass
-  let mainClassOverride = null, extraClasspath = [];
-  if (inst.type === 'fabric') {
-    const loaders = await listLoaders(inst.versionId);
-    const pick = inst.loaderVersion || loaders[0]?.loader;
-    if (!pick) throw new Error(`Fabric sin loader para ${inst.versionId}`);
-    send(`[ferro] fabric loader ${pick}...\n`);
-    const meta = await getLoaderMeta(inst.versionId, pick);
-    const fab = await resolveFabricLibraries(meta, d.libraries, (s) => send(`[ferro] fabric ${s.done}/${s.total} ${s.lib}\n`));
-    mainClassOverride = fab.mainClass;
-    extraClasspath = fab.classpathExtra;
-    send(`[ferro] fabric: ${fab.count} libs, main ${fab.mainClass}\n`);
-  }
+  const vanilla = await getVersionDetails(inst.versionId);
+  const requiredJavaVanilla = vanilla.javaVersion?.majorVersion || null;
+  if (requiredJavaVanilla) send(`[ferro] esta versión pide Java ${requiredJavaVanilla}\n`);
+
+  // Java antes: el instalador Forge/NeoForge también lo necesita
   const { checkJava } = require('../core/javaManager');
   let java;
   if (inst.settings?.javaMode === 'custom' && inst.settings?.javaPath) {
     const custom = await checkJava(inst.settings.javaPath);
     if (!custom) throw new Error(`Java personalizado no válido: ${inst.settings.javaPath}`);
-    if (requiredJava && custom.major !== null && requiredJava > 8 && custom.major < requiredJava) {
-      send(`[ferro] aviso: tu java personalizado es ${custom.major} y se pide ${requiredJava}\n`);
+    if (requiredJavaVanilla && custom.major !== null && requiredJavaVanilla > 8 && custom.major < requiredJavaVanilla) {
+      send(`[ferro] aviso: tu java personalizado es ${custom.major} y se pide ${requiredJavaVanilla}\n`);
     }
     java = custom;
   } else {
-    java = await ensureJava(requiredJava, d.runtimes, send);
+    java = await ensureJava(requiredJavaVanilla, d.runtimes, send);
   }
-  send(`[ferro] Java ${java.version} (major ${java.major}) en ${java.path}${java.managed ? ' [gestionado]' : ''}\n[ferro] lanzando...\n`);
+  const javaBin = java.path === 'java' ? 'java' : java.path;
+  send(`[ferro] Java ${java.version} (major ${java.major}) en ${java.path}${java.managed ? ' [gestionado]' : ''}\n`);
+
+  // Perfil efectivo: vanilla, modloader ligero, o el generado por el instalador Forge/NeoForge
+  let details = vanilla;
+  let profileDir = path.join(d.versions, vanilla.id);
+  let mainClassOverride = null, extraClasspath = [];
+  if (inst.type === 'forge' || inst.type === 'neoforge') {
+    const isForge = inst.type === 'forge';
+    const ver = inst.loaderVersion;
+    if (!ver) throw new Error(`Crea la instancia eligiendo versión de ${inst.type}`);
+    const installerJar = path.join(d.versions, '_installers', `${inst.type}-${inst.versionId}-${ver}-installer.jar`);
+    await downloadInstaller(isForge ? forgeInstallerUrl(inst.versionId, ver) : neoInstallerUrl(ver), installerJar);
+    send(`[ferro] instalador ${inst.type} ${ver} listo\n`);
+    let profileJson = inst.forgeProfileId ? path.join(d.versions, inst.forgeProfileId, `${inst.forgeProfileId}.json`) : null;
+    if (!profileJson || !fs.existsSync(profileJson)) {
+      profileJson = await runInstaller(javaBin, installerJar, d.base, d.versions, send);
+      const pid = path.basename(path.dirname(profileJson));
+      setForgeProfile(d.instances, inst.name, { forgeProfileId: pid });
+      send(`[ferro] perfil ${inst.type} instalado: ${pid}\n`);
+    } else {
+      send(`[ferro] perfil ${inst.type} ya instalado\n`);
+    }
+    profileDir = path.dirname(profileJson);
+    details = JSON.parse(fs.readFileSync(profileJson, 'utf8'));
+  } else if (inst.type === 'fabric' || inst.type === 'quilt') {
+    const api = loaderApi(inst.type);
+    const loaders = await api.list(inst.versionId);
+    const pick = inst.loaderVersion || loaders[0]?.loader;
+    if (!pick) throw new Error(`${api.label} sin loader para ${inst.versionId}`);
+    send(`[ferro] ${api.label} loader ${pick}...\n`);
+    const meta = await api.meta(inst.versionId, pick);
+    const fab = await api.resolve(meta, d.libraries, (s) => send(`[ferro] ${api.label} ${s.done}/${s.total} ${s.lib}\n`));
+    mainClassOverride = fab.mainClass;
+    extraClasspath = fab.classpathExtra;
+    send(`[ferro] ${api.label}: ${fab.count} libs, main ${fab.mainClass}\n`);
+  }
+  const requiredJava = details.javaVersion?.majorVersion || requiredJavaVanilla;
+
+  const forClient = details.downloads?.client?.url ? details : vanilla;
+  const clientJar = await downloadClientJar(forClient, d.versions, (p) => send(`[ferro] client ${(p*100).toFixed(0)}%\n`));
+  const cp = await resolveLibraries(details, d.libraries, (s) => send(`[ferro] lib ${s.done}/${s.total} ${s.lib}\n`));
+  const nativesDir = path.join(profileDir, 'natives-windows');
+  await resolveNatives(details, d.libraries, nativesDir, (s) => send(`[ferro] natives ${s.done}/${s.total}\n`));
+  await downloadAssets(details, d.assets, (s) => send(`[ferro] assets ${s.done}/${s.total}\n`));
+  const loggingPath = await downloadLoggingConfig(details, d.base || d.versions);
+  send('[ferro] lanzando...\n');
   const effRam = ramMb || inst.settings?.ramMb || 2048;
   const effW = width || inst.settings?.width || null;
   const effH = height || inst.settings?.height || null;
@@ -276,7 +348,7 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
   } catch (e) {
     send(`[ferro] refresh falló, modo offline (${e.message})\n`);
   }
-  activeChild = await launch({ javaPath: java.path === 'java' ? 'java' : java.path, versionDetails: details, clientJar, librariesCp: cp, nativesDir, loggingPath, instanceDir: inst.path, dataDirs: d, username: username || 'Ferro', ramMb: effRam, width: effW, height: effH, onLog: send, mainClassOverride, extraClasspath, auth: authArg });
+  activeChild = await launch({ javaPath: javaBin, versionDetails: details, clientJar, librariesCp: cp, nativesDir, loggingPath, instanceDir: inst.path, dataDirs: d, username: username || 'Ferro', ramMb: effRam, width: effW, height: effH, onLog: send, mainClassOverride, extraClasspath, auth: authArg });
   activeInstance = inst.name;
   activeChild.on('close', () => { activeChild = null; activeInstance = null; });
   return true;

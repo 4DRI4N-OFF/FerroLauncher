@@ -66,6 +66,11 @@ body::before {
   border-radius: 16px;
   margin: 2px 0 12px;
   filter: drop-shadow(0 8px 22px rgba(255, 160, 40, 0.35));
+  transition: transform 0.25s ease, filter 0.25s ease;
+}
+.brand-logo:hover {
+  transform: scale(1.03) translateY(-1px);
+  filter: drop-shadow(0 12px 30px rgba(255, 130, 25, 0.6)) brightness(1.1);
 }
 .side button {
   display: flex;

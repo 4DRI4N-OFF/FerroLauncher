@@ -29,6 +29,8 @@ export default function App() {
   const [authStep, setAuthStep] = useState(null);
   const [browserWaiting, setBrowserWaiting] = useState(false);
   const [pollCount, setPollCount] = useState(0);
+  const [appVer, setAppVer] = useState('');
+  const [upd, setUpd] = useState({ state: 'idle' });
   const pollRef = useRef(null);
   const [launchInstance, setLaunchInstance] = useState('');
   const [log, setLog] = useState('[ferro] listo\n');
@@ -71,7 +73,7 @@ export default function App() {
     setSearching(true);
     try {
       const inst = instances.find((i) => i.name === modsFor);
-      const hits = await window.ferro.modSearch({ query: modQuery, mcVersion: inst?.versionId || versionId });
+      const hits = await window.ferro.modSearch({ query: modQuery, mcVersion: inst?.versionId || versionId, loader: ['quilt','forge','neoforge'].includes(inst?.type) ? inst.type : 'fabric' });
       setModHits(hits);
       setInstalledIds([]);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -136,6 +138,8 @@ export default function App() {
         loadAuth();
       }
     });
+    window.ferro.onUpdate?.((d) => setUpd(d));
+    window.ferro.appVersion?.().then(setAppVer).catch(()=>{});
   }, []);
 
   const doBrowserAuth = async () => {
@@ -197,17 +201,17 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (instanceType !== 'fabric') return;
-    window.ferro.fabricLoaders(versionId).then((l) => {
+    if (instanceType === 'vanilla') return;
+    window.ferro.loaders({ mcVersion: versionId, type: instanceType }).then((l) => {
       setLoaders(l);
       if (l[0]) setLoaderVersion(l[0].loader);
-    }).catch((e) => setLog((x) => x + `[error fabric] ${e.message}\n`));
+    }).catch((e) => setLog((x) => x + `[error ${instanceType}] ${e.message}\n`));
   }, [instanceType, versionId]);
 
   const create = async () => {
     try {
-      await window.ferro.createInstance({ name: instanceName, versionId, type: instanceType, loaderVersion: instanceType === 'fabric' ? loaderVersion : undefined });
-      setLog((l) => l + `[ferro] instancia creada: ${instanceName} (${versionId}${instanceType === 'fabric' ? ` + fabric ${loaderVersion}` : ''})\n`);
+      await window.ferro.createInstance({ name: instanceName, versionId, type: instanceType, loaderVersion: instanceType === 'vanilla' ? undefined : loaderVersion });
+      setLog((l) => l + `[ferro] instancia creada: ${instanceName} (${versionId}${instanceType === 'vanilla' ? '' : ` + ${instanceType} ${loaderVersion}`})\n`);
       refresh();
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
@@ -281,7 +285,7 @@ export default function App() {
             <div className="row">
               <input value={username} onChange={(e)=>setUsername(e.target.value)} placeholder="Usuario" />
               <select value={launchInstance} onChange={(e)=>setLaunchInstance(e.target.value)}>
-                {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='fabric'?' · fabric':''})</option>)}
+                {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' · '+i.type})</option>)}
               </select>
               {!running
                 ? <button className="primary" onClick={play} disabled={!launchInstance}>▶ JUGAR</button>
@@ -325,17 +329,20 @@ export default function App() {
               <select value={instanceType} onChange={(e)=>setInstanceType(e.target.value)}>
                 <option value="vanilla">Vanilla</option>
                 <option value="fabric">Fabric</option>
+                <option value="quilt">Quilt</option>
+                <option value="forge">Forge</option>
+                <option value="neoforge">NeoForge</option>
               </select>
-              {instanceType==='fabric' && (
+              {instanceType!=='vanilla' && (
                 <select value={loaderVersion} onChange={(e)=>setLoaderVersion(e.target.value)}>
-                  {loaders.map((l)=><option key={l.loader} value={l.loader}>{l.loader}{l.stable?' (estable)':''}</option>)}
+                  {loaders.map((l)=><option key={l.loader} value={l.loader}>{l.loader}{l.tag?` (${l.tag})`:''}{l.stable && !l.tag?' (estable)':''}</option>)}
                 </select>
               )}
               <button className="primary" onClick={create}>Crear</button>
             </div>
             <h3>Instaladas ({instances.length})</h3>
             <div className="grid">
-              {instances.map((i)=><div key={i.name} className="card"><b>{i.name}</b><div className="pill">{i.versionId}{i.type==='fabric' ? ` + fabric ${i.loaderVersion||''}` : ''}</div><div className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</div><div className="row"><button className="ghost" onClick={()=>editSettings(i.name)}>⚙ Ajustes</button></div></div>)}
+              {instances.map((i)=><div key={i.name} className="card"><b>{i.name}</b><div className="pill">{i.versionId}{i.type==='vanilla' ? '' : ` + ${i.type} ${i.loaderVersion||''}`}</div><div className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</div><div className="row"><button className="ghost" onClick={()=>editSettings(i.name)}>⚙ Ajustes</button></div></div>)}
             </div>
             {settingsFor && (
               <>
@@ -357,16 +364,16 @@ export default function App() {
         )}
         {tab==='mods' && (
           <div className="card">
-            <h2>Mods (Modrinth + Fabric)</h2>
+            <h2>Mods (Modrinth)</h2>
             <div className="row">
               <select value={modsFor} onChange={(e)=>{setModsFor(e.target.value); loadMods(e.target.value);}}>
-                {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='fabric'?' fabric':''})</option>)}
+                {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' '+i.type})</option>)}
               </select>
               <input value={modQuery} onChange={(e)=>setModQuery(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter') doSearch();}} placeholder="Buscar mod..." />
               <button className="primary" onClick={doSearch} disabled={searching || !modsFor}>{searching ? 'Buscando…' : 'Buscar'}</button>
               <button className="ghost" onClick={()=>loadMods(modsFor)} disabled={!modsFor}>Ver instalados</button>
             </div>
-            {!modsFor && <p>Crea primero una instancia Fabric en 📦 Instancias.</p>}
+            {!modsFor && <p>Crea primero una instancia Fabric o Quilt en 📦 Instancias.</p>}
             <h3>Resultados</h3>
             {modHits.length===0 && <p style={{opacity:.6}}>Sin resultados todavía — busca algo arriba.</p>}
             <div className="grid">
@@ -464,11 +471,25 @@ export default function App() {
           </div>
         )}
         {tab==='ajustes' && (
+          <>
+          <div className="card">
+            <h2>Actualizaciones {appVer && <span className="pill">v{appVer}</span>}</h2>
+            <div className="row">
+              <button className="ghost" onClick={async()=>{setUpd({state:'checking'}); try{await window.ferro.checkUpdate();}catch(e){setUpd({state:'error',error:e.message});}}}>Buscar actualizaciones</button>
+              {upd.state==='checking' && <span className="pill"><span className="spinner" />buscando…</span>}
+              {upd.state==='available' && <span className="pill">Nueva versión {upd.version}: descargando…</span>}
+              {upd.state==='downloading' && <span className="pill"><span className="spinner" />{(upd.percent||0).toFixed(0)}%</span>}
+              {upd.state==='downloaded' && <><span className="pill green">✓ v{upd.version} lista</span><button className="primary" onClick={()=>window.ferro.quitAndInstall()}>Reiniciar e instalar</button></>}
+              {upd.state==='error' && <span className="pill">Sin conexión con releases{upd.error?`: ${upd.error.slice(0,80)}`:''}</span>}
+              {upd.state==='dev' && <span className="pill">Modo desarrollo</span>}
+            </div>
+          </div>
           <div className="card">
             <h2>Java</h2>
             <pre>{JSON.stringify(java, null, 2) || 'no encontrado'}</pre>
             <p style={{opacity:.7}}>Se usa el Java del sistema si cumple el requisito de la versión; si no, se descarga Temurin auto a runtimes/.</p>
           </div>
+          </>
         )}
       </div>
     </div>

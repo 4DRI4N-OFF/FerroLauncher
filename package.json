@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "adm-zip": "^0.6.0",
+    "electron-updater": "^6.8.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -30,7 +31,9 @@
   "build": {
     "appId": "com.ferro.launcher",
     "productName": "FerroLauncher",
-    "directories": { "output": "release" },
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "electron/**/*",
       "core/**/*",
@@ -42,8 +45,18 @@
       "icon": "build/icon.ico",
       "signAndEditExecutable": false,
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "nsis": {
@@ -51,6 +64,13 @@
       "allowToChangeInstallationDirectory": true,
       "shortcutName": "FerroLauncher"
     },
-    "portable": { "artifactName": "FerroLauncher-portable.exe" }
+    "portable": {
+      "artifactName": "FerroLauncher-portable.exe"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "GlorkFX",
+      "repo": "FerroLauncher"
+    }
   }
 }

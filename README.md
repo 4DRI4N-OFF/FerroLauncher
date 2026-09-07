@@ -8,24 +8,25 @@ A Prism-style launcher: instances, loaders, mods and modpacks in one place.
 ## Features
 
 - **Auth:** offline mode + Microsoft-account login (OAuth 2.0 + PKCE, auto-refresh)
-- **Loaders:** Vanilla, Fabric ✅ · Forge, NeoForge, Quilt 🛠️ (roadmap)
+- **Loaders:** Vanilla, Fabric, Quilt, Forge, NeoForge ✅
 - **Instances:** isolated game dirs, per-instance RAM / Java / resolution, start-stop from console
 - **Mods:** search, install, enable/disable and update from **Modrinth**
 - **Modpacks:** one-click `.mrpack` install (mods + configs + overrides)
 - **Java:** auto-detects the required version, downloads Temurin when missing
 - **Console:** live logs with level/text filters, autoscroll
-- **UI:** liquid-glass theme, Spanish + English
+- **Updates:** auto-updater from GitHub Releases
+- **UI:** liquid-glass ember theme, Spanish + English
 
 ## Roadmap
 
-- [x] Offline launch (Vanilla + Fabric)
+- [x] Offline launch (Vanilla + Fabric + Quilt + Forge + NeoForge)
 - [x] Modrinth mods & modpacks
 - [x] Microsoft login flow (pending Mojang app approval)
-- [ ] Forge / NeoForge / Quilt support
+- [x] Auto-updater, custom icon
 - [ ] CurseForge browsing, shaderpacks & resource packs tabs
 - [ ] Skins & capes manager, servers list
-- [ ] Backups, instance export/import (.ferro / .mrpack)
-- [ ] Auto-updater, custom icon, installer signing
+- [ ] Backups, instance export/import
+- [ ] Installer signing
 - [ ] Multi-account switcher
 
 ## Install (users)

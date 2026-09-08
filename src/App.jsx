@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import brand from './assets/brand.png';
 import { sfx } from './sfx.js';
 import { STR, getLang } from './i18n.js';
+import { GithubIcon, DiscordIcon, YoutubeIcon, XIcon } from './brands.jsx';
 import {
   Play, Square, Layers, Package, LayoutGrid, Gift, User, Palette,
   Settings, Search, Plus, RefreshCw, FolderOpen, Copy, Pencil, Trash2,
@@ -1052,14 +1053,12 @@ export default function App() {
           <div className="card">
             <h2>{t('set.share')}</h2>
             <div className="row">
-              {social.github && <button className="ghost" onClick={()=>window.ferro.openUrl({url:social.github})}><ExternalLink size={14} /> GitHub</button>}
-              {social.discord && <button className="ghost" onClick={()=>window.ferro.openUrl({url:social.discord})}><MessageCircle size={14} /> Discord</button>}
-              {social.youtube && <button className="ghost" onClick={()=>window.ferro.openUrl({url:social.youtube})}><Play size={14} /> YouTube</button>}
+              {social.github && <button className="ghost" onClick={()=>window.ferro.openUrl({url:social.github})}><GithubIcon size={15} /> GitHub</button>}
+              {social.discord && <button className="ghost" onClick={()=>window.ferro.openUrl({url:social.discord})}><DiscordIcon size={16} /> Discord</button>}
+              {social.youtube && <button className="ghost" onClick={()=>window.ferro.openUrl({url:social.youtube})}><YoutubeIcon size={16} /> YouTube</button>}
             </div>
             <div className="row" style={{marginTop:10}}>
-              <button className="ghost" onClick={()=>shareLinks('x')}>X</button>
-              <button className="ghost" onClick={()=>shareLinks('reddit')}>Reddit</button>
-              <button className="ghost" onClick={()=>shareLinks('whatsapp')}>WhatsApp</button>
+              <button className="ghost" onClick={()=>shareLinks('x')}><XIcon size={13} /> X</button>
               <button className="ghost" onClick={()=>shareLinks('telegram')}>Telegram</button>
               <button className="ghost" onClick={()=>shareLinks('copy')}>Copiar enlace</button>
             </div>

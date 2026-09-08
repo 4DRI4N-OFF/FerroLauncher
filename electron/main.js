@@ -330,9 +330,9 @@ ipcMain.handle('ferro:social', async () => ({
 function readSocial(base) {
   try {
     const s = JSON.parse(require('fs').readFileSync(require('path').join(base, 'ferro-config.json'), 'utf8')).social || {};
-    return { discord: 'https://discord.gg/vTujTm3hE', youtube: '', ...s };
+    return { discord: 'https://discord.gg/vTujTm3hE', youtube: 'https://www.youtube.com/@4dri4n-08', ...s };
   }
-  catch { return { discord: 'https://discord.gg/vTujTm3hE', youtube: '' }; }
+  catch { return { discord: 'https://discord.gg/vTujTm3hE', youtube: 'https://www.youtube.com/@4dri4n-08' }; }
 }
 function readWebhook(base) {
   try { return JSON.parse(require('fs').readFileSync(require('path').join(base, 'ferro-config.json'), 'utf8')).discordWebhook || ''; }

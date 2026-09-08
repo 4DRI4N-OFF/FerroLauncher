@@ -84,4 +84,27 @@ function deleteBackup(baseDir, instanceName, file) {
   return true;
 }
 
-module.exports = { exportInstance, importPack, listBackups, createBackup, restoreBackup, deleteBackup };
+// Copia total del perfil: todo menos lo re-descargable (y sin copias para no anidar)
+const PROFILE_SKIP = new Set(['libraries', 'assets', 'versions', 'runtimes', 'backups']);
+
+function profileBackup(baseDir, destZip, onLog) {
+  fs.mkdirSync(path.dirname(destZip), { recursive: true });
+  const zip = new AdmZip();
+  for (const e of fs.readdirSync(baseDir, { withFileTypes: true })) {
+    if (PROFILE_SKIP.has(e.name)) continue;
+    const full = path.join(baseDir, e.name);
+    if (e.isDirectory()) zip.addLocalFolder(full, e.name);
+    else zip.addLocalFile(full);
+  }
+  zip.writeZip(destZip);
+  onLog && onLog(`[ferro] perfil exportado ${(fs.statSync(destZip).size / 1048576).toFixed(1)} MB\n`);
+  return destZip;
+}
+
+function profileRestore(zipPath, baseDir, onLog) {
+  new AdmZip(zipPath).extractAllTo(baseDir, true);
+  onLog && onLog('[ferro] perfil restaurado (reinicia el launcher)\n');
+  return true;
+}
+
+module.exports = { exportInstance, importPack, listBackups, createBackup, restoreBackup, deleteBackup, profileBackup, profileRestore };

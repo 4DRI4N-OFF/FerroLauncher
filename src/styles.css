@@ -17,6 +17,12 @@
   --glow: rgba(255, 160, 40, 0.35);
   --glow2: rgba(255, 130, 25, 0.6);
   --sel: rgba(255, 110, 40, 0.45);
+  --r-card: 22px;
+  --r-btn: 16px;
+  --r-ghost: 14px;
+  --r-input: 14px;
+  --r-mini: 10px;
+  --r-side: 24px;
 }
 
 [data-theme="midnight"] {
@@ -34,6 +40,12 @@
   --glow: rgba(94, 177, 255, 0.35);
   --glow2: rgba(90, 150, 255, 0.6);
   --sel: rgba(59, 130, 246, 0.45);
+  --r-card: 14px;
+  --r-btn: 10px;
+  --r-ghost: 10px;
+  --r-input: 10px;
+  --r-mini: 7px;
+  --r-side: 16px;
 }
 
 [data-theme="forest"] {
@@ -51,6 +63,12 @@
   --glow: rgba(74, 222, 128, 0.32);
   --glow2: rgba(74, 222, 128, 0.55);
   --sel: rgba(74, 222, 128, 0.4);
+  --r-card: 28px;
+  --r-btn: 20px;
+  --r-ghost: 18px;
+  --r-input: 18px;
+  --r-mini: 12px;
+  --r-side: 30px;
 }
 
 [data-theme="sakura"] {
@@ -68,7 +86,20 @@
   --glow: rgba(249, 168, 212, 0.35);
   --glow2: rgba(236, 72, 153, 0.6);
   --sel: rgba(236, 72, 153, 0.45);
+  --r-card: 26px;
+  --r-btn: 22px;
+  --r-ghost: 20px;
+  --r-input: 20px;
+  --r-mini: 14px;
+  --r-side: 28px;
 }
+
+/* ——— Identidad extra por tema ——— */
+[data-theme="midnight"] .card { border-width: 1px; border-color: rgba(148, 197, 255, 0.16); }
+[data-theme="midnight"] .side button.active { letter-spacing: 0.6px; }
+[data-theme="forest"] .card { box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+[data-theme="sakura"] button.primary { letter-spacing: 1px; }
+[data-theme="sakura"] .pill { border-radius: 999px; }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body {
@@ -119,7 +150,7 @@ body::after {
   -webkit-backdrop-filter: blur(28px) saturate(1.7);
   backdrop-filter: blur(28px) saturate(1.7);
   border: 1px solid var(--stroke-soft);
-  border-radius: 24px;
+  border-radius: var(--r-side);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 .side h1 {
@@ -240,7 +271,7 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
   -webkit-backdrop-filter: blur(24px) saturate(1.6);
   backdrop-filter: blur(24px) saturate(1.6);
   border: 1px solid var(--stroke-soft);
-  border-radius: 22px;
+  border-radius: var(--r-card);
   padding: 20px;
   margin-bottom: 14px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -357,6 +388,22 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
 .morph-body { display: flex; flex-direction: column; gap: 14px; animation: mbody 0.35s ease 0.4s both; }
 @keyframes mbody { from { opacity: 0; transform: translateY(10px); } }
 
+/* ——— Galería estilo móvil ——— */
+.gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.gal-item {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--stroke-soft);
+  border-radius: 16px; padding: 10px;
+  display: flex; flex-direction: column; gap: 8px;
+  transition: transform 0.2s ease, background 0.2s;
+}
+.gal-item:hover { transform: translateY(-2px); background: rgba(255, 255, 255, 0.09); }
+.gal-item img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; cursor: zoom-in; }
+.gal-ph { width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.05); }
+.gal-foot { display: flex; }
+.gal-foot .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--muted); }
+.gal-item .actions { margin-top: 0; }
+
 /* ——— Pills por loader ——— */
 .pill.l-vanilla { background: rgba(148, 163, 184, 0.14); border-color: rgba(148, 163, 184, 0.4); }
 .pill.l-fabric { background: rgba(255, 182, 46, 0.16); border-color: rgba(255, 182, 46, 0.5); color: #ffe1a8; }
@@ -375,7 +422,7 @@ input, select {
   border: 1px solid var(--stroke-soft);
   color: var(--ink);
   padding: 10px 13px;
-  border-radius: 14px;
+  border-radius: var(--r-input);
   outline: none;
   transition: border 0.2s, box-shadow 0.2s;
 }
@@ -401,7 +448,7 @@ button.primary {
   font-weight: 800;
   letter-spacing: 0.4px;
   padding: 11px 22px;
-  border-radius: 16px;
+  border-radius: var(--r-btn);
   cursor: pointer;
   box-shadow: 0 10px 28px rgba(255, 100, 30, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.65);
   transition: transform 0.15s ease, box-shadow 0.2s, filter 0.2s;
@@ -417,7 +464,7 @@ button.ghost {
   color: var(--ink);
   font-weight: 600;
   padding: 10px 15px;
-  border-radius: 14px;
+  border-radius: var(--r-ghost);
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
   transition: all 0.2s ease;
@@ -431,7 +478,7 @@ button.ghost.danger:hover:not(:disabled) { border-color: rgba(248, 113, 113, 0.6
 .mini {
   display: inline-flex; align-items: center; gap: 6px;
   font-family: inherit; font-size: 12.5px; font-weight: 600;
-  padding: 6px 12px; border-radius: 10px;
+  padding: 6px 12px; border-radius: var(--r-mini);
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--stroke-soft);
   color: var(--ink); cursor: pointer;
@@ -455,7 +502,7 @@ button.ghost.danger:hover:not(:disabled) { border-color: rgba(248, 113, 113, 0.6
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .grid .card {
   margin: 0;
-  border-radius: 18px;
+  border-radius: var(--r-card);
   background: rgba(255, 255, 255, 0.055);
   display: flex;
   flex-direction: column;

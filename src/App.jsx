@@ -5,7 +5,8 @@ import { STR, getLang } from './i18n.js';
 import {
   Play, Square, Layers, Package, LayoutGrid, Gift, User, Palette,
   Settings, Search, Plus, RefreshCw, FolderOpen, Copy, Pencil, Trash2,
-  Download, Upload, Check, X, AlertTriangle, Info,
+  Download, Upload, Check, X, AlertTriangle, Info, Camera,
+  MessageCircle, ExternalLink,
 } from 'lucide-react';
 
 // El recuadro del botón crece hasta convertirse en la ventana (morph ida y vuelta)
@@ -121,6 +122,9 @@ export default function App() {
   }, [theme]);
   const [dcId, setDcId] = useState('');
   const [dcOn, setDcOn] = useState(true);
+  const [dcHook, setDcHook] = useState('');
+  const [social, setSocial] = useState({ github: '', discord: '', youtube: '' });
+  useEffect(() => { window.ferro.social?.().then(setSocial).catch(()=>{}); }, []);
   const [toasts, setToasts] = useState([]);
   const [flashKey, setFlashKey] = useState(0);
   const [scare, setScare] = useState(null);
@@ -174,8 +178,13 @@ export default function App() {
   const [bkList, setBkList] = useState([]);
   const [crList, setCrList] = useState([]);
   const [crOpen, setCrOpen] = useState(null);
+  const [shList, setShList] = useState([]);
   const [modalOrigin, setModalOrigin] = useState(null);
   const [modalClosing, setModalClosing] = useState(false);
+  const [galName, setGalName] = useState('');
+  const [galOrigin, setGalOrigin] = useState(null);
+  const [galClosing, setGalClosing] = useState(false);
+  const [galShots, setGalShots] = useState([]);
   const [intro, setIntro] = useState(true);
   const introImgRef = useRef(null);
   const sideLogoRef = useRef(null);
@@ -306,6 +315,12 @@ export default function App() {
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
+  const loadShots = async (name) => {
+    if (!name) return;
+    try { setShList(await window.ferro.shots({ instanceName: name })); }
+    catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
   useEffect(() => { if (tab === 'mods' && modsFor) loadMods(modsFor); }, [modsFor]);
 
   useEffect(() => {
@@ -383,11 +398,29 @@ export default function App() {
       setAccount(await window.ferro.authStatus());
       setAccts(await window.ferro.accounts());
       const dc = await window.ferro.discord().catch(()=>({clientId:'',enabled:true}));
-      setDcId(dc.clientId || ''); setDcOn(dc.enabled !== false);
+      setDcId(dc.clientId || ''); setDcOn(dc.enabled !== false); setDcHook(dc.webhook || '');
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
   const stopPoll = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
+
+  const shareLinks = (net) => {
+    const url = encodeURIComponent('https://github.com/4DRI4N-OFF/FerroLauncher');
+    const txt = encodeURIComponent(lang === 'en'
+      ? 'FerroLauncher: free open-source Minecraft Java launcher for Windows (all loaders, mods, modpacks)'
+      : 'FerroLauncher: launcher gratis y open-source de Minecraft Java para Windows (todos los loaders, mods, modpacks)');
+    const links = {
+      x: `https://x.com/intent/tweet?text=${txt}&url=${url}`,
+      reddit: `https://www.reddit.com/submit?url=${url}&title=${txt}`,
+      whatsapp: `https://wa.me/?text=${txt}%20${url}`,
+      telegram: `https://t.me/share/url?url=${url}&text=${txt}`,
+    };
+    if (net === 'copy') {
+      try { navigator.clipboard.writeText('https://github.com/4DRI4N-OFF/FerroLauncher'); setLog((l) => l + '[ferro] enlace copiado\n'); } catch {}
+      return;
+    }
+    window.ferro.openUrl(links[net]);
+  };
 
   const loadSkin = async (name) => {
     try { setSkinInfo(await window.ferro.skin({ name: name ?? skinName ?? username ?? 'Ferro' })); }
@@ -604,6 +637,24 @@ export default function App() {
 
   const closeModal = () => { setModalClosing(true); setTimeout(() => { setSettingsFor(''); setModalOrigin(null); setModalClosing(false); }, 280); };
 
+  const openGallery = async (name, e) => {
+    const r = e?.currentTarget?.getBoundingClientRect?.();
+    setGalOrigin(r ? { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width, h: r.height } : null);
+    setGalName(name);
+    setGalShots([]);
+    try {
+      const list = await window.ferro.shots({ instanceName: name });
+      setGalShots(list.map((s) => ({ ...s, thumb: null })));
+      for (const s of list) {
+        window.ferro.shotThumb({ instanceName: name, file: s.file })
+          .then((t) => setGalShots((g) => g.map((x) => (x.file === s.file ? { ...x, thumb: t.dataUrl } : x))))
+          .catch(() => {});
+      }
+    } catch (e2) { setLog((l) => l + `[error] ${e2.message}\n`); }
+  };
+
+  const closeGallery = () => { setGalClosing(true); setTimeout(() => { setGalName(''); setGalOrigin(null); setGalClosing(false); setGalShots([]); }, 280); };
+
   const saveSettings = async () => {
     if (!settingsFor || saving) return;
     setSaving(true);
@@ -726,7 +777,7 @@ export default function App() {
               <input value={instFilter} onChange={(e)=>setInstFilter(e.target.value)} placeholder={t('inst.filterPh')} />
             </div>
             <div className="grid">
-              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className="card"><div className="card-title" title={i.name}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}</span><span className={`pill l-${i.type}`}>{i.type==='vanilla' ? 'vanilla' : `${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}{fmtPlay(i.playSecs) ? ` · ${fmtPlay(i.playSecs)}` : ''}</span> : <span className="pill">{t('inst.neverPlayed')}</span>}</div><div className="actions"><button className="ghost" onClick={(e)=>editSettings(i.name, e)}><Settings size={14} /> {t('inst.settings')}</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}><Upload size={14} /> {t('inst.export')}</button><button className="ghost" onClick={async()=>{await window.ferro.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> {t('inst.folder')}</button><button className="ghost" onClick={async()=>{await window.ferro.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> {t('inst.duplicate')}</button><button className="ghost" onClick={async()=>{const n=window.prompt(t('inst.renamePrompt'), i.name); if(n && n!==i.name){await window.ferro.renameInstance({instanceName:i.name, newName:n}); refresh();}}}><Pencil size={14} /> {t('inst.rename')}</button><button className="ghost danger" onClick={async()=>{if(window.confirm(t('inst.delConfirm', {n:i.name}))){await window.ferro.deleteInstance({instanceName:i.name}); refresh();}}}><Trash2 size={14} /> {t('inst.delete')}</button></div>
+              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className="card"><div className="card-title" title={i.name}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}</span><span className={`pill l-${i.type}`}>{i.type==='vanilla' ? 'vanilla' : `${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}{fmtPlay(i.playSecs) ? ` · ${fmtPlay(i.playSecs)}` : ''}</span> : <span className="pill">{t('inst.neverPlayed')}</span>}</div><div className="actions"><button className="ghost" onClick={(e)=>editSettings(i.name, e)}><Settings size={14} /> {t('inst.settings')}</button><button className="ghost" onClick={(e)=>openGallery(i.name, e)}><Camera size={14} /> {t('inst.shots')}</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}><Upload size={14} /> {t('inst.export')}</button><button className="ghost" onClick={async()=>{await window.ferro.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> {t('inst.folder')}</button><button className="ghost" onClick={async()=>{await window.ferro.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> {t('inst.duplicate')}</button><button className="ghost" onClick={async()=>{const n=window.prompt(t('inst.renamePrompt'), i.name); if(n && n!==i.name){await window.ferro.renameInstance({instanceName:i.name, newName:n}); refresh();}}}><Pencil size={14} /> {t('inst.rename')}</button><button className="ghost danger" onClick={async()=>{if(window.confirm(t('inst.delConfirm', {n:i.name}))){await window.ferro.deleteInstance({instanceName:i.name}); refresh();}}}><Trash2 size={14} /> {t('inst.delete')}</button></div>
 </div>)}
             </div>
             <div className="row" style={{marginTop:12}}>
@@ -991,6 +1042,35 @@ export default function App() {
               <button className="ghost" onClick={async()=>{await window.ferro.setDiscord({clientId:dcId, enabled:dcOn}); setLog((l)=>l+'[ferro] discord guardado\n');}}><Check size={14} /> {t('acct.save')}</button>
               <button className="ghost" onClick={async()=>{const v=!dcOn; setDcOn(v); await window.ferro.setDiscord({enabled:v});}}>{dcOn ? `✓ ${t('set.sfxOn')}` : t('set.sfxOff')}</button>
             </div>
+            <div className="row" style={{marginTop:10}}>
+              <input value={dcHook} onChange={(e)=>setDcHook(e.target.value)} placeholder="Webhook: https://discord.com/api/webhooks/…" style={{minWidth:280}} />
+              <button className="ghost" onClick={async()=>{await window.ferro.setDiscord({webhook:dcHook}); setLog((l)=>l+'[ferro] webhook guardado\n');}}><Check size={14} /> {t('acct.save')}</button>
+              <button className="ghost" onClick={async()=>{try{await window.ferro.testWebhook(); setLog((l)=>l+'[ferro] webhook OK\n');}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>Probar envío</button>
+            </div>
+            <p style={{opacity:.65}}>Canal de Discord → ajustes → Integraciones → Webhooks → Nuevo. Avisos de partidas, crashes e instalaciones.</p>
+          </div>
+          <div className="card">
+            <h2>{t('set.share')}</h2>
+            <div className="row">
+              {social.github && <button className="ghost" onClick={()=>window.ferro.openUrl({url:social.github})}><ExternalLink size={14} /> GitHub</button>}
+              {social.discord && <button className="ghost" onClick={()=>window.ferro.openUrl({url:social.discord})}><MessageCircle size={14} /> Discord</button>}
+              {social.youtube && <button className="ghost" onClick={()=>window.ferro.openUrl({url:social.youtube})}><Play size={14} /> YouTube</button>}
+            </div>
+            <div className="row" style={{marginTop:10}}>
+              <button className="ghost" onClick={()=>shareLinks('x')}>X</button>
+              <button className="ghost" onClick={()=>shareLinks('reddit')}>Reddit</button>
+              <button className="ghost" onClick={()=>shareLinks('whatsapp')}>WhatsApp</button>
+              <button className="ghost" onClick={()=>shareLinks('telegram')}>Telegram</button>
+              <button className="ghost" onClick={()=>shareLinks('copy')}>Copiar enlace</button>
+            </div>
+          </div>
+          <div className="card">
+            <h2>{t('set.profile')}</h2>
+            <p style={{opacity:.65}}>{t('set.profileDesc')}</p>
+            <div className="row">
+              <button className="ghost" onClick={async()=>{await window.ferro.profileBackup();}}><Upload size={14} /> {t('set.profileBk')}</button>
+              <button className="ghost danger" onClick={async()=>{if(window.confirm(t('set.profileRsConfirm'))){await window.ferro.profileRestore(); refresh(); loadAuth();}}}>{t('set.profileRs')}</button>
+            </div>
           </div>
           <div className="card">
             <h2>{t('set.java')}</h2>
@@ -1041,6 +1121,26 @@ export default function App() {
           <div className="subhead"><span>{t('inst.crashesOf')} {settingsFor}</span><button className="mini" onClick={async()=>{await window.ferro.openCrashes({instanceName:settingsFor});}}><FolderOpen size={12} /> {t('inst.folder')}</button></div>
           {crList.length===0 ? <p style={{opacity:.6}}>{t('inst.noCrashes')}</p> : (<div className="sublist">{crList.map((c)=><div key={c.file} className="subrow"><span className="grow" title={c.description||c.file}>{c.description||c.file}</span><button className="mini" onClick={async()=>{const r = crOpen?.file===c.file ? null : await window.ferro.crashRead({instanceName:settingsFor, file:c.file}); setCrOpen(r);}}>{crOpen?.file===c.file ? t('mods.hide') : t('inst.view')}</button></div>)}</div>)}
           {crOpen && <pre style={{marginTop:4}}>{crOpen.content}{crOpen.truncated ? '\n…(truncado)' : ''}</pre>}
+        </MorphModal>
+      )}
+      {galName && (
+        <MorphModal origin={galOrigin} closing={galClosing} onClose={closeGallery} title={`${t('inst.shotsOf')} ${galName} (${galShots.length})`}>
+          {galShots.length===0
+            ? <p style={{opacity:.6}}>{t('inst.noShots')}</p>
+            : (<div className="gal-grid">
+              {galShots.map((s)=>(
+                <div key={s.file} className="gal-item">
+                  {s.thumb
+                    ? <img src={s.thumb} alt={s.file} loading="lazy" onClick={async()=>{await window.ferro.shotView({instanceName:galName, file:s.file});}} />
+                    : <div className="gal-ph"><span className="spinner" /></div>}
+                  <div className="gal-foot"><span className="grow" title={s.file}>{s.file}</span></div>
+                  <div className="actions">
+                    <button className="mini" onClick={async()=>{await window.ferro.shotView({instanceName:galName, file:s.file});}}>{t('inst.view')}</button>
+                    <button className="mini danger" onClick={async()=>{await window.ferro.shotDelete({instanceName:galName, file:s.file}); setGalShots((g)=>g.filter((x)=>x.file!==s.file));}}><Trash2 size={12} /></button>
+                  </div>
+                </div>
+              ))}
+            </div>)}
         </MorphModal>
       )}
     </div>

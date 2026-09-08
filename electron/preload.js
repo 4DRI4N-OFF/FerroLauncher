@@ -23,6 +23,9 @@ contextBridge.exposeInMainWorld('ferro', {
   clientId: () => ipcRenderer.invoke('ferro:clientId'),
   discord: () => ipcRenderer.invoke('ferro:discord'),
   setDiscord: (data) => ipcRenderer.invoke('ferro:setDiscord', data),
+  testWebhook: () => ipcRenderer.invoke('ferro:testWebhook'),
+  openUrl: (data) => ipcRenderer.invoke('ferro:openUrl', data),
+  social: () => ipcRenderer.invoke('ferro:social'),
   setClientId: (data) => ipcRenderer.invoke('ferro:setClientId', data),
   authStatus: () => ipcRenderer.invoke('ferro:authStatus'),
   authStart: () => ipcRenderer.invoke('ferro:authStart'),
@@ -50,9 +53,16 @@ contextBridge.exposeInMainWorld('ferro', {
   backupCreate: (data) => ipcRenderer.invoke('ferro:backupCreate', data),
   backupRestore: (data) => ipcRenderer.invoke('ferro:backupRestore', data),
   backupDelete: (data) => ipcRenderer.invoke('ferro:backupDelete', data),
+  profileBackup: () => ipcRenderer.invoke('ferro:profileBackup'),
+  profileRestore: () => ipcRenderer.invoke('ferro:profileRestore'),
   crashes: (data) => ipcRenderer.invoke('ferro:crashes', data),
   crashRead: (data) => ipcRenderer.invoke('ferro:crashRead', data),
   openCrashes: (data) => ipcRenderer.invoke('ferro:openCrashes', data),
+  shots: (data) => ipcRenderer.invoke('ferro:shots', data),
+  shotThumb: (data) => ipcRenderer.invoke('ferro:shotThumb', data),
+  shotView: (data) => ipcRenderer.invoke('ferro:shotView', data),
+  shotDelete: (data) => ipcRenderer.invoke('ferro:shotDelete', data),
+  openShots: (data) => ipcRenderer.invoke('ferro:openShots', data),
   onAuthResult: (cb) => {
     ipcRenderer.on('ferro:auth-done', (_, d) => cb(null, d));
     ipcRenderer.on('ferro:auth-error', (_, e) => cb(e, null));

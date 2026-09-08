@@ -26,6 +26,8 @@ const skins = require('../core/skinService');
 const backups = require('../core/backupService');
 const discord = require('../core/discordService');
 const crashes = require('../core/crashService');
+const gallery = require('../core/galleryService');
+const notify = require('../core/notifyService');
 const res = require('../core/resourceService');
 
 function findInstance(d, name) {
@@ -238,7 +240,9 @@ ipcMain.handle('ferro:modInstall', async (event, { instanceName, projectId, kind
   const inst = findInstance(getDirs(), instanceName);
   if (k === 'mod' && inst.type === 'vanilla') throw new Error('Los mods requieren instancia con loader');
   const send = (t) => win && win.webContents.send('ferro:log', t);
-  return installMod(inst.path, projectId, inst.versionId, inst.type, send, k);
+  const r = await installMod(inst.path, projectId, inst.versionId, inst.type, send, k);
+  notify(getDirs().base, 'ok', `Contenido instalado`, `${r.file} → ${instanceName}`);
+  return r;
 });
 ipcMain.handle('ferro:modRemove', async (_, { instanceName, file, kind }) => {
   removeMod(findInstance(getDirs(), instanceName).path, file, kind);
@@ -301,8 +305,50 @@ ipcMain.handle('ferro:packInstall', async (_, { name, projectId, packVersionId, 
 ipcMain.handle('ferro:java', async () => (await findJava()) || null);
 
 ipcMain.handle('ferro:clientId', async () => auth.getClientId(getDirs().base));
-ipcMain.handle('ferro:discord', async () => auth.getDiscord(getDirs().base));
-ipcMain.handle('ferro:setDiscord', async (_, patch) => auth.setDiscord(getDirs().base, patch || {}));
+ipcMain.handle('ferro:discord', async () => ({ ...auth.getDiscord(getDirs().base), webhook: readWebhook(getDirs().base) }));
+ipcMain.handle('ferro:setDiscord', async (_, patch) => {
+  const d = writeWebhook(getDirs().base, patch || {});
+  return { ...auth.setDiscord(getDirs().base, patch || {}), webhook: d };
+});
+ipcMain.handle('ferro:testWebhook', async () => {
+  const ok = await notify(getDirs().base, 'ok', 'FerroLauncher conectado', 'Webhook funcionando. Avisaré de partidas, crashes e instalaciones.');
+  if (!ok) throw new Error('No se pudo enviar (URL inválida o sin conexión)');
+  return true;
+});
+ipcMain.handle('ferro:openUrl', async (_, { url }) => {
+  const u = String(url || '');
+  if (!/^https:\/\/(x\.com|www\.reddit\.com|wa\.me|t\.me|github\.com|discord\.gg|discord\.com|www\.youtube\.com|youtu\.be|www\.tiktok\.com)\//.test(u)) throw new Error('URL no permitida');
+  await shell.openExternal(u);
+  return true;
+});
+ipcMain.handle('ferro:social', async () => ({
+  github: 'https://github.com/4DRI4N-OFF/FerroLauncher',
+  discord: readSocial(getDirs().base).discord || '',
+  youtube: readSocial(getDirs().base).youtube || '',
+}));
+
+function readSocial(base) {
+  try {
+    const s = JSON.parse(require('fs').readFileSync(require('path').join(base, 'ferro-config.json'), 'utf8')).social || {};
+    return { discord: 'https://discord.gg/vTujTm3hE', youtube: '', ...s };
+  }
+  catch { return { discord: 'https://discord.gg/vTujTm3hE', youtube: '' }; }
+}
+function readWebhook(base) {
+  try { return JSON.parse(require('fs').readFileSync(require('path').join(base, 'ferro-config.json'), 'utf8')).discordWebhook || ''; }
+  catch { return ''; }
+}
+function writeWebhook(base, patch) {
+  const fs = require('fs');
+  const path = require('path');
+  const p = path.join(base, 'ferro-config.json');
+  let cfg = {};
+  try { cfg = JSON.parse(fs.readFileSync(p, 'utf8')); } catch {}
+  if (patch.webhook !== undefined) cfg.discordWebhook = String(patch.webhook || '').trim();
+  fs.mkdirSync(base, { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
+  return cfg.discordWebhook || '';
+}
 ipcMain.handle('ferro:setClientId', async (_, { clientId }) => auth.setClientId(getDirs().base, clientId));
 ipcMain.handle('ferro:authStatus', async () => {
   const acc = auth.loadAccount(getDirs().base);
@@ -467,10 +513,47 @@ ipcMain.handle('ferro:backupRestore', async (_, { instanceName, file }) => {
   return backups.restoreBackup(d.base, d.instances, instanceName, file, send);
 });
 ipcMain.handle('ferro:backupDelete', async (_, { instanceName, file }) => backups.deleteBackup(getDirs().base, instanceName, file));
+ipcMain.handle('ferro:profileBackup', async () => {
+  const d = getDirs();
+  const send = (t) => win && win.webContents.send('ferro:log', t);
+  const stamp = new Date().toISOString().slice(0, 10);
+  const { filePath } = await dialog.showSaveDialog(win, { title: 'Copia total del perfil', defaultPath: `ferro-perfil-${stamp}.ferro`, filters: [{ name: 'Ferro perfil', extensions: ['ferro'] }] });
+  if (!filePath) return null;
+  return backups.profileBackup(d.base, filePath, send);
+});
+ipcMain.handle('ferro:profileRestore', async () => {
+  const d = getDirs();
+  const send = (t) => win && win.webContents.send('ferro:log', t);
+  const { filePaths } = await dialog.showOpenDialog(win, { title: 'Restaurar perfil', filters: [{ name: 'Ferro perfil', extensions: ['ferro'] }], properties: ['openFile'] });
+  if (!filePaths?.[0]) return null;
+  return backups.profileRestore(filePaths[0], d.base, send);
+});
 ipcMain.handle('ferro:crashes', async (_, { instanceName }) => crashes.listCrashes(findInstance(getDirs(), instanceName).path));
 ipcMain.handle('ferro:crashRead', async (_, { instanceName, file }) => crashes.readCrash(findInstance(getDirs(), instanceName).path, file));
 ipcMain.handle('ferro:openCrashes', async (_, { instanceName }) => {
   const dir = crashes.crashDir(findInstance(getDirs(), instanceName).path);
+  require('fs').mkdirSync(dir, { recursive: true });
+  await shell.openPath(dir);
+  return true;
+});
+ipcMain.handle('ferro:shots', async (_, { instanceName }) => gallery.listShots(findInstance(getDirs(), instanceName).path));
+ipcMain.handle('ferro:shotThumb', async (_, { instanceName, file }) => {
+  const list = gallery.listShots(findInstance(getDirs(), instanceName).path);
+  const hit = list.find((s) => s.file === path.basename(file));
+  if (!hit) throw new Error('Captura no encontrada');
+  if (hit.size > 15 * 1048576) throw new Error('Imagen demasiado grande');
+  return { file: hit.file, dataUrl: 'data:image/png;base64,' + require('fs').readFileSync(hit.path).toString('base64') };
+});
+ipcMain.handle('ferro:shotView', async (_, { instanceName, file }) => {
+  const list = gallery.listShots(findInstance(getDirs(), instanceName).path);
+  const hit = list.find((s) => s.file === path.basename(file));
+  if (!hit) throw new Error('Captura no encontrada');
+  await shell.openPath(hit.path);
+  return true;
+});
+ipcMain.handle('ferro:shotDelete', async (_, { instanceName, file }) => gallery.deleteShot(findInstance(getDirs(), instanceName).path, file));
+ipcMain.handle('ferro:openShots', async (_, { instanceName }) => {
+  const dir = gallery.shotsDir(findInstance(getDirs(), instanceName).path);
   require('fs').mkdirSync(dir, { recursive: true });
   await shell.openPath(dir);
   return true;
@@ -621,6 +704,7 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
   activeInstance = inst.name;
   activeT0 = Date.now();
   touchPlayed(d.instances, inst.name);
+  notify(d.base, 'info', `Jugando ${details.id}`, `${inst.name} · ${inst.type === 'vanilla' ? 'vanilla' : inst.type} · ${(authArg && authArg.username) || username || 'Ferro'}`);
   // Discord RPC (no bloquea; falla en silencio sin cliente Discord)
   try {
     const dc = auth.getDiscord(d.base);
@@ -638,7 +722,10 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
     try { discord.clear(); } catch {}
   });
   activeChild.on('close', (code) => {
-    if (code !== 0 && code !== null) send(`[ferro] crash detectado en ${inst.name} (código ${code})\n`);
+    if (code !== 0 && code !== null) {
+      send(`[ferro] crash detectado en ${inst.name} (código ${code})\n`);
+      notify(d.base, 'error', `Crash en ${inst.name}`, `Código ${code}. Informe disponible en Instancias.`);
+    }
   });
   return true;
 });

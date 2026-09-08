@@ -1,6 +1,6 @@
 {
   "name": "ferro-launcher",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "FerroLauncher - Launcher de Minecraft hecho desde 0",
   "author": "Adrian Garcia Martinez",
   "main": "electron/main.js",

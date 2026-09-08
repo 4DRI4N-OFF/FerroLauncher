@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import brand from './assets/brand.png';
 import { sfx } from './sfx.js';
+import { STR, getLang } from './i18n.js';
 import {
   Play, Square, Layers, Package, LayoutGrid, Gift, User, Palette,
   Settings, Search, Plus, RefreshCw, FolderOpen, Copy, Pencil, Trash2,
@@ -9,6 +10,18 @@ import {
 
 export default function App() {
   const [tab, setTab] = useState('jugar');
+  const [lang, setLang] = useState(getLang());
+  const t = (k, vars) => {
+    let s = (STR[lang] && STR[lang][k]) || STR.es[k] || k;
+    if (vars) for (const [kk, vv] of Object.entries(vars)) s = s.replace(`{${kk}}`, vv);
+    return s;
+  };
+  const setLangBoth = (l) => { setLang(l); try { localStorage.setItem('ferro-lang', l); } catch {} };
+  const fmtPlay = (s) => {
+    const m = Math.floor((s || 0) / 60);
+    if (!m) return null;
+    return m < 60 ? `${m} min` : `${(m / 60).toFixed(m < 600 ? 1 : 0)} h`;
+  };
   const [versions, setVersions] = useState([]);
   const [instances, setInstances] = useState([]);
   const [java, setJava] = useState(null);
@@ -56,6 +69,7 @@ export default function App() {
   const [flashKey, setFlashKey] = useState(0);
   const [scare, setScare] = useState(null);
   const toastId = useRef(0);
+  const touchedVer = useRef({ create: false, filter: false, pack: false });
 
   const pushToast = (type, msg) => {
     const id = ++toastId.current;
@@ -152,7 +166,15 @@ export default function App() {
 
   const refresh = async () => {
     try {
-      setVersions(await window.ferro.versions());
+      const vers = await window.ferro.versions();
+      setVersions(vers);
+      // Predeterminada: la última release del manifiesto (vale para futuras versiones)
+      const latest = vers[0]?.id;
+      if (latest) {
+        if (!touchedVer.current.create) setVersionId(latest);
+        if (!touchedVer.current.filter) setFVersion(latest);
+        if (!touchedVer.current.pack) setPackMc(latest);
+      }
       const inst = await window.ferro.instances();
       setInstances(inst);
       if (inst[0] && !launchInstance) setLaunchInstance(inst[0].name);
@@ -205,7 +227,7 @@ export default function App() {
       setLog((l) => l + `[ferro] instalando ${title} en ${modsFor}...\n`);
       const r = await window.ferro.modInstall({ instanceName: modsFor, projectId, kind });
       setLog((l) => l + `[ferro] instalado ${r.file}\n`);
-      pushToast('success', `${title} instalado`);
+      pushToast('success', `${title} ${t('toast.installed')}`);
       setInstalledIds((s) => [...s, projectId]);
       await loadMods(modsFor);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -223,6 +245,10 @@ export default function App() {
   };
 
   const doPackVers = async (projectId) => {
+    if (packVers[projectId]) {
+      setPackVers((p) => { const n = { ...p }; delete n[projectId]; return n; });
+      return;
+    }
     try {
       const vers = await window.ferro.packVersions({ projectId, mcVersion: packMc, loader: packLoader || undefined });
       setPackVers((p) => ({ ...p, [projectId]: vers }));
@@ -237,7 +263,7 @@ export default function App() {
       setTab('jugar');
       const r = await window.ferro.packInstall({ name: `${pack.title} ${v.number}`, projectId: pack.id, packVersionId: v.id, mcVersion: packMc });
       setLog((l) => l + `[ferro] instancia ${r.name} creada desde modpack\n`);
-      pushToast('success', `Modpack instalado: ${r.name}`);
+      pushToast('success', `${t('toast.packDone')}: ${r.name}`);
       await refresh();
       setLaunchInstance(r.name);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -327,7 +353,7 @@ export default function App() {
       if (err) setLog((l) => l + `[error] ${err.error || err}\n`);
       else {
         setLog((l) => l + `[ferro] sesión iniciada: ${data.name}\n`);
-        pushToast('success', `Sesión: ${data.name}`);
+        pushToast('success', `${t('toast.login')}: ${data.name}`);
         loadAuth();
       }
     });
@@ -421,7 +447,7 @@ export default function App() {
     try {
       await window.ferro.createInstance({ name: instanceName, versionId, type: instanceType, loaderVersion: instanceType === 'vanilla' ? undefined : loaderVersion });
       setLog((l) => l + `[ferro] instancia creada: ${instanceName} (${versionId}${instanceType === 'vanilla' ? '' : ` + ${instanceType} ${loaderVersion}`})\n`);
-      pushToast('success', `Instancia ${instanceName} creada`);
+      pushToast('success', t('toast.instCreated', {n:instanceName}));
       refresh();
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
@@ -479,61 +505,81 @@ export default function App() {
     <div className="layout">
       <div className="side">
         <img ref={sideLogoRef} className="brand-logo" src={brand} alt="FerroLauncher" />
-        <button className={tab==='jugar'?'active':''} onClick={()=>setTab('jugar')}><Play size={16} /> Jugar</button>
-        <button className={tab==='versiones'?'active':''} onClick={()=>setTab('versiones')}><Layers size={16} /> Versiones</button>
-        <button className={tab==='instancias'?'active':''} onClick={()=>setTab('instancias')}><Package size={16} /> Instancias</button>
-        <button className={tab==='mods'?'active':''} onClick={()=>{setTab('mods'); if(modsFor) loadMods(modsFor);}}><LayoutGrid size={16} /> Contenido</button>
-        <button className={tab==='packs'?'active':''} onClick={()=>setTab('packs')}><Gift size={16} /> Modpacks</button>
-        <button className={tab==='cuenta'?'active':''} onClick={()=>{setTab('cuenta'); loadAuth();}}><User size={16} /> Cuenta</button>
-        <button className={tab==='skin'?'active':''} onClick={()=>{setTab('skin'); loadSkin();}}><Palette size={16} /> Skin</button>
-        <button className={tab==='ajustes'?'active':''} onClick={()=>setTab('ajustes')}><Settings size={16} /> Ajustes</button>
-        <div className="ver">v0.3.0 · ajustes + consola</div>
+        <button className={tab==='jugar'?'active':''} onClick={()=>setTab('jugar')}><Play size={16} /> {t('tab.play')}</button>
+        <button className={tab==='versiones'?'active':''} onClick={()=>setTab('versiones')}><Layers size={16} /> {t('tab.versions')}</button>
+        <button className={tab==='instancias'?'active':''} onClick={()=>setTab('instancias')}><Package size={16} /> {t('tab.instances')}</button>
+        <button className={tab==='mods'?'active':''} onClick={()=>{setTab('mods'); if(modsFor) loadMods(modsFor);}}><LayoutGrid size={16} /> {t('tab.content')}</button>
+        <button className={tab==='packs'?'active':''} onClick={()=>setTab('packs')}><Gift size={16} /> {t('tab.packs')}</button>
+        <button className={tab==='cuenta'?'active':''} onClick={()=>{setTab('cuenta'); loadAuth();}}><User size={16} /> {t('tab.account')}</button>
+        <button className={tab==='skin'?'active':''} onClick={()=>{setTab('skin'); loadSkin();}}><Palette size={16} /> {t('tab.skin')}</button>
+        <button className={tab==='ajustes'?'active':''} onClick={()=>setTab('ajustes')}><Settings size={16} /> {t('tab.settings')}</button>
+        <div className="player-chip" onClick={()=>setTab('cuenta')} title={t('tab.account')}>
+          {playFace ? <img className="face" src={playFace} alt="" onError={()=>setPlayFace(null)} /> : <User size={18} />}
+          <div className="pc-id"><b>{account?.name || username || '—'}</b><span>{account ? t('play.online') : t('play.offline')}</span></div>
+          <span className={`dot ${account ? 'on' : ''}`} />
+        </div>
+        <div className="ver">v0.3.0 · {t('footerTag')}</div>
       </div>
-      <div className="main">
-        {tab==='jugar' && (
-          <div className="card">
-            <h2>Jugar (offline)</h2>
-            <div className="row">
-              {playFace && <img className="face lg" src={playFace} alt="" onError={()=>setPlayFace(null)} />}
-              <input value={username} onChange={(e)=>setUsername(e.target.value)} placeholder="Usuario" />
+      <div className="main" key={tab}>
+        {tab==='jugar' && (<>
+          <div className={`card hero hero-${(() => { const s = instances.find((i)=>i.name===launchInstance); return s ? s.type : 'vanilla'; })()}`}>
+            <div className="hero-top">
+              {playFace && <img className="face xl" src={playFace} alt="" onError={()=>setPlayFace(null)} />}
+              <div className="hero-id">
+                <div className="hero-kicker">{account ? `${account.name} · ${t('play.online')}` : `${username || '—'} · ${t('play.offline')}`}</div>
+                <div className="hero-title">{launchInstance || 'FerroLauncher'}</div>
+                <div className="meta">
+                  {(() => { const s = instances.find((i)=>i.name===launchInstance); return s ? (<>
+                    <span className="pill">{s.versionId}</span>
+                    <span className={`pill l-${s.type}`}>{s.type==='vanilla' ? 'vanilla' : `${s.type} ${s.loaderVersion||''}`}</span>
+                    <span className="pill">{((s.settings?.ramMb||2048)/1024)} GB</span>
+                  </>) : null; })()}
+                  {running && <span className="pill green"><span className="spinner" />{t('play.running')}</span>}
+                </div>
+              </div>
+              <div className="hero-play">
+                {!running
+                  ? <button className="primary" onClick={play} disabled={!launchInstance}><Play size={18} /> {t('play.play')}</button>
+                  : <button className="primary" onClick={stop} style={{filter:'hue-rotate(140deg)'}}><Square size={18} /> {t('play.stop')}</button>}
+              </div>
+            </div>
+            <div className="row hero-controls">
+              <input value={username} onChange={(e)=>setUsername(e.target.value)} placeholder={t('play.userPh')} />
               <select value={launchInstance} onChange={(e)=>setLaunchInstance(e.target.value)}>
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' · '+i.type})</option>)}
               </select>
-              {!running
-                ? <button className="primary" onClick={play} disabled={!launchInstance}><Play size={16} /> JUGAR</button>
-                : <button className="primary" onClick={stop} style={{filter:'hue-rotate(140deg)'}}><Square size={16} /> DETENER</button>}
-              <button className="ghost" onClick={refresh}><RefreshCw size={14} /> Recargar</button>
-              {running && <span className="pill green"><span className="spinner" />en ejecución</span>}
-              {account ? <span className="pill green"><Check size={12} /> {account.name} (online)</span> : <span className="pill">offline</span>}
+              <button className="ghost" onClick={refresh}><RefreshCw size={14} /> {t('play.reload')}</button>
             </div>
             {!account && nameState.status !== 'idle' && (
               <div className="row" style={{marginTop:8}}>
-                {nameState.status === 'checking' && <span className="pill"><span className="spinner" />comprobando nombre…</span>}
-                {nameState.status === 'free' && <span className="pill green"><Check size={12} /> nombre libre</span>}
-                {nameState.status === 'invalid' && <span className="pill">3-16 caracteres: letras, números y _</span>}
-                {nameState.status === 'unknown' && <span className="pill">sin conexión para verificar</span>}
-                {nameState.status === 'taken' && <><span className="pill">premium: elige otro</span>{nameState.suggestions.map((s)=><button key={s} className="ghost" onClick={()=>setUsername(s)}>{s}</button>)}</>}
+                {nameState.status === 'checking' && <span className="pill"><span className="spinner" />{t('play.checkingName')}</span>}
+                {nameState.status === 'free' && <span className="pill green"><Check size={12} /> {t('play.nameFree')}</span>}
+                {nameState.status === 'invalid' && <span className="pill">{t('play.nameInvalid')}</span>}
+                {nameState.status === 'unknown' && <span className="pill">{t('play.nameUnknown')}</span>}
+                {nameState.status === 'taken' && <><span className="pill">{t('play.nameTaken')}</span>{nameState.suggestions.map((s)=><button key={s} className="ghost" onClick={()=>setUsername(s)}>{s}</button>)}</>}
               </div>
             )}
-            {instances.length===0 && <p>Crea tu primera instancia en Instancias.</p>}
-            <h3>Consola</h3>
+            {instances.length===0 && <p>{t('play.noInst')}</p>}
+          </div>
+          <div className="card">
+            <h3>{t('play.console')}</h3>
             <div className="row" style={{marginBottom:8}}>
               <select value={logLevel} onChange={(e)=>setLogLevel(e.target.value)}>
-                <option value="todo">Todo</option>
-                <option value="ferro">Solo Ferro</option>
-                <option value="warn">Avisos</option>
-                <option value="error">Errores</option>
+                <option value="todo">{t('play.lvAll')}</option>
+                <option value="ferro">{t('play.lvFerro')}</option>
+                <option value="warn">{t('play.lvWarn')}</option>
+                <option value="error">{t('play.lvError')}</option>
               </select>
-              <input value={logSearch} onChange={(e)=>setLogSearch(e.target.value)} placeholder="Filtrar texto..." />
+              <input value={logSearch} onChange={(e)=>setLogSearch(e.target.value)} placeholder={t('play.filterPh')} />
               <button className="ghost" onClick={()=>setAutoScroll(!autoScroll)}>{autoScroll ? '✓ Autoscroll' : 'Autoscroll'}</button>
-              <button className="ghost" onClick={()=>setLog('')}>Limpiar</button>
+              <button className="ghost" onClick={()=>setLog('')}>{t('play.clear')}</button>
             </div>
             <div className="log" ref={logRef}>{filteredLog}</div>
           </div>
-        )}
+        </>)}
         {tab==='versiones' && (
           <div className="card">
-            <h2>Versiones release (Mojang)</h2>
+            <h2>{t('ver.title')}</h2>
             <div className="grid">
               {versions.map((v)=><div key={v.id} className="card"><div className="card-title">{v.id}</div><div className="meta"><span className="pill">{v.type}</span><span className="pill">{new Date(v.releaseTime).toLocaleDateString()}</span></div></div>)}
             </div>
@@ -541,10 +587,10 @@ export default function App() {
         )}
         {tab==='instancias' && (
           <div className="card">
-            <h2>Crear instancia</h2>
+            <h2>{t('inst.createTitle')}</h2>
             <div className="row">
-              <input value={instanceName} onChange={(e)=>setInstanceName(e.target.value)} placeholder="Nombre" />
-              <select value={versionId} onChange={(e)=>setVersionId(e.target.value)}>
+              <input value={instanceName} onChange={(e)=>setInstanceName(e.target.value)} placeholder={t('inst.namePh')} />
+              <select value={versionId} onChange={(e)=>{touchedVer.current.create=true; setVersionId(e.target.value);}}>
                 {versions.map((v)=><option key={v.id} value={v.id}>{v.id}</option>)}
               </select>
               <select value={instanceType} onChange={(e)=>setInstanceType(e.target.value)}>
@@ -556,48 +602,48 @@ export default function App() {
               </select>
               {instanceType!=='vanilla' && (
                 <select value={loaderVersion} onChange={(e)=>setLoaderVersion(e.target.value)}>
-                  {loaders.map((l)=><option key={l.loader} value={l.loader}>{l.loader}{l.tag?` (${l.tag})`:''}{l.stable && !l.tag?' (estable)':''}</option>)}
+                  {loaders.map((l)=><option key={l.loader} value={l.loader}>{l.loader}{l.tag?` (${l.tag})`:''}{l.stable && !l.tag?(lang==='en'?' (stable)':' (estable)'):''}</option>)}
                 </select>
               )}
-              <button className="primary" onClick={create}><Plus size={14} /> Crear</button>
+              <button className="primary" onClick={create}><Plus size={14} /> {t('inst.create')}</button>
             </div>
-            <h3>Instaladas ({instances.length})</h3>
+            <h3>{t('inst.installed')} ({instances.length})</h3>
             <div className="row" style={{marginBottom:10}}>
-              <input value={instFilter} onChange={(e)=>setInstFilter(e.target.value)} placeholder="Filtrar instancias..." />
+              <input value={instFilter} onChange={(e)=>setInstFilter(e.target.value)} placeholder={t('inst.filterPh')} />
             </div>
             <div className="grid">
-              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className="card"><div className="card-title" title={i.name}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}{i.type==='vanilla' ? '' : ` + ${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}</span> : <span className="pill">sin jugar</span>}</div><div className="actions"><button className="ghost" onClick={()=>editSettings(i.name)}><Settings size={14} /> Ajustes</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}><Upload size={14} /> Exportar</button><button className="ghost" onClick={async()=>{await window.ferro.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> Carpeta</button><button className="ghost" onClick={async()=>{await window.ferro.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> Duplicar</button><button className="ghost" onClick={async()=>{const n=window.prompt('Nuevo nombre:', i.name); if(n && n!==i.name){await window.ferro.renameInstance({instanceName:i.name, newName:n}); refresh();}}}><Pencil size={14} /> Renombrar</button><button className="ghost danger" onClick={async()=>{if(window.confirm(`¿Eliminar ${i.name}? Se borran sus archivos.`)){await window.ferro.deleteInstance({instanceName:i.name}); refresh();}}}><Trash2 size={14} /> Eliminar</button></div></div>)}
+              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className="card"><div className="card-title" title={i.name}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}</span><span className={`pill l-${i.type}`}>{i.type==='vanilla' ? 'vanilla' : `${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}{fmtPlay(i.playSecs) ? ` · ${fmtPlay(i.playSecs)}` : ''}</span> : <span className="pill">{t('inst.neverPlayed')}</span>}</div><div className="actions"><button className="ghost" onClick={()=>editSettings(i.name)}><Settings size={14} /> {t('inst.settings')}</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}><Upload size={14} /> {t('inst.export')}</button><button className="ghost" onClick={async()=>{await window.ferro.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> {t('inst.folder')}</button><button className="ghost" onClick={async()=>{await window.ferro.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> {t('inst.duplicate')}</button><button className="ghost" onClick={async()=>{const n=window.prompt(t('inst.renamePrompt'), i.name); if(n && n!==i.name){await window.ferro.renameInstance({instanceName:i.name, newName:n}); refresh();}}}><Pencil size={14} /> {t('inst.rename')}</button><button className="ghost danger" onClick={async()=>{if(window.confirm(t('inst.delConfirm', {n:i.name}))){await window.ferro.deleteInstance({instanceName:i.name}); refresh();}}}><Trash2 size={14} /> {t('inst.delete')}</button></div></div>)}
             </div>
             <div className="row" style={{marginTop:12}}>
-              <button className="primary" onClick={async()=>{const n=await window.ferro.importInstance(); if(n){setLog((l)=>l+`[ferro] importada ${n}\n`); refresh();}}}><Upload size={14} /> Importar .ferro</button>
+              <button className="primary" onClick={async()=>{const n=await window.ferro.importInstance(); if(n){setLog((l)=>l+`[ferro] importada ${n}\n`); refresh();}}}><Upload size={14} /> {t('inst.import')}</button>
             </div>
-            <h3>Copias de {bkFor || '…'}</h3>
+            <h3>{t('inst.backupsOf')} {bkFor || '…'}</h3>
             <div className="row">
               <select value={bkFor} onChange={(e)=>{setBkFor(e.target.value); loadBackups(e.target.value);}}>
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name}</option>)}
               </select>
-              <button className="ghost" onClick={async()=>{await window.ferro.backupCreate({instanceName:bkFor}); loadBackups(bkFor);}} disabled={!bkFor}>Crear copia</button>
+              <button className="ghost" onClick={async()=>{await window.ferro.backupCreate({instanceName:bkFor}); loadBackups(bkFor);}} disabled={!bkFor}>{t('inst.createBk')}</button>
             </div>
-            {bkList.length===0 && <p style={{opacity:.6}}>Sin copias todavía.</p>}
+            {bkList.length===0 && <p style={{opacity:.6}}>{t('inst.noBk')}</p>}
             <div className="grid" style={{marginTop:10}}>
               {bkList.map((b)=><div key={b.file} className="card"><div className="card-title" title={b.file}>{b.file}</div><div className="meta"><span className="pill">{(b.size/1048576).toFixed(1)} MB</span></div><div className="actions">
-                <button className="ghost" onClick={async()=>{await window.ferro.backupRestore({instanceName:bkFor, file:b.file});}}>Restaurar</button>
+                <button className="ghost" onClick={async()=>{await window.ferro.backupRestore({instanceName:bkFor, file:b.file});}}>{t('inst.restore')}</button>
                 <button className="ghost danger" onClick={async()=>{await window.ferro.backupDelete({instanceName:bkFor, file:b.file}); loadBackups(bkFor);}}><Trash2 size={14} /> Eliminar</button>
               </div></div>)}
             </div>
             {settingsFor && (
               <>
-                <h3>Ajustes de {settingsFor}</h3>
+                <h3>{t('inst.settingsOf')} {settingsFor} <button className="ghost" onClick={()=>setSettingsFor('')} style={{marginLeft:8}}><X size={14} /></button></h3>
                 <div className="row">
-                  <label>RAM (MB) <input type="number" value={sRam} min={512} max={16384} step={512} onChange={(e)=>setSRam(Number(e.target.value))} style={{width:110}} /></label>
-                  <label>Ancho <input type="number" value={sW} min={320} max={7680} onChange={(e)=>setSW(Number(e.target.value))} style={{width:90}} /></label>
-                  <label>Alto <input type="number" value={sH} min={240} max={4320} onChange={(e)=>setSH(Number(e.target.value))} style={{width:90}} /></label>
+                  <label>{t('inst.ram')} <input type="number" value={sRam} min={512} max={16384} step={512} onChange={(e)=>setSRam(Number(e.target.value))} style={{width:110}} /></label>
+                  <label>{t('inst.width')} <input type="number" value={sW} min={320} max={7680} onChange={(e)=>setSW(Number(e.target.value))} style={{width:90}} /></label>
+                  <label>{t('inst.height')} <input type="number" value={sH} min={240} max={4320} onChange={(e)=>setSH(Number(e.target.value))} style={{width:90}} /></label>
                   <select value={sJavaMode} onChange={(e)=>setSJavaMode(e.target.value)}>
-                    <option value="auto">Java auto</option>
-                    <option value="custom">Java personalizado</option>
+                    <option value="auto">{t('inst.javaAuto')}</option>
+                    <option value="custom">{t('inst.javaCustom')}</option>
                   </select>
                   {sJavaMode==='custom' && <input value={sJavaPath} onChange={(e)=>setSJavaPath(e.target.value)} placeholder="C:\...\bin\java.exe" style={{minWidth:260}} />}
-                  <button className="primary" onClick={saveSettings} disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</button>
+                  <button className="primary" onClick={saveSettings} disabled={saving}>{saving ? t('inst.saving') : t('inst.save')}</button>
                 </div>
               </>
             )}
@@ -605,18 +651,18 @@ export default function App() {
         )}
         {tab==='mods' && (
           <div className="card">
-            <h2>Contenido (Modrinth)</h2>
+            <h2>{t('mods.title')}</h2>
             <div className="row">
               <select value={modsFor} onChange={(e)=>{setModsFor(e.target.value); loadMods(e.target.value);}}>
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' '+i.type})</option>)}
               </select>
               <select value={kind} onChange={(e)=>{setKind(e.target.value); setModHits([]); setInstalledIds([]); loadMods(modsFor, e.target.value);}} title="Tipo">
-                <option value="mod">Mods</option>
-                <option value="shader">Shaders</option>
-                <option value="resourcepack">Resource packs</option>
+                <option value="mod">{t('mods.tMods')}</option>
+                <option value="shader">{t('mods.tShaders')}</option>
+                <option value="resourcepack">{t('mods.tRp')}</option>
               </select>
               <input value={modQuery} onChange={(e)=>setModQuery(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter') doSearch();}} placeholder={`Buscar ${kindName}...`} />
-              <select value={fVersion} onChange={(e)=>setFVersion(e.target.value)} title="Versión de Minecraft">
+              <select value={fVersion} onChange={(e)=>{touchedVer.current.filter=true; setFVersion(e.target.value);}} title="Versión de Minecraft">
                 {versions.map((v)=><option key={v.id} value={v.id}>{v.id}</option>)}
               </select>
               {kind==='mod' && (
@@ -628,18 +674,18 @@ export default function App() {
               </select>
               )}
               <select value={fSort} onChange={(e)=>setFSort(e.target.value)} title="Orden">
-                <option value="relevance">Relevancia</option>
-                <option value="downloads">Descargas</option>
-                <option value="follows">Seguidores</option>
-                <option value="newest">Novedades</option>
-                <option value="updated">Actualizados</option>
+                <option value="relevance">{t('mods.sRelevance')}</option>
+                <option value="downloads">{t('mods.sDownloads')}</option>
+                <option value="follows">{t('mods.sFollows')}</option>
+                <option value="newest">{t('mods.sNewest')}</option>
+                <option value="updated">{t('mods.sUpdated')}</option>
               </select>
-              <button className="primary" onClick={doSearch} disabled={searching || !modsFor}>{searching ? 'Buscando…' : <><Search size={14} /> Buscar</>}</button>
-              <button className="ghost" onClick={()=>loadMods(modsFor)} disabled={!modsFor}>Ver instalados</button>
+              <button className="primary" onClick={doSearch} disabled={searching || !modsFor}>{searching ? t('mods.searching') : <><Search size={14} /> {t('mods.search')}</>}</button>
+              <button className="ghost" onClick={()=>loadMods(modsFor)} disabled={!modsFor}>{t('mods.viewInstalled')}</button>
             </div>
-            {!modsFor && <p>Crea primero una instancia con loader (Fabric, Quilt, Forge o NeoForge) en Instancias.</p>}
-            <h3>Resultados{modTotal>0 && ` (${modTotal.toLocaleString()})`} · {fVersion} · {fLoader}</h3>
-            {modHits.length===0 && <p style={{opacity:.6}}>Sin resultados todavía — busca algo arriba.</p>}
+            {!modsFor && <p>{t('mods.needLoader')}</p>}
+            <h3>{t('mods.results')}{modTotal>0 && ` (${modTotal.toLocaleString()})`} · {fVersion} · {fLoader}</h3>
+            {modHits.length===0 && <p style={{opacity:.6}}>{t('mods.noResults')}</p>}
             <div className="grid">
               {modHits.map((m)=>{
                 const busy = installingId===m.id;
@@ -648,47 +694,47 @@ export default function App() {
                 <div key={m.id} className="card">
                   <div className="mod-head">{m.icon && <img className="mod-icon" src={m.icon} alt="" />}<b>{m.title}</b></div>
                   <div className="desc">{m.description?.slice(0,120)}</div>
-                  <div className="meta"><span className="pill"><Download size={12} /> {m.downloads?.toLocaleString?.() || m.downloads}</span>{m.updated && <span className="pill">↻ {new Date(m.updated).toLocaleDateString()}</span>}{m.client==='required' && <span className="pill green">cliente</span>}</div>
+                  <div className="meta"><span className="pill"><Download size={12} /> {m.downloads?.toLocaleString?.() || m.downloads}</span>{m.updated && <span className="pill">↻ {new Date(m.updated).toLocaleDateString()}</span>}{m.client==='required' && <span className="pill green">{t('mods.client')}</span>}</div>
                   <div className="actions">
                     <button className={done ? 'ghost ok' : 'ghost'} disabled={busy || done || !modsFor} onClick={()=>doInstall(m.id, m.title)}>
-                      {busy ? <><span className="spinner" />Instalando…</> : done ? <><Check size={14} /> Instalado</> : <><Download size={14} /> Instalar</>}
+                      {busy ? <><span className="spinner" />{t('mods.installing')}</> : done ? <><Check size={14} /> {t('mods.installedDone')}</> : <><Download size={14} /> {t('mods.install')}</>}
                     </button>
                   </div>
                 </div>);
               })}
             </div>
-            <h3>Instalados ({mods.length})</h3>
+            <h3>{t('mods.installed')} ({mods.length})</h3>
             <div className="grid">
               {mods.map((m)=><div key={m.file} className="card"><div className="card-title" title={m.file}>{m.file}</div><div className="meta"><span className="pill">{(m.size/1048576).toFixed(1)} MB{m.disabled?' · desactivado':''}</span></div><div className="actions">
-                <button className="ghost" onClick={async()=>{await window.ferro.modToggle({instanceName:modsFor, file:m.file, disable:!m.disabled, kind}); loadMods(modsFor);}}>{m.disabled?'Activar':'Desactivar'}</button>
-                <button className="ghost danger" onClick={async()=>{await window.ferro.modRemove({instanceName:modsFor, file:m.file, kind}); loadMods(modsFor);}}><X size={14} /> Quitar</button>
+                <button className="ghost" onClick={async()=>{await window.ferro.modToggle({instanceName:modsFor, file:m.file, disable:!m.disabled, kind}); loadMods(modsFor);}}>{m.disabled?t('mods.activate'):t('mods.deactivate')}</button>
+                <button className="ghost danger" onClick={async()=>{await window.ferro.modRemove({instanceName:modsFor, file:m.file, kind}); loadMods(modsFor);}}><X size={14} /> {t('mods.remove')}</button>
               </div></div>)}
             </div>
           </div>
         )}
         {tab==='packs' && (
           <div className="card">
-            <h2>Modpacks (1 clic)</h2>
+            <h2>{t('packs.title')}</h2>
             <div className="row">
-              <select value={packMc} onChange={(e)=>setPackMc(e.target.value)}>
+              <select value={packMc} onChange={(e)=>{touchedVer.current.pack=true; setPackMc(e.target.value);}}>
                 {versions.map((v)=><option key={v.id} value={v.id}>{v.id}</option>)}
               </select>
-              <input value={packQuery} onChange={(e)=>setPackQuery(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter') doPackSearch();}} placeholder="Buscar modpack..." />
+              <input value={packQuery} onChange={(e)=>setPackQuery(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter') doPackSearch();}} placeholder={t('packs.searchPh')} />
               <select value={packLoader} onChange={(e)=>setPackLoader(e.target.value)} title="Loader">
-                <option value="">Todos</option>
+                <option value="">{t('packs.loaderAll')}</option>
                 <option value="fabric">Fabric</option>
                 <option value="quilt">Quilt</option>
                 <option value="forge">Forge</option>
                 <option value="neoforge">NeoForge</option>
               </select>
               <select value={packSort} onChange={(e)=>setPackSort(e.target.value)} title="Orden">
-                <option value="relevance">Relevancia</option>
-                <option value="downloads">Descargas</option>
-                <option value="follows">Seguidores</option>
-                <option value="newest">Novedades</option>
-                <option value="updated">Actualizados</option>
+                <option value="relevance">{t('mods.sRelevance')}</option>
+                <option value="downloads">{t('mods.sDownloads')}</option>
+                <option value="follows">{t('mods.sFollows')}</option>
+                <option value="newest">{t('mods.sNewest')}</option>
+                <option value="updated">{t('mods.sUpdated')}</option>
               </select>
-              <button className="primary" onClick={doPackSearch}><Search size={14} /> Buscar</button>
+              <button className="primary" onClick={doPackSearch}><Search size={14} /> {t('packs.search')}</button>
             </div>
             <p style={{opacity:.65}}>{packTotal>0 ? `${packTotal.toLocaleString()} resultados · ` : ''}{packMc}{packLoader ? ` · ${packLoader}` : ''}. Crea una instancia nueva con el MC + loader que pida el pack. El progreso sale en ▶ Jugar.</p>
             <div className="grid">
@@ -697,14 +743,14 @@ export default function App() {
                   <div className="mod-head">{p.icon && <img className="mod-icon" src={p.icon} alt="" />}<b>{p.title}</b></div>
                   <div className="desc">{p.description?.slice(0,120)}</div>
                   <div className="meta"><span className="pill"><Download size={12} /> {p.downloads?.toLocaleString?.() || p.downloads}</span>{p.updated && <span className="pill">↻ {new Date(p.updated).toLocaleDateString()}</span>}</div>
-                  <div className="actions"><button className="ghost" onClick={()=>doPackVers(p.id)}>Versiones</button></div>
+                    <div className="actions"><button className="ghost" onClick={()=>doPackVers(p.id)}>{packVers[p.id] ? t('mods.hide') : t('packs.versions')}</button></div>
                   {(packVers[p.id]||[]).map((v)=>(
                     <div className="meta" key={v.id}>
                       <span className="pill">{v.number}</span>
                       {(v.loaders||[]).map((ld)=><span className="pill" key={ld}>{ld}</span>)}
                       {(v.game||[]).slice(0,3).map((g)=><span className="pill" key={g}>{g}</span>)}
                       <button className="ghost" disabled={!!packBusy} onClick={()=>doPackInstall(p, v)}>
-                        {packBusy===v.id ? <><span className="spinner" />Instalando…</> : 'Instalar'}
+                        {packBusy===v.id ? <><span className="spinner" />{t('mods.installing')}</> : t('mods.install')}
                       </button>
                     </div>
                   ))}
@@ -715,114 +761,124 @@ export default function App() {
         )}
         {tab==='cuenta' && (
           <div className="card">
-            <h2>Cuenta Microsoft</h2>
-            <p>Sesión integrada: pulsa iniciar, autoriza en el navegador y listo. Sin cuenta, el launcher sigue en modo offline.</p>
+            <h2>{t('acct.title')}</h2>
+            <p>{t('acct.desc')}</p>
             <div className="row">
               <input value={clientId} onChange={(e)=>setClientId(e.target.value)} placeholder="Client ID (por defecto el oficial)" style={{minWidth:300}} />
-              <button className="ghost" onClick={async()=>{await window.ferro.setClientId({ clientId }); setLog((l)=>l+'[ferro] client ID guardado\n');}}>Guardar</button>
+              <button className="ghost" onClick={async()=>{await window.ferro.setClientId({ clientId }); setLog((l)=>l+'[ferro] client ID guardado\n');}}>{t('acct.save')}</button>
             </div>
-            <h3>Cuentas ({accts.length})</h3>
-            {accts.length===0 && <p style={{opacity:.6}}>Sin cuentas. Inicia sesión abajo para añadir la primera.</p>}
+            <h3>{t('acct.accounts')} ({accts.length})</h3>
+            {accts.length===0 && <p style={{opacity:.6}}>{t('acct.noAccounts')}</p>}
             <div className="grid">
-              {accts.map((a)=><div key={a.uuid} className="card"><div className="mod-head"><img className="face" src={`https://visage.surgeplay.com/face/64/${a.uuid.replace(/-/g,'')}`} alt="" onError={(e)=>{e.currentTarget.src=`https://minotar.net/helm/${a.uuid.replace(/-/g,'')}/64.png`;}} /><div className="card-title">{a.name}</div></div><div className="meta">{a.active && <span className="pill green">✓ activa</span>}</div><div className="actions">
-                {!a.active && <button className="ghost" onClick={async()=>{await window.ferro.authSelect({uuid:a.uuid}); loadAuth();}}>Usar</button>}
-                <button className="ghost danger" onClick={async()=>{await window.ferro.authRemove({uuid:a.uuid}); loadAuth();}}><X size={14} /> Quitar</button>
+              {accts.map((a)=><div key={a.uuid} className="card"><div className="mod-head"><img className="face" src={`https://visage.surgeplay.com/face/64/${a.uuid.replace(/-/g,'')}`} alt="" onError={(e)=>{e.currentTarget.src=`https://minotar.net/helm/${a.uuid.replace(/-/g,'')}/64.png`;}} /><div className="card-title">{a.name}</div></div><div className="meta">{a.active && <span className="pill green">✓ {t('acct.active')}</span>}</div><div className="actions">
+                {!a.active && <button className="ghost" onClick={async()=>{await window.ferro.authSelect({uuid:a.uuid}); loadAuth();}}>{t('acct.use')}</button>}
+                <button className="ghost danger" onClick={async()=>{await window.ferro.authRemove({uuid:a.uuid}); loadAuth();}}><X size={14} /> {t('acct.remove')}</button>
               </div></div>)}
             </div>
-            <h3>Estado</h3>
+            <h3>{t('acct.status')}</h3>
             {account
-              ? <><div className="row"><span className="pill green">✓ {account.name}</span><button className="ghost danger" onClick={doLogout}>Cerrar sesión</button></div>
-                {!browserWaiting && !authStep && <p style={{marginTop:10}}><button className="ghost" onClick={doBrowserAuth}>Añadir otra cuenta</button></p>}</>
+              ? <><div className="row"><span className="pill green">✓ {account.name}</span><button className="ghost danger" onClick={doLogout}>{t('acct.logout')}</button></div>
+                {!browserWaiting && !authStep && <p style={{marginTop:10}}><button className="ghost" onClick={doBrowserAuth}>{t('acct.addAnother')}</button></p>}</>
               : browserWaiting
                 ? <div className="card">
-                    <p><span className="spinner" />Completa el login en la ventana de Microsoft y acepta los permisos…</p>
-                    <button className="ghost" onClick={cancelBrowserAuth}>Cancelar</button>
+                    <p><span className="spinner" />{t('acct.waitBrowser')}</p>
+                    <button className="ghost" onClick={cancelBrowserAuth}>{t('acct.cancel')}</button>
                   </div>
                 : !authStep
                   ? <div className="row">
-                      <button className="primary" onClick={doBrowserAuth}>Iniciar sesión</button>
+                      <button className="primary" onClick={doBrowserAuth}>{t('acct.login')}</button>
                     </div>
                   : null}
             {!account && !browserWaiting && (
               !authStep
-                ? <p style={{marginTop:12}}><button className="ghost" onClick={doAuthStart} disabled={!clientId}>Método alternativo: código manual</button></p>
+                ? <p style={{marginTop:12}}><button className="ghost" onClick={doAuthStart} disabled={!clientId}>{t('acct.altMethod')}</button></p>
                 : <div className="card">
-                    <p>1. Abre <b>{authStep.verificationUri}</b></p>
-                    <p>2. Introduce el código <b style={{fontSize:22, letterSpacing:2}}>{authStep.userCode}</b></p>
-                    <p style={{opacity:.65}}><span className="spinner" />Esperando autorización… (comprobación {pollCount})</p>
+                    <p>1. {t('acct.step1')} <b>{authStep.verificationUri}</b></p>
+                    <p>2. {t('acct.step2')} <b style={{fontSize:22, letterSpacing:2}}>{authStep.userCode}</b></p>
+                    <p style={{opacity:.65}}><span className="spinner" />{t('acct.waiting')} ({t('acct.checkN')} {pollCount})</p>
                     <div className="row">
-                      <button className="ghost" onClick={()=>doAuthPollOnce()}>Comprobar ahora</button>
-                      <button className="ghost" onClick={()=>{stopPoll(); setAuthStep(null);}}>Cancelar</button>
+                      <button className="ghost" onClick={()=>doAuthPollOnce()}>{t('acct.checkNow')}</button>
+                      <button className="ghost" onClick={()=>{stopPoll(); setAuthStep(null);}}>{t('acct.cancel')}</button>
                     </div>
                   </div>)}
           </div>
         )}
         {tab==='skin' && (
           <div className="card">
-            <h2>Apariencia</h2>
+            <h2>{t('skin.title')}</h2>
             <div className="row">
-              <input value={skinName} onChange={(e)=>setSkinName(e.target.value)} placeholder="Nombre (offline)" />
-              <button className="ghost" onClick={()=>loadSkin()}>Ver</button>
-              {skinInfo?.online && <span className="pill green">✓ sesión online</span>}
+              <input value={skinName} onChange={(e)=>setSkinName(e.target.value)} placeholder={t('skin.namePh')} />
+              <button className="ghost" onClick={()=>loadSkin()}>{t('skin.view')}</button>
+              {skinInfo?.online && <span className="pill green">✓ {t('skin.online')}</span>}
             </div>
-            {!skinInfo && <p style={{opacity:.65}}>Pulsa Ver para cargar la skin.</p>}
+            {!skinInfo && <p style={{opacity:.65}}>{t('skin.pressView')}</p>}
             {skinInfo?.note && <p style={{opacity:.65}}>{skinInfo.note}</p>}
             {skinInfo?.renders && (
               <div className="row" style={{alignItems:'flex-start', marginTop:12}}>
-                <div className="card" style={{margin:0}}><div className="card-title">{skinInfo.name}</div><div className="meta"><span className="pill">{skinInfo.variant || 'classic'}</span>{skinInfo.cape && <span className="pill">🧥 {skinInfo.cape.alias || 'capa'}</span>}</div><img src={skinInfo.renders.face} alt="cara" width={64} height={64} style={{borderRadius:12}} /></div>
-                <div className="card" style={{margin:0}}><div className="card-title">Cuerpo</div><img src={skinInfo.renders.full} alt="cuerpo" style={{maxHeight:280}} onError={(e)=>{e.currentTarget.src=`https://minotar.net/armor/body/${skinInfo.uuid}/150.png`;}} /></div>
-                {skinInfo.cape && <div className="card" style={{margin:0}}><div className="card-title">Capa</div><img src={skinInfo.cape.url} alt="capa" style={{maxHeight:200}} /></div>}
+                <div className="card" style={{margin:0}}><div className="card-title">{skinInfo.name}</div><div className="meta"><span className="pill">{skinInfo.variant || 'classic'}</span>{skinInfo.cape && <span className="pill">{skinInfo.cape.alias || t('skin.capeDef')}</span>}</div><img src={skinInfo.renders.face} alt="cara" width={64} height={64} style={{borderRadius:12}} /></div>
+                <div className="card" style={{margin:0}}><div className="card-title">{t('skin.body')}</div><img src={skinInfo.renders.full} alt="cuerpo" style={{maxHeight:280}} onError={(e)=>{e.currentTarget.src=`https://minotar.net/armor/body/${skinInfo.uuid}/150.png`;}} /></div>
+                {skinInfo.cape && <div className="card" style={{margin:0}}><div className="card-title">{t('skin.cape')}</div><img src={skinInfo.cape.url} alt="capa" style={{maxHeight:200}} /></div>}
               </div>
             )}
-            <h3>Cambiar skin (online)</h3>
-            <p style={{opacity:.65}}>Pega la URL directa de la textura (p. ej. botón derecho → copiar enlace en minecraftskins o NameMC). Sin sesión no se puede aplicar.</p>
+            <h3>{t('skin.changeTitle')}</h3>
+            <p style={{opacity:.65}}>{t('skin.changeDesc')}</p>
             <div className="row">
               <input value={skinUrl} onChange={(e)=>setSkinUrl(e.target.value)} placeholder="https://…/skin.png" style={{minWidth:280}} />
               <select value={skinVariant} onChange={(e)=>setSkinVariant(e.target.value)}>
-                <option value="classic">Clásica (4px)</option>
-                <option value="slim">Delgada (3px)</option>
+                <option value="classic">{t('skin.classic')}</option>
+                <option value="slim">{t('skin.slim')}</option>
               </select>
-              <button className="primary" onClick={applySkin} disabled={skinBusy || !skinUrl}>{skinBusy ? 'Aplicando…' : 'Aplicar'}</button>
-              <button className="ghost danger" onClick={resetSkin}>Restablecer</button>
+              <button className="primary" onClick={applySkin} disabled={skinBusy || !skinUrl}>{skinBusy ? t('skin.applying') : t('skin.apply')}</button>
+              <button className="ghost danger" onClick={resetSkin}>{t('skin.reset')}</button>
             </div>
           </div>
         )}
         {tab==='ajustes' && (
           <>
           <div className="card">
-            <h2>Actualizaciones {appVer && <span className="pill">v{appVer}</span>}</h2>
+            <h2>{t('set.updates')} {appVer && <span className="pill">v{appVer}</span>}</h2>
             <div className="row">
-              <button className="ghost" onClick={async()=>{setUpd({state:'checking'}); try{await window.ferro.checkUpdate();}catch(e){setUpd({state:'error',error:e.message});}}}>Buscar actualizaciones</button>
-              {upd.state==='checking' && <span className="pill"><span className="spinner" />buscando…</span>}
-              {upd.state==='available' && <span className="pill">Nueva versión {upd.version}: descargando…</span>}
+              <button className="ghost" onClick={async()=>{setUpd({state:'checking'}); try{await window.ferro.checkUpdate();}catch(e){setUpd({state:'error',error:e.message});}}}>{t('set.checkUpd')}</button>
+              {upd.state==='checking' && <span className="pill"><span className="spinner" />{t('set.upChecking')}</span>}
+              {upd.state==='available' && <span className="pill">{t('set.upAvail', {v:upd.version})}</span>}
               {upd.state==='downloading' && <span className="pill"><span className="spinner" />{(upd.percent||0).toFixed(0)}%</span>}
-              {upd.state==='downloaded' && <><span className="pill green">✓ v{upd.version} lista</span><button className="primary" onClick={()=>window.ferro.quitAndInstall()}>Reiniciar e instalar</button></>}
-              {upd.state==='error' && <span className="pill">Sin conexión con releases{upd.error?`: ${upd.error.slice(0,80)}`:''}</span>}
-              {upd.state==='dev' && <span className="pill">Modo desarrollo</span>}
+              {upd.state==='downloaded' && <><span className="pill green">✓ v{upd.version} {t('set.upReady')}</span><button className="primary" onClick={()=>window.ferro.quitAndInstall()}>{t('set.restart')}</button></>}
+              {upd.state==='error' && <span className="pill">{t('set.upErr')}{upd.error?`: ${upd.error.slice(0,80)}`:''}</span>}
+              {upd.state==='dev' && <span className="pill">{t('set.upDev')}</span>}
             </div>
           </div>
           <div className="card">
-            <h2>Sonido</h2>
+            <h2>{t('set.lang')}</h2>
             <div className="row">
-              <button className="ghost" onClick={()=>{sfx.cfg.enabled=!sfx.cfg.enabled; sfx.save(); setSfxOn(sfx.cfg.enabled); if(sfx.cfg.enabled) sfx.play('success');}}>{sfxOn ? '✓ Activado' : 'Desactivado'}</button>
-              <button className="ghost" onClick={()=>{sfx.cfg.hover=!sfx.cfg.hover; sfx.save(); setSfxHover(sfx.cfg.hover);}}>Hover: {sfxHover ? 'sí' : 'no'}</button>
-              <label>Volumen <input type="range" min={0} max={1} step={0.05} value={sfxVol} onChange={(e)=>{sfx.cfg.volume=Number(e.target.value); sfx.save(); setSfxVol(sfx.cfg.volume);}} style={{width:130}} /></label>
-              <button className="ghost" onClick={()=>sfx.play('launch')}>Probar</button>
+              <select value={lang} onChange={(e)=>setLangBoth(e.target.value)}>
+                <option value="es">Español</option>
+                <option value="en">English</option>
+              </select>
             </div>
           </div>
           <div className="card">
-            <h2>Discord Rich Presence</h2>
-            <p style={{opacity:.65}}>Muestra "Jugando Minecraft" con instancia y versión. Crea la app gratis en discord.com/developers → copia el Application ID. Para el logo, súbelo en Rich Presence → Art Assets con nombre <b>logo</b>.</p>
+            <h2>{t('set.sound')}</h2>
             <div className="row">
-              <input value={dcId} onChange={(e)=>setDcId(e.target.value)} placeholder="Application ID de Discord" style={{minWidth:240}} />
-              <button className="ghost" onClick={async()=>{await window.ferro.setDiscord({clientId:dcId, enabled:dcOn}); setLog((l)=>l+'[ferro] discord guardado\n');}}><Check size={14} /> Guardar</button>
-              <button className="ghost" onClick={async()=>{const v=!dcOn; setDcOn(v); await window.ferro.setDiscord({enabled:v});}}>{dcOn ? '✓ Activado' : 'Desactivado'}</button>
+              <button className="ghost" onClick={()=>{sfx.cfg.enabled=!sfx.cfg.enabled; sfx.save(); setSfxOn(sfx.cfg.enabled); if(sfx.cfg.enabled) sfx.play('success');}}>{sfxOn ? `✓ ${t('set.sfxOn')}` : t('set.sfxOff')}</button>
+              <button className="ghost" onClick={()=>{sfx.cfg.hover=!sfx.cfg.hover; sfx.save(); setSfxHover(sfx.cfg.hover);}}>{t('set.hover')}: {sfxHover ? t('set.yes') : t('set.no')}</button>
+              <label>{t('set.volume')} <input type="range" min={0} max={1} step={0.05} value={sfxVol} onChange={(e)=>{sfx.cfg.volume=Number(e.target.value); sfx.save(); setSfxVol(sfx.cfg.volume);}} style={{width:130}} /></label>
+              <button className="ghost" onClick={()=>sfx.play('launch')}>{t('set.test')}</button>
             </div>
           </div>
           <div className="card">
-            <h2>Java</h2>
+            <h2>{t('set.discord')}</h2>
+            <p style={{opacity:.65}}>{t('set.discordDesc')}</p>
+            <div className="row">
+              <input value={dcId} onChange={(e)=>setDcId(e.target.value)} placeholder={t('set.dcPh')} style={{minWidth:240}} />
+              <button className="ghost" onClick={async()=>{await window.ferro.setDiscord({clientId:dcId, enabled:dcOn}); setLog((l)=>l+'[ferro] discord guardado\n');}}><Check size={14} /> {t('acct.save')}</button>
+              <button className="ghost" onClick={async()=>{const v=!dcOn; setDcOn(v); await window.ferro.setDiscord({enabled:v});}}>{dcOn ? `✓ ${t('set.sfxOn')}` : t('set.sfxOff')}</button>
+            </div>
+          </div>
+          <div className="card">
+            <h2>{t('set.java')}</h2>
             <pre>{JSON.stringify(java, null, 2) || 'no encontrado'}</pre>
-            <p style={{opacity:.7}}>Se usa el Java del sistema si cumple el requisito de la versión; si no, se descarga Temurin auto a runtimes/.</p>
+            <p style={{opacity:.7}}>{t('set.javaDesc')}</p>
+            <p style={{opacity:.5, fontSize:12}}>Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft. · Contact: github.com/4DRI4N-OFF/FerroLauncher/issues</p>
           </div>
           </>
         )}
@@ -835,10 +891,10 @@ export default function App() {
       {flashKey > 0 && <div key={flashKey} className="vignette" />}
       {scare && (
         <div className="scare" onClick={() => setScare(null)}>
-          <div className="scare-title">ACCESO DENEGADO</div>
-          <div className="scare-sub">Suplantación detectada: <b>{scare.name}</b></div>
-          <div className="scare-case">Reporte {scare.caseId} · archivado</div>
-          <div className="scare-warn">Usar la cuenta de otra persona va contra los Términos de Mojang y puede acabar en baneo. Usa tu propia cuenta o inicia sesión con Microsoft. Pulsa para continuar.</div>
+          <div className="scare-title">{t('scare.title')}</div>
+          <div className="scare-sub">{t('scare.sub')} <b>{scare.name}</b></div>
+          <div className="scare-case">{t('scare.report')} {scare.caseId} · {t('scare.filed')}</div>
+          <div className="scare-warn">{t('scare.warn')}</div>
         </div>
       )}
       <div className="toasts">

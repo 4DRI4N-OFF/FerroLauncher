@@ -60,5 +60,11 @@ MIT — see LICENSE.
 
 ## Disclaimer
 
-Not affiliated with Mojang AB or Microsoft. Minecraft is a trademark
-of Mojang Synergies AB.
+NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
+FerroLauncher downloads game files exclusively from official Mojang/Microsoft servers and
+never redistributes them. Minecraft is a trademark of Mojang Synergies AB.
+
+## Contact
+
+Owner: Adrián García Martínez ([@4DRI4N-OFF](https://github.com/4DRI4N-OFF)).
+Issues and contact: <https://github.com/4DRI4N-OFF/FerroLauncher/issues>.

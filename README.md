@@ -11,7 +11,7 @@
   <a href="https://www.youtube.com/@4dri4n-08"><img src="https://img.shields.io/badge/YouTube-@4dri4n--08-red?logo=youtube" alt="YouTube" /></a>
 </p>
 
-<p align="center"><b>Open-source Minecraft: Java Edition launcher for Windows.</b><br />Instances, loaders, mods and modpacks in one place — with a liquid-glass ember UI.</p>
+<p align="center"><b>Open-source Minecraft: Java Edition launcher for Windows.</b><br />Instances, loaders, mods and modpacks in one place — with a glassmorphism ember UI.</p>
 
 ---
 
@@ -24,7 +24,7 @@
 | 📦 Instances | Isolated dirs, per-instance RAM / Java / resolution, start-stop console |
 | 🧪 Content | Mods, shaders, resource packs + one-click `.mrpack` modpacks (Modrinth) |
 | ☕ Java | Auto-detects the required version, downloads Temurin when missing |
-| 🎨 UI | Liquid-glass ember theme + Midnight / Forest / Sakura, ES/EN, sounds, toasts |
+| 🎨 UI | Glassmorphism ember theme + Midnight / Forest / Sakura, ES/EN, sounds, toasts |
 | 🛡️ Safety | Premium-name anti-impersonation, download verification, backups |
 | 🔄 More | Auto-updater, skins & capes, Discord RPC + webhooks, crash viewer, gallery |
 

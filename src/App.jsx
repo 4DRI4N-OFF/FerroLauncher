@@ -179,7 +179,6 @@ export default function App() {
   const [bkList, setBkList] = useState([]);
   const [crList, setCrList] = useState([]);
   const [crOpen, setCrOpen] = useState(null);
-  const [shList, setShList] = useState([]);
   const [modalOrigin, setModalOrigin] = useState(null);
   const [modalClosing, setModalClosing] = useState(false);
   const [galName, setGalName] = useState('');
@@ -313,12 +312,6 @@ export default function App() {
     if (!name) return;
     setCrOpen(null);
     try { setCrList(await window.ferro.crashes({ instanceName: name })); }
-    catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
-  };
-
-  const loadShots = async (name) => {
-    if (!name) return;
-    try { setShList(await window.ferro.shots({ instanceName: name })); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -512,7 +505,6 @@ export default function App() {
 
   const cancelBrowserAuth = async () => {
     setBrowserWaiting(false);
-    try { await window.ferro.authBrowserCancel(); } catch {}
     try { await window.ferro.authWindowCancel(); } catch {}
   };
 
@@ -924,7 +916,7 @@ export default function App() {
             <h2>{t('acct.title')}</h2>
             <p>{t('acct.desc')}</p>
             <div className="row">
-              <input value={clientId} onChange={(e)=>setClientId(e.target.value)} placeholder="Client ID (por defecto el oficial)" style={{minWidth:300}} />
+              <input value={clientId} onChange={(e)=>setClientId(e.target.value)} placeholder={t('acct.clientPh')} style={{minWidth:300}} />
               <button className="ghost" onClick={async()=>{await window.ferro.setClientId({ clientId }); setLog((l)=>l+'[ferro] client ID guardado\n');}}>{t('acct.save')}</button>
             </div>
             <h3>{t('acct.accounts')} ({accts.length})</h3>

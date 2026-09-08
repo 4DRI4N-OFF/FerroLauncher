@@ -327,26 +327,8 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
 .grid .card:nth-child(5) { animation-delay: 0.2s; }
 .grid .card:nth-child(6) { animation-delay: 0.25s; }
 .grid .card:nth-child(n+7) { animation-delay: 0.3s; }
-.grid .card.expanded {
-  grid-column: 1 / -1;
-  border-color: rgba(255, 182, 46, 0.4);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45), 0 0 30px rgba(255, 130, 30, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
 
-/* ——— Subventana dentro de la tarjeta ——— */
-.subpanel {
-  margin-top: 14px;
-  padding: 16px;
-  border: 1px solid var(--stroke-soft);
-  border-radius: 16px;
-  background: rgba(0, 0, 0, 0.28);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  display: flex; flex-direction: column; gap: 12px;
-  animation: sub-in 0.3s ease both;
-  box-shadow: inset 0 2px 16px rgba(0, 0, 0, 0.35);
-}
-@keyframes sub-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+/* ——— Subsecciones del modal ——— */
 .subhead {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   font-size: 11.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.6px;
@@ -602,11 +584,8 @@ pre {
   animation: t-shrink 4.5s linear forwards; }
 .toast.error .t-bar { animation-duration: 6s; }
 @keyframes toast-in { from { opacity: 0; transform: translateX(60px) scale(0.95); } to { opacity: 1; transform: none; } }
-@keyframes toast-out { to { opacity: 0; transform: translateX(60px) scale(0.95); } }
 @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
 @keyframes t-shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
-@keyframes flash-red { 0%, 100% { box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1); } 30% { box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4), 0 0 34px rgba(248, 113, 113, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1); } }
-.flash-red { animation: flash-red 0.6s ease; }
 
 /* ——— Viñeta roja al fallar ——— */
 .vignette {

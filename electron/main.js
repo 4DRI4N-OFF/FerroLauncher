@@ -226,7 +226,6 @@ ipcMain.handle('ferro:versions', async () => {
 
 ipcMain.handle('ferro:instances', async () => listInstances(getDirs().instances));
 ipcMain.handle('ferro:createInstance', async (_, { name, versionId, type, loaderVersion }) => createInstance(getDirs().instances, name, versionId, { type, loaderVersion }));
-ipcMain.handle('ferro:fabricLoaders', async (_, mcVersion) => listLoaders(mcVersion));
 ipcMain.handle('ferro:loaders', async (_, { mcVersion, type }) => {
   if (type === 'forge') return (await listForge(mcVersion)).map((f) => ({ loader: f.version, tag: f.tag }));
   if (type === 'neoforge') return (await listNeoForge(mcVersion)).map((v) => ({ loader: v, stable: true }));
@@ -394,30 +393,8 @@ ipcMain.handle('ferro:skinReset', async () => {
   return skins.resetSkin(acc.mcToken);
 });
 
-let browserAuth = null;
-ipcMain.handle('ferro:authBrowser', async () => {
-  const d = getDirs();
-  if (browserAuth) browserAuth.cancel();
-  const { url, cancel } = await auth.browserLogin({
-    clientId: auth.getClientId(d.base),
-    baseDir: d.base,
-    onDone: (acc) => {
-      browserAuth = null;
-      win && win.webContents.send('ferro:auth-done', { name: acc.profile.name, uuid: acc.profile.uuid });
-    },
-    onError: (e) => {
-      browserAuth = null;
-      win && win.webContents.send('ferro:auth-error', { error: e.message });
-    },
-  });
-  browserAuth = { cancel };
-  await shell.openExternal(url);
-  return true;
-});
-ipcMain.handle('ferro:authBrowserCancel', async () => { if (browserAuth) browserAuth.cancel(); browserAuth = null; return true; });
-ipcMain.handle('ferro:authWindowCancel', async () => { try { if (authWin && !authWin.isDestroyed()) authWin.close(); } catch {} authWin = null; return true; });
-
 let authWin = null;
+ipcMain.handle('ferro:authWindowCancel', async () => { try { if (authWin && !authWin.isDestroyed()) authWin.close(); } catch {} authWin = null; return true; });
 ipcMain.handle('ferro:authWindow', async () => {
   const d = getDirs();
   const clientId = auth.getClientId(d.base);

@@ -1,14 +1,10 @@
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
-const http = require('http');
 
-// Client ID integrado (el de tu app Azure): los usuarios finales no registran nada.
-// Se puede sobreescribir desde la UI (pestaña Cuentas) y se guarda en ferro-config.json.
-const DEFAULT_CLIENT_ID = 'e38aa735-6b06-4111-9d58-5190f3d754db';
-// Discord App ID integrado: RPC funciona para todos sin configurar.
-// Opcional por usuario desde Ajustes → Discord.
-const DEFAULT_DISCORD_ID = '1546684646656446576';
+// Sin IDs integrados a propósito: cada usuario usa su propia app Azure/Discord.
+// Se configuran en la UI (Cuenta / Ajustes → Discord) y se guardan en ferro-config.json.
+const DEFAULT_CLIENT_ID = '';
+const DEFAULT_DISCORD_ID = '';
 
 const MS_DEVICE = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode';
 const MS_TOKEN = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/token';
@@ -247,7 +243,7 @@ module.exports = {
   getClientId, setClientId, getDiscord, setDiscord, deviceStart, devicePollOnce,
   completeLogin, validAccount, loadAccount, clearAccount,
   listAccounts, setActive, removeAccount,
-  browserLogin, exchangeCode, authorizeUrl, NATIVE_REDIRECT, SCOPE,
+  exchangeCode, authorizeUrl, NATIVE_REDIRECT, SCOPE,
 };
 
 function authorizeUrl({ clientId, redirectUri, challenge, state }) {
@@ -264,58 +260,4 @@ async function exchangeCode({ clientId, code, redirectUri, verifier, baseDir }) 
   });
   if (data.error || !data.access_token) throw new Error(data.error_description || data.error || 'Token rechazado');
   return completeLogin(baseDir, data.access_token, data.refresh_token);
-}
-
-// Flujo navegador (PKCE + localhost): devuelve { url, cancel() }.
-// Llama onDone({account}) al completar o onError(err).
-function browserLogin({ clientId, baseDir, onDone, onError }) {
-  const verifier = crypto.randomBytes(32).toString('base64url');
-  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
-  const state = crypto.randomBytes(8).toString('hex');
-  let server = null;
-
-  const finishHtml = (ok, msg) =>
-    `<html><body style="background:#0b0e17;color:#f2f4fb;font-family:sans-serif;display:flex;height:100vh;align-items:center;justify-content:center"><h2>${ok ? '✓' : '✗'} ${msg}</h2><p>&nbsp;Puedes cerrar esta ventana.</p></body></html>`;
-
-  const close = () => { try { server && server.close(); } catch {} server = null; };
-
-  server = http.createServer(async (req, res) => {
-    try {
-      const u = new URL(req.url, 'http://localhost');
-      if (u.pathname !== '/callback') { res.writeHead(404); res.end(); return; }
-      if (u.searchParams.get('state') !== state) throw new Error('state inválido');
-      if (u.searchParams.get('error')) throw new Error(u.searchParams.get('error_description') || u.searchParams.get('error'));
-      const code = u.searchParams.get('code');
-      if (!code) throw new Error('Sin código de Microsoft');
-      const port = server.address().port;
-      const data = await form(MS_TOKEN, {
-        grant_type: 'authorization_code', client_id: clientId, code,
-        redirect_uri: `http://localhost:${port}/callback`, code_verifier: verifier,
-      });
-      if (data.error || !data.access_token) throw new Error(data.error_description || data.error || 'Token rechazado');
-      const acc = await completeLogin(baseDir, data.access_token, data.refresh_token);
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(finishHtml(true, 'Sesión iniciada en FerroLauncher.'));
-      close();
-      onDone && onDone(acc);
-    } catch (e) {
-      try { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(finishHtml(false, e.message)); } catch {}
-      close();
-      onError && onError(e);
-    }
-  });
-
-  return new Promise((resolve, reject) => {
-    server.listen(0, '127.0.0.1', () => {
-      const port = server.address().port;
-      const url =
-        `https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?` +
-        `client_id=${encodeURIComponent(clientId)}&response_type=code` +
-        `&redirect_uri=${encodeURIComponent(`http://localhost:${port}/callback`)}` +
-        `&scope=${encodeURIComponent(SCOPE)}&code_challenge=${challenge}` +
-        `&code_challenge_method=S256&state=${state}&prompt=select_account`;
-      resolve({ url, cancel: close });
-    });
-    server.on('error', reject);
-  });
 }

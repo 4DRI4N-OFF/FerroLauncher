@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, shell, dialog, screen } = require('electron
 const path = require('path');
 const fs = require('fs');
 const { getDataDir, dirs } = require('../core/constants');
-const { ensureDirs, listInstances, createInstance, updateInstanceSettings, setForgeProfile, duplicateInstance, deleteInstance, renameInstance, touchPlayed } = require('../core/instanceManager');
+const { ensureDirs, listInstances, createInstance, updateInstanceSettings, setForgeProfile, duplicateInstance, deleteInstance, renameInstance, touchPlayed, addPlayTime } = require('../core/instanceManager');
 const { listVersions, getVersionDetails, downloadClientJar } = require('../core/mojangService');
 const { findJava, ensureJava } = require('../core/javaManager');
 const { resolveLibraries, launch } = require('../core/launcher');
@@ -63,6 +63,13 @@ let splash = null;
 let D = null;
 let activeChild = null;
 let activeInstance = null;
+let activeT0 = null;
+
+function fmtPlay(totalSecs) {
+  const m = Math.floor((totalSecs || 0) / 60);
+  if (m < 60) return `${m} min`;
+  return `${(m / 60).toFixed(m < 600 ? 1 : 0)} h`;
+}
 
 function getDirs() {
   if (!D) {
@@ -572,6 +579,7 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
   }
   activeChild = await launch({ javaPath: javaBin, versionDetails: details, clientJar, librariesCp: cp, nativesDir, loggingPath, instanceDir: inst.path, dataDirs: d, username: username || 'Ferro', ramMb: effRam, width: effW, height: effH, onLog: send, mainClassOverride, extraClasspath, auth: authArg });
   activeInstance = inst.name;
+  activeT0 = Date.now();
   touchPlayed(d.instances, inst.name);
   // Discord RPC (no bloquea; falla en silencio sin cliente Discord)
   try {
@@ -580,6 +588,14 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
       discord.setPlaying(dc.clientId, { version: details.id, instance: inst.name, loader: inst.type, username: (authArg && authArg.username) || username || 'Ferro' }, send);
     }
   } catch {}
-  activeChild.on('close', () => { activeChild = null; activeInstance = null; try { discord.clear(); } catch {} });
+  activeChild.on('close', () => {
+    const secs = activeT0 ? Math.round((Date.now() - activeT0) / 1000) : 0;
+    if (activeInstance && secs >= 60) {
+      const total = addPlayTime(d.instances, activeInstance, secs);
+      if (total) send(`[ferro] sesión de ${Math.floor(secs / 60)} min (total ${fmtPlay(total)})\n`);
+    }
+    activeChild = null; activeInstance = null; activeT0 = null;
+    try { discord.clear(); } catch {}
+  });
   return true;
 });

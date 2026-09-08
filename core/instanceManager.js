@@ -56,7 +56,7 @@ function updateInstanceSettings(instancesDir, name, patch) {
   return withSettings({ name, path: dir, ...cfg });
 }
 
-module.exports = { ensureDirs, listInstances, createInstance, updateInstanceSettings, defaultSettings, setForgeProfile, duplicateInstance, deleteInstance, renameInstance, touchPlayed };
+module.exports = { ensureDirs, listInstances, createInstance, updateInstanceSettings, defaultSettings, setForgeProfile, duplicateInstance, deleteInstance, renameInstance, touchPlayed, addPlayTime };
 
 function copyDir(src, dest) {
   fs.mkdirSync(dest, { recursive: true });
@@ -107,6 +107,17 @@ function touchPlayed(instancesDir, name) {
     cfg.plays = (cfg.plays || 0) + 1;
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
   } catch {}
+}
+
+function addPlayTime(instancesDir, name, secs) {
+  try {
+    if (!secs || secs < 5) return null;
+    const cfgPath = path.join(instancesDir, name, 'ferro.json');
+    const cfg = withSettings(JSON.parse(fs.readFileSync(cfgPath, 'utf8')));
+    cfg.playSecs = Math.round((cfg.playSecs || 0) + secs);
+    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+    return cfg.playSecs;
+  } catch { return null; }
 }
 
 function setForgeProfile(instancesDir, name, patch) {

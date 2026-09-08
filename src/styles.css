@@ -34,6 +34,19 @@ body::before {
   background-size: 26px 26px;
   mask-image: radial-gradient(ellipse at 50% 30%, black 30%, transparent 75%);
 }
+body::after {
+  content: "";
+  position: fixed;
+  inset: -12%;
+  pointer-events: none;
+  background:
+    radial-gradient(560px 380px at 18% 22%, rgba(255, 110, 40, 0.16), transparent 60%),
+    radial-gradient(680px 480px at 82% 72%, rgba(226, 58, 26, 0.14), transparent 60%),
+    radial-gradient(500px 500px at 70% 15%, rgba(255, 214, 100, 0.1), transparent 60%);
+  animation: drift 18s ease-in-out infinite alternate;
+}
+@keyframes drift { to { transform: translate(3%, -2.5%) scale(1.05); } }
+.layout { position: relative; z-index: 1; }
 
 .layout { display: grid; grid-template-columns: 248px 1fr; height: 100vh; }
 
@@ -63,7 +76,7 @@ body::before {
 }
 .brand-logo {
   width: 100%;
-  aspect-ratio: 2048 / 887;
+  aspect-ratio: 2030 / 701;
   height: auto;
   display: block;
   border-radius: 16px;
@@ -84,7 +97,7 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
   background: radial-gradient(420px 260px at 50% 30%, rgba(255,110,40,.25), transparent 70%), rgba(13, 9, 8, 0.92);
 }
 .intro-logo {
-  width: 300px; aspect-ratio: 2048 / 887; height: auto; display: block;
+  width: 300px; aspect-ratio: 2030 / 701; height: auto; display: block;
   border-radius: 18px;
   filter: drop-shadow(0 12px 34px rgba(255, 120, 25, 0.5));
 }
@@ -98,11 +111,22 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
   background: transparent;
   border: 1px solid transparent;
   color: var(--muted);
-  padding: 11px 13px;
+  padding: 11px 13px 11px 16px;
   border-radius: 16px;
   cursor: pointer;
   transition: all 0.22s ease;
+  position: relative;
 }
+.side button::before {
+  content: "";
+  position: absolute;
+  left: 5px; top: 24%; height: 52%; width: 3px;
+  border-radius: 3px;
+  background: transparent;
+  transition: background 0.22s ease;
+}
+.side button:hover::before { background: rgba(255, 255, 255, 0.25); }
+.side button.active::before { background: rgba(26, 13, 6, 0.65); }
 .side button:hover {
   color: var(--ink);
   background: rgba(255, 255, 255, 0.07);
@@ -128,8 +152,26 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
   backdrop-filter: blur(10px);
 }
 
+/* ——— Chip de jugador ——— */
+.player-chip {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; margin-top: 4px;
+  border: 1px solid var(--stroke-soft); border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.player-chip:hover { background: rgba(255, 255, 255, 0.1); transform: translateY(-1px); }
+.player-chip .pc-id { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.player-chip .pc-id b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-chip .pc-id span { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.player-chip .dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.25); flex-shrink: 0; }
+.player-chip .dot.on { background: #34d399; box-shadow: 0 0 10px rgba(52, 211, 153, 0.9); }
+
 /* ——— Contenido ——— */
-.main { padding: 14px 18px 18px 14px; overflow: auto; }
+.main { padding: 14px 22px 22px 16px; overflow: auto; }
+.main > * { max-width: 1060px; margin-inline: auto; }
+.main > .card { margin-bottom: 14px; }
 .main > .card { animation: rise 0.35s ease both; }
 @keyframes rise {
   from { opacity: 0; transform: translateY(10px) scale(0.99); }
@@ -144,14 +186,72 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
   padding: 20px;
   margin-bottom: 14px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  position: relative;
 }
-.card h2 { margin: 0 0 4px; font-size: 19px; letter-spacing: 0.2px; }
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 28px; right: 28px; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 190, 90, 0.55), transparent);
+  pointer-events: none;
+}
+.grid .card::before { left: 18px; right: 18px; opacity: 0.7; }
+.card h2 { margin: 0 0 4px; font-size: 21px; font-weight: 800; letter-spacing: 0.3px; }
 .card h3 { margin: 18px 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 1.4px; color: var(--muted); }
 .card p { color: var(--muted); }
+
+/* ——— Hero Jugar ——— */
+.hero {
+  background:
+    radial-gradient(600px 220px at 20% 0%, rgba(255, 140, 40, 0.16), transparent 65%),
+    var(--glass-strong);
+  overflow: hidden;
+}
+.hero-vanilla { background: radial-gradient(600px 220px at 20% 0%, rgba(52, 211, 153, 0.14), transparent 65%), var(--glass-strong); }
+.hero-fabric { background: radial-gradient(600px 220px at 20% 0%, rgba(255, 182, 46, 0.2), transparent 65%), var(--glass-strong); }
+.hero-quilt { background: radial-gradient(600px 220px at 20% 0%, rgba(167, 139, 250, 0.2), transparent 65%), var(--glass-strong); }
+.hero-forge { background: radial-gradient(600px 220px at 20% 0%, rgba(248, 113, 113, 0.18), transparent 65%), var(--glass-strong); }
+.hero-neoforge { background: radial-gradient(600px 220px at 20% 0%, rgba(251, 146, 60, 0.22), transparent 65%), var(--glass-strong); }
+.hero-top { display: flex; gap: 20px; align-items: center; }
+.hero-id { flex: 1; min-width: 0; }
+.hero-kicker { font-size: 11.5px; text-transform: uppercase; letter-spacing: 2.2px; color: var(--muted); margin-bottom: 4px; }
+.hero-title {
+  font-size: clamp(26px, 4vw, 38px); font-weight: 900; letter-spacing: 0.5px; line-height: 1.05;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  background: linear-gradient(92deg, #fff3d6, var(--amber) 60%, var(--ember));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 4px 18px rgba(255, 130, 30, 0.3));
+}
+.hero-id .meta { margin-top: 10px; }
+.hero-play { flex-shrink: 0; }
+.hero h2 { font-size: 26px; }
+.hero-controls { margin-top: 16px; }
+.face.xl { width: 76px; height: 76px; border-radius: 22px; }
+.hero-play .primary { font-size: 18px; padding: 16px 44px; border-radius: 20px; white-space: nowrap; }
+
+/* ——— Entrada escalonada ——— */
+.main > .card { animation: rise 0.35s ease both; }
+.grid .card { animation: rise 0.4s ease both; }
+.grid .card:nth-child(2) { animation-delay: 0.05s; }
+.grid .card:nth-child(3) { animation-delay: 0.1s; }
+.grid .card:nth-child(4) { animation-delay: 0.15s; }
+.grid .card:nth-child(5) { animation-delay: 0.2s; }
+.grid .card:nth-child(6) { animation-delay: 0.25s; }
+.grid .card:nth-child(n+7) { animation-delay: 0.3s; }
+
+/* ——— Pills por loader ——— */
+.pill.l-vanilla { background: rgba(148, 163, 184, 0.14); border-color: rgba(148, 163, 184, 0.4); }
+.pill.l-fabric { background: rgba(255, 182, 46, 0.16); border-color: rgba(255, 182, 46, 0.5); color: #ffe1a8; }
+.pill.l-quilt { background: rgba(167, 139, 250, 0.16); border-color: rgba(167, 139, 250, 0.5); color: #d6c8ff; }
+.pill.l-forge { background: rgba(248, 113, 113, 0.14); border-color: rgba(248, 113, 113, 0.45); color: #fecaca; }
+.pill.l-neoforge { background: rgba(251, 146, 60, 0.16); border-color: rgba(251, 146, 60, 0.5); color: #fed7aa; }
+
+/* ——— Press físico ——— */
+button.primary:active, button.ghost:active, .side button:active { transform: scale(0.97); }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
 input, select {
-  background: rgba(10, 13, 24, 0.6);
+  background: rgba(10, 8, 7, 0.62);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   border: 1px solid var(--stroke-soft);
@@ -161,6 +261,15 @@ input, select {
   outline: none;
   transition: border 0.2s, box-shadow 0.2s;
 }
+select {
+  appearance: none; -webkit-appearance: none;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ffb62e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  cursor: pointer;
+}
+input[type="range"] { accent-color: var(--amber); padding: 0; border: none; background: transparent; }
 input:focus, select:focus { border-color: rgba(255, 182, 46, 0.65); box-shadow: 0 0 0 3px rgba(255, 110, 40, 0.18); }
 input::placeholder { color: rgba(235, 240, 255, 0.35); }
 select option { background: #141a2c; }

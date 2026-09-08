@@ -38,15 +38,15 @@ function tone({ f = 600, f2 = null, t = 0.08, type = 'sine', v = 1, delay = 0, m
 }
 
 const RECIPES = {
-  click: (m) => tone({ f: 640, f2: 880, t: 0.07, type: 'triangle', v: 0.5, master: m }),
-  hover: (m) => tone({ f: 980, t: 0.035, type: 'sine', v: 0.12, master: m }),
-  success: (m) => { tone({ f: 523, t: 0.09, v: 0.6, master: m }); tone({ f: 784, t: 0.12, v: 0.6, delay: 0.09, master: m }); },
-  error: (m) => tone({ f: 190, f2: 130, t: 0.18, type: 'sawtooth', v: 0.4, master: m }),
+  click: (m) => { tone({ f: 880, f2: 1318, t: 0.055, type: 'sine', v: 0.4, master: m }); tone({ f: 2637, t: 0.03, type: 'sine', v: 0.1, master: m }); },
+  hover: (m) => tone({ f: 1568, t: 0.025, type: 'sine', v: 0.07, master: m }),
+  success: (m) => { tone({ f: 659, t: 0.1, type: 'triangle', v: 0.5, master: m }); tone({ f: 784, t: 0.1, type: 'triangle', v: 0.5, delay: 0.08, master: m }); tone({ f: 988, t: 0.16, type: 'triangle', v: 0.55, delay: 0.16, master: m }); },
+  error: (m) => { tone({ f: 233, f2: 110, t: 0.24, type: 'sine', v: 0.6, master: m }); tone({ f: 466, f2: 220, t: 0.18, type: 'triangle', v: 0.2, master: m }); },
   alarm: (m) => {
     for (let i = 0; i < 3; i++) {
       tone({ f: 620, f2: 310, t: 0.22, type: 'sawtooth', v: 0.5, delay: i * 0.28, master: m });
       tone({ f: 155, t: 0.22, type: 'square', v: 0.25, delay: i * 0.28, master: m });
     }
   },
-  launch: (m) => { tone({ f: 280, f2: 920, t: 0.35, type: 'triangle', v: 0.55, master: m }); tone({ f: 140, f2: 460, t: 0.35, type: 'sine', v: 0.4, master: m }); },
+  launch: (m) => { tone({ f: 220, f2: 1175, t: 0.42, type: 'triangle', v: 0.5, master: m }); tone({ f: 440, f2: 2350, t: 0.42, type: 'sine', v: 0.2, master: m }); tone({ f: 110, f2: 330, t: 0.4, type: 'sine', v: 0.35, master: m }); },
 };

@@ -155,9 +155,9 @@ export default function App() {
   const [logSearch, setLogSearch] = useState('');
   const [autoScroll, setAutoScroll] = useState(true);
   const [settingsFor, setSettingsFor] = useState('');
-  const [sRam, setSRam] = useState(2048);
-  const [sW, setSW] = useState(854);
-  const [sH, setSH] = useState(480);
+  const [sRam, setSRam] = useState('2048');
+  const [sW, setSW] = useState('854');
+  const [sH, setSH] = useState('480');
   const [sJavaMode, setSJavaMode] = useState('auto');
   const [sJavaPath, setSJavaPath] = useState('');
   const [saving, setSaving] = useState(false);
@@ -485,7 +485,7 @@ export default function App() {
     setSettingsFor(name);
     const i = instances.find((x) => x.name === name);
     if (i?.settings) {
-      setSRam(i.settings.ramMb); setSW(i.settings.width); setSH(i.settings.height);
+      setSRam(String(i.settings.ramMb)); setSW(String(i.settings.width)); setSH(String(i.settings.height));
       setSJavaMode(i.settings.javaMode); setSJavaPath(i.settings.javaPath || '');
     }
   };
@@ -635,9 +635,9 @@ export default function App() {
               <>
                 <h3>{t('inst.settingsOf')} {settingsFor} <button className="ghost" onClick={()=>setSettingsFor('')} style={{marginLeft:8}}><X size={14} /></button></h3>
                 <div className="row">
-                  <label>{t('inst.ram')} <input type="number" value={sRam} min={512} max={16384} step={512} onChange={(e)=>setSRam(Number(e.target.value))} style={{width:110}} /></label>
-                  <label>{t('inst.width')} <input type="number" value={sW} min={320} max={7680} onChange={(e)=>setSW(Number(e.target.value))} style={{width:90}} /></label>
-                  <label>{t('inst.height')} <input type="number" value={sH} min={240} max={4320} onChange={(e)=>setSH(Number(e.target.value))} style={{width:90}} /></label>
+                  <label>{t('inst.ram')} <input type="number" value={sRam} min={512} max={16384} step={512} onChange={(e)=>setSRam(e.target.value)} style={{width:110}} /></label>
+                  <label>{t('inst.width')} <input type="number" value={sW} min={320} max={7680} onChange={(e)=>setSW(e.target.value)} style={{width:90}} /></label>
+                  <label>{t('inst.height')} <input type="number" value={sH} min={240} max={4320} onChange={(e)=>setSH(e.target.value)} style={{width:90}} /></label>
                   <select value={sJavaMode} onChange={(e)=>setSJavaMode(e.target.value)}>
                     <option value="auto">{t('inst.javaAuto')}</option>
                     <option value="custom">{t('inst.javaCustom')}</option>

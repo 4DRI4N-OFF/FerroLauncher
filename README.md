@@ -1,9 +1,15 @@
 # ⛏️ FerroLauncher
 
-[![Release](https://img.shields.io/github/v/release/4DRI4N-OFF/FerroLauncher)](https://github.com/4DRI4N-OFF/FerroLauncher/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-amber.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)](https://github.com/4DRI4N-OFF/FerroLauncher/releases)
-[![Electron](https://img.shields.io/badge/built%20with-Electron-47848f.svg)](https://www.electronjs.org/)
+<p align="center">
+  <img src="src/assets/brand.png" alt="FerroLauncher" width="600" />
+</p>
+
+<p align="center">
+  <a href="https://github.com/4DRI4N-OFF/FerroLauncher/releases"><img src="https://img.shields.io/github/v/release/4DRI4N-OFF/FerroLauncher" alt="Release" /></a>
+  <img src="https://img.shields.io/badge/License-MIT-amber.svg" alt="License: MIT" />
+  <img src="https://img.shields.io/badge/platform-Windows-blue.svg" alt="Platform" />
+  <img src="https://img.shields.io/badge/built%20with-Electron-47848f.svg" alt="Electron" />
+</p>
 
 Open-source **Minecraft: Java Edition** launcher for Windows, built with Electron + React + Node.js.
 A Prism-style launcher: instances, loaders, mods and modpacks in one place.

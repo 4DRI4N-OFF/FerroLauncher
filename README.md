@@ -1,5 +1,10 @@
 # ⛏️ FerroLauncher
 
+[![Release](https://img.shields.io/github/v/release/4DRI4N-OFF/FerroLauncher)](https://github.com/4DRI4N-OFF/FerroLauncher/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-amber.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)](https://github.com/4DRI4N-OFF/FerroLauncher/releases)
+[![Electron](https://img.shields.io/badge/built%20with-Electron-47848f.svg)](https://www.electronjs.org/)
+
 Open-source **Minecraft: Java Edition** launcher for Windows, built with Electron + React + Node.js.
 A Prism-style launcher: instances, loaders, mods and modpacks in one place.
 
@@ -7,27 +12,24 @@ A Prism-style launcher: instances, loaders, mods and modpacks in one place.
 
 ## Features
 
-- **Auth:** offline mode + Microsoft-account login (OAuth 2.0 + PKCE, auto-refresh)
+- **Auth:** offline mode + Microsoft-account login (OAuth 2.0 + PKCE, auto-refresh, multi-account)
 - **Loaders:** Vanilla, Fabric, Quilt, Forge, NeoForge ✅
-- **Instances:** isolated game dirs, per-instance RAM / Java / resolution, start-stop from console
-- **Mods:** search, install, enable/disable and update from **Modrinth**
-- **Modpacks:** one-click `.mrpack` install (mods + configs + overrides)
+- **Instances:** isolated game dirs, per-instance RAM / Java / resolution, start-stop from console, backups, import/export
+- **Content:** mods, shaders, resource packs and one-click `.mrpack` modpacks from **Modrinth**
 - **Java:** auto-detects the required version, downloads Temurin when missing
-- **Console:** live logs with level/text filters, autoscroll
-- **Updates:** auto-updater from GitHub Releases
-- **UI:** liquid-glass ember theme, Spanish + English
+- **Extras:** skins & capes, Discord Rich Presence, auto-updater, sounds, ES/EN UI
 
 ## Roadmap
 
 - [x] Offline launch (Vanilla + Fabric + Quilt + Forge + NeoForge)
-- [x] Modrinth mods & modpacks
+- [x] Modrinth mods, shaders, resource packs & modpacks
 - [x] Microsoft login flow (pending Mojang app approval)
 - [x] Auto-updater, custom icon
-- [ ] CurseForge browsing, shaderpacks & resource packs tabs
-- [ ] Skins & capes manager, servers list
-- [ ] Backups, instance export/import
+- [x] Skins & capes manager
+- [x] Backups, instance export/import
+- [x] Multi-account switcher
+- [ ] CurseForge browsing, servers list
 - [ ] Installer signing
-- [ ] Multi-account switcher
 
 ## Install (users)
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import brand from './assets/brand.png';
 import { sfx } from './sfx.js';
 import { STR, getLang } from './i18n.js';
@@ -7,6 +7,47 @@ import {
   Settings, Search, Plus, RefreshCw, FolderOpen, Copy, Pencil, Trash2,
   Download, Upload, Check, X, AlertTriangle, Info,
 } from 'lucide-react';
+
+// El recuadro del botón crece hasta convertirse en la ventana (morph ida y vuelta)
+function MorphModal({ origin, closing, onClose, title, children }) {
+  const boxRef = useRef(null);
+  const ovRef = useRef(null);
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    if (!box || !origin) return;
+    const r = box.getBoundingClientRect();
+    const dx = origin.cx - (r.left + r.width / 2);
+    const dy = origin.cy - (r.top + r.height / 2);
+    const sx = Math.max(0.05, origin.w / r.width);
+    const sy = Math.max(0.05, origin.h / r.height);
+    box.animate([
+      { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, opacity: 1, borderRadius: '14px' },
+      { transform: 'none', opacity: 1, borderRadius: '22px' },
+    ], { duration: 700, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'backwards' });
+  }, []);
+  useEffect(() => {
+    if (!closing) return;
+    const box = boxRef.current, ov = ovRef.current;
+    if (ov) { ov.style.transition = 'opacity .25s ease'; ov.style.opacity = '0'; }
+    if (box && origin) {
+      const r = box.getBoundingClientRect();
+      const dx = origin.cx - (r.left + r.width / 2);
+      const dy = origin.cy - (r.top + r.height / 2);
+      box.animate([
+        { transform: 'none', opacity: 1 },
+        { transform: `translate(${dx}px, ${dy}px) scale(${Math.max(0.05, origin.w / r.width)}, ${Math.max(0.05, origin.h / r.height)})`, opacity: 1 },
+      ], { duration: 260, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'forwards' });
+    }
+  }, [closing]);
+  return (
+    <div className="morph-overlay" ref={ovRef} onClick={onClose}>
+      <div ref={boxRef} className="morph-box" onClick={(e) => e.stopPropagation()}>
+        <div className="morph-head"><span className="card-title">{title}</span><button className="mini" onClick={onClose}><X size={12} /></button></div>
+        <div className="morph-body">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [tab, setTab] = useState('jugar');
@@ -47,6 +88,8 @@ export default function App() {
   const [updMap, setUpdMap] = useState({});
   const [checkingUpd, setCheckingUpd] = useState(false);
   const [updMsg, setUpdMsg] = useState('');
+  const [rpOn, setRpOn] = useState(null);
+  const [shaderCur, setShaderCur] = useState(null);
   const [packMc, setPackMc] = useState('1.21.1');
   const [packLoader, setPackLoader] = useState('');
   const [packSort, setPackSort] = useState('relevance');
@@ -67,6 +110,15 @@ export default function App() {
   const [sfxVol, setSfxVol] = useState(sfx.cfg.volume);
   const [sfxHover, setSfxHover] = useState(sfx.cfg.hover);
   const [sfxPack, setSfxPack] = useState(sfx.cfg.pack || 'cristal');
+  const [theme, setTheme] = useState(() => { try { return localStorage.getItem('ferro-theme') || 'ember'; } catch { return 'ember'; } });
+
+  useEffect(() => {
+    try {
+      if (theme === 'ember') document.documentElement.removeAttribute('data-theme');
+      else document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('ferro-theme', theme);
+    } catch {}
+  }, [theme]);
   const [dcId, setDcId] = useState('');
   const [dcOn, setDcOn] = useState(true);
   const [toasts, setToasts] = useState([]);
@@ -107,7 +159,7 @@ export default function App() {
           const [, instName] = crashM;
           pushToast('error', t('toast.crash', { n: instName }), {
             label: t('inst.view'),
-            fn: () => { setTab('instancias'); setCrFor(instName); loadCrashes(instName); },
+            fn: () => { setTab('instancias'); setSettingsFor(instName); loadBackups(instName); loadCrashes(instName); },
           });
         }
       }
@@ -119,11 +171,11 @@ export default function App() {
   const [skinUrl, setSkinUrl] = useState('');
   const [skinVariant, setSkinVariant] = useState('classic');
   const [skinBusy, setSkinBusy] = useState(false);
-  const [bkFor, setBkFor] = useState('');
   const [bkList, setBkList] = useState([]);
-  const [crFor, setCrFor] = useState('');
   const [crList, setCrList] = useState([]);
   const [crOpen, setCrOpen] = useState(null);
+  const [modalOrigin, setModalOrigin] = useState(null);
+  const [modalClosing, setModalClosing] = useState(false);
   const [intro, setIntro] = useState(true);
   const introImgRef = useRef(null);
   const sideLogoRef = useRef(null);
@@ -194,8 +246,6 @@ export default function App() {
       setInstances(inst);
       if (inst[0] && !launchInstance) setLaunchInstance(inst[0].name);
       if (inst[0] && !modsFor) setModsFor(inst[0].name);
-      if (inst[0] && !bkFor) { setBkFor(inst[0].name); loadBackups(inst[0].name); }
-      if (inst[0] && !crFor) { setCrFor(inst[0].name); loadCrashes(inst[0].name); }
       setJava(await window.ferro.java());
       try { setAccount(await window.ferro.authStatus()); } catch {}
     } catch (e) {
@@ -205,7 +255,18 @@ export default function App() {
 
   const loadMods = async (name, k) => {
     if (!name) return;
-    try { setMods(await window.ferro.mods({ instanceName: name, kind: k || kind })); }
+    const kk = k || kind;
+    try {
+      setMods(await window.ferro.mods({ instanceName: name, kind: kk }));
+      if (kk === 'resourcepack') {
+        try { const r = await window.ferro.rp({ instanceName: name }); setRpOn(r.enabled); }
+        catch { setRpOn(null); }
+      }
+      if (kk === 'shader') {
+        try { setShaderCur(await window.ferro.shader({ instanceName: name })); }
+        catch { setShaderCur(null); }
+      }
+    }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -527,14 +588,21 @@ export default function App() {
     if (autoScroll && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [filteredLog, autoScroll]);
 
-  const editSettings = (name) => {
+  const editSettings = (name, e) => {
+    if (settingsFor === name) { setSettingsFor(''); setModalOrigin(null); return; }
+    const r = e?.currentTarget?.getBoundingClientRect?.();
+    setModalOrigin(r ? { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width, h: r.height } : null);
     setSettingsFor(name);
     const i = instances.find((x) => x.name === name);
     if (i?.settings) {
       setSRam(String(i.settings.ramMb)); setSW(String(i.settings.width)); setSH(String(i.settings.height));
       setSJavaMode(i.settings.javaMode); setSJavaPath(i.settings.javaPath || '');
     }
+    loadBackups(name);
+    loadCrashes(name);
   };
+
+  const closeModal = () => { setModalClosing(true); setTimeout(() => { setSettingsFor(''); setModalOrigin(null); setModalClosing(false); }, 280); };
 
   const saveSettings = async () => {
     if (!settingsFor || saving) return;
@@ -658,63 +726,22 @@ export default function App() {
               <input value={instFilter} onChange={(e)=>setInstFilter(e.target.value)} placeholder={t('inst.filterPh')} />
             </div>
             <div className="grid">
-              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className="card"><div className="card-title" title={i.name}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}</span><span className={`pill l-${i.type}`}>{i.type==='vanilla' ? 'vanilla' : `${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}{fmtPlay(i.playSecs) ? ` · ${fmtPlay(i.playSecs)}` : ''}</span> : <span className="pill">{t('inst.neverPlayed')}</span>}</div><div className="actions"><button className="ghost" onClick={()=>editSettings(i.name)}><Settings size={14} /> {t('inst.settings')}</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}><Upload size={14} /> {t('inst.export')}</button><button className="ghost" onClick={async()=>{await window.ferro.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> {t('inst.folder')}</button><button className="ghost" onClick={async()=>{await window.ferro.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> {t('inst.duplicate')}</button><button className="ghost" onClick={async()=>{const n=window.prompt(t('inst.renamePrompt'), i.name); if(n && n!==i.name){await window.ferro.renameInstance({instanceName:i.name, newName:n}); refresh();}}}><Pencil size={14} /> {t('inst.rename')}</button><button className="ghost danger" onClick={async()=>{if(window.confirm(t('inst.delConfirm', {n:i.name}))){await window.ferro.deleteInstance({instanceName:i.name}); refresh();}}}><Trash2 size={14} /> {t('inst.delete')}</button></div></div>)}
+              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className="card"><div className="card-title" title={i.name}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}</span><span className={`pill l-${i.type}`}>{i.type==='vanilla' ? 'vanilla' : `${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}{fmtPlay(i.playSecs) ? ` · ${fmtPlay(i.playSecs)}` : ''}</span> : <span className="pill">{t('inst.neverPlayed')}</span>}</div><div className="actions"><button className="ghost" onClick={(e)=>editSettings(i.name, e)}><Settings size={14} /> {t('inst.settings')}</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}><Upload size={14} /> {t('inst.export')}</button><button className="ghost" onClick={async()=>{await window.ferro.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> {t('inst.folder')}</button><button className="ghost" onClick={async()=>{await window.ferro.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> {t('inst.duplicate')}</button><button className="ghost" onClick={async()=>{const n=window.prompt(t('inst.renamePrompt'), i.name); if(n && n!==i.name){await window.ferro.renameInstance({instanceName:i.name, newName:n}); refresh();}}}><Pencil size={14} /> {t('inst.rename')}</button><button className="ghost danger" onClick={async()=>{if(window.confirm(t('inst.delConfirm', {n:i.name}))){await window.ferro.deleteInstance({instanceName:i.name}); refresh();}}}><Trash2 size={14} /> {t('inst.delete')}</button></div>
+</div>)}
             </div>
             <div className="row" style={{marginTop:12}}>
               <button className="primary" onClick={async()=>{const n=await window.ferro.importInstance(); if(n){setLog((l)=>l+`[ferro] importada ${n}\n`); refresh();}}}><Upload size={14} /> {t('inst.import')}</button>
             </div>
-            <h3>{t('inst.backupsOf')} {bkFor || '…'}</h3>
-            <div className="row">
-              <select value={bkFor} onChange={(e)=>{setBkFor(e.target.value); loadBackups(e.target.value);}}>
-                {instances.map((i)=><option key={i.name} value={i.name}>{i.name}</option>)}
-              </select>
-              <button className="mini" onClick={async()=>{await window.ferro.backupCreate({instanceName:bkFor}); loadBackups(bkFor);}} disabled={!bkFor}>{t('inst.createBk')}</button>
-            </div>
-            {bkList.length===0 && <p style={{opacity:.6}}>{t('inst.noBk')}</p>}
-            <div className="grid" style={{marginTop:10}}>
-              {bkList.map((b)=><div key={b.file} className="card"><div className="card-title" title={b.file}>{b.file}</div><div className="meta"><span className="pill">{(b.size/1048576).toFixed(1)} MB</span></div><div className="actions">
-                <button className="mini" onClick={async()=>{await window.ferro.backupRestore({instanceName:bkFor, file:b.file});}}>{t('inst.restore')}</button>
-                <button className="mini danger" onClick={async()=>{await window.ferro.backupDelete({instanceName:bkFor, file:b.file}); loadBackups(bkFor);}}><Trash2 size={12} /> {t('inst.delete')}</button>
-              </div></div>)}
-            </div>
-            <h3>{t('inst.crashesOf')} {crFor || '…'}</h3>
-            <div className="row">
-              <select value={crFor} onChange={(e)=>{setCrFor(e.target.value); loadCrashes(e.target.value);}}>
-                {instances.map((i)=><option key={i.name} value={i.name}>{i.name}</option>)}
-              </select>
-              <button className="ghost" onClick={async()=>{await window.ferro.openCrashes({instanceName:crFor});}} disabled={!crFor}><FolderOpen size={14} /> {t('inst.folder')}</button>
-            </div>
-            {crList.length===0 && <p style={{opacity:.6}}>{t('inst.noCrashes')}</p>}
-            <div className="grid" style={{marginTop:10}}>
-              {crList.map((c)=><div key={c.file} className="card"><div className="card-title" title={c.file}>{c.file}</div><div className="meta">{c.description && <span className="pill">{c.description}</span>}<span className="pill">{new Date(c.mtime).toLocaleString()}</span></div><div className="actions"><button className="mini" onClick={async()=>{const r = crOpen?.file===c.file ? null : await window.ferro.crashRead({instanceName:crFor, file:c.file}); setCrOpen(r);}}>{crOpen?.file===c.file ? t('mods.hide') : t('inst.view')}</button></div>
-              {crOpen?.file===c.file && <pre style={{marginTop:10}}>{crOpen.content}{crOpen.truncated ? '\n…(truncado)' : ''}</pre>}</div>)}
-            </div>
-            {settingsFor && (
-              <>
-                <h3>{t('inst.settingsOf')} {settingsFor} <button className="ghost" onClick={()=>setSettingsFor('')} style={{marginLeft:8}}><X size={14} /></button></h3>
-                <div className="row">
-                  <label>{t('inst.ram')} <input type="number" value={sRam} min={512} max={16384} step={512} onChange={(e)=>setSRam(e.target.value)} style={{width:110}} /></label>
-                  <label>{t('inst.width')} <input type="number" value={sW} min={320} max={7680} onChange={(e)=>setSW(e.target.value)} style={{width:90}} /></label>
-                  <label>{t('inst.height')} <input type="number" value={sH} min={240} max={4320} onChange={(e)=>setSH(e.target.value)} style={{width:90}} /></label>
-                  <select value={sJavaMode} onChange={(e)=>setSJavaMode(e.target.value)}>
-                    <option value="auto">{t('inst.javaAuto')}</option>
-                    <option value="custom">{t('inst.javaCustom')}</option>
-                  </select>
-                  {sJavaMode==='custom' && <input value={sJavaPath} onChange={(e)=>setSJavaPath(e.target.value)} placeholder="C:\...\bin\java.exe" style={{minWidth:260}} />}
-                  <button className="primary" onClick={saveSettings} disabled={saving}>{saving ? t('inst.saving') : t('inst.save')}</button>
-                </div>
-              </>
-            )}
           </div>
         )}
         {tab==='mods' && (
           <div className="card">
             <h2>{t('mods.title')}</h2>
             <div className="row">
-              <select value={modsFor} onChange={(e)=>{setModsFor(e.target.value); setUpdMap({}); setUpdMsg(''); loadMods(e.target.value);}}>
+              <select value={modsFor} onChange={(e)=>{setModsFor(e.target.value); setUpdMap({}); setUpdMsg(''); setRpOn(null); setShaderCur(null); loadMods(e.target.value);}}>
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' '+i.type})</option>)}
               </select>
-              <select value={kind} onChange={(e)=>{setKind(e.target.value); setModHits([]); setInstalledIds([]); setUpdMap({}); setUpdMsg(''); loadMods(modsFor, e.target.value);}} title="Tipo">
+              <select value={kind} onChange={(e)=>{setKind(e.target.value); setModHits([]); setInstalledIds([]); setUpdMap({}); setUpdMsg(''); setRpOn(null); setShaderCur(null); loadMods(modsFor, e.target.value);}} title="Tipo">
                 <option value="mod">{t('mods.tMods')}</option>
                 <option value="shader">{t('mods.tShaders')}</option>
                 <option value="resourcepack">{t('mods.tRp')}</option>
@@ -762,6 +789,15 @@ export default function App() {
               })}
             </div>
             <h3>{t('mods.installed')} ({mods.length})</h3>
+            {kind==='shader' && (
+            <div className="row" style={{marginBottom:10}}>
+              {shaderCur?.iris
+                ? <span className="pill green">Iris OK{shaderCur.pack ? ` · ${shaderCur.pack}` : ''}</span>
+                : <span className="pill">{t('mods.needIris')}</span>}
+              {shaderCur?.pack && <button className="mini" onClick={async()=>{await window.ferro.shaderSet({instanceName:modsFor, file:null}); loadMods(modsFor);}}>{t('mods.shadersOff')}</button>}
+            </div>
+            )}
+            {kind==='resourcepack' && rpOn===null && mods.length>0 && <p style={{opacity:.6}}>{t('mods.playOnce')}</p>}
             {kind==='mod' && (
             <div className="row" style={{marginBottom:10}}>
               <button className="ghost" onClick={checkUpdates} disabled={checkingUpd || !modsFor}>{checkingUpd ? t('mods.updating') : t('mods.checkUpd')}</button>
@@ -769,9 +805,16 @@ export default function App() {
             </div>
             )}
             <div className="grid">
-              {mods.map((m)=>{ const u = updMap[m.file]; return (<div key={m.file} className="card"><div className="card-title" title={m.file}>{m.file}</div><div className="meta"><span className="pill">{(m.size/1048576).toFixed(1)} MB{m.disabled?' · desactivado':''}</span>{u && <span className="pill green">→ {u.latest}</span>}</div><div className="actions">
-                {u && <button className="primary" onClick={()=>doModUpdate(u)}>{t('mods.update')}</button>}
-                <button className="mini" onClick={async()=>{await window.ferro.modToggle({instanceName:modsFor, file:m.file, disable:!m.disabled, kind}); loadMods(modsFor);}}>{m.disabled?t('mods.activate'):t('mods.deactivate')}</button>
+              {mods.map((m)=>{ const u = updMap[m.file];
+                const rpActive = kind==='resourcepack' && rpOn?.includes(m.file);
+                const shaderActive = kind==='shader' && shaderCur?.pack===m.file && shaderCur?.enabled;
+                return (<div key={m.file} className="card"><div className="card-title" title={m.file}>{m.file}</div><div className="meta"><span className="pill">{(m.size/1048576).toFixed(1)} MB{m.disabled?' · desactivado':''}</span>{u && <span className="pill green">→ {u.latest}</span>}{rpActive && <span className="pill green">activo</span>}{shaderActive && <span className="pill green">en uso</span>}</div><div className="actions">
+                {kind==='mod' && u && <button className="primary" onClick={()=>doModUpdate(u)}>{t('mods.update')}</button>}
+                {kind==='resourcepack'
+                  ? <button className="mini" onClick={async()=>{await window.ferro.rpToggle({instanceName:modsFor, file:m.file, enable:!rpActive}); loadMods(modsFor);}}>{rpActive?t('mods.deactivate'):t('mods.activate')}</button>
+                  : kind==='shader'
+                    ? <button className="mini hot" onClick={async()=>{await window.ferro.shaderSet({instanceName:modsFor, file:m.file}); loadMods(modsFor);}} disabled={!shaderCur?.iris}>{t('mods.use')}</button>
+                    : <button className="mini" onClick={async()=>{await window.ferro.modToggle({instanceName:modsFor, file:m.file, disable:!m.disabled, kind}); loadMods(modsFor);}}>{m.disabled?t('mods.activate'):t('mods.deactivate')}</button>}
                 <button className="mini danger" onClick={async()=>{await window.ferro.modRemove({instanceName:modsFor, file:m.file, kind}); loadMods(modsFor);}}><X size={12} /> {t('mods.remove')}</button>
               </div></div>);})}
             </div>
@@ -913,11 +956,17 @@ export default function App() {
             </div>
           </div>
           <div className="card">
-            <h2>{t('set.lang')}</h2>
+            <h2>{t('set.lang')} / Theme</h2>
             <div className="row">
               <select value={lang} onChange={(e)=>setLangBoth(e.target.value)}>
                 <option value="es">Español</option>
                 <option value="en">English</option>
+              </select>
+              <select value={theme} onChange={(e)=>setTheme(e.target.value)} title={t('set.theme')}>
+                <option value="ember">Brasa</option>
+                <option value="midnight">Medianoche</option>
+                <option value="forest">Bosque</option>
+                <option value="sakura">Sakura</option>
               </select>
             </div>
           </div>
@@ -976,6 +1025,24 @@ export default function App() {
           </div>
         ))}
       </div>
+      {settingsFor && (
+        <MorphModal origin={modalOrigin} closing={modalClosing} onClose={closeModal} title={settingsFor}>
+          <div className="subhead"><span>{t('inst.settings')}</span></div>
+          <div className="row">
+            <label>{t('inst.ram')} <input type="number" value={sRam} min={512} max={16384} step={512} onChange={(e)=>setSRam(e.target.value)} style={{width:100}} /></label>
+            <label>{t('inst.width')} <input type="number" value={sW} min={320} max={7680} onChange={(e)=>setSW(e.target.value)} style={{width:80}} /></label>
+            <label>{t('inst.height')} <input type="number" value={sH} min={240} max={4320} onChange={(e)=>setSH(e.target.value)} style={{width:80}} /></label>
+            <select value={sJavaMode} onChange={(e)=>setSJavaMode(e.target.value)}><option value="auto">{t('inst.javaAuto')}</option><option value="custom">{t('inst.javaCustom')}</option></select>
+            {sJavaMode==='custom' && <input value={sJavaPath} onChange={(e)=>setSJavaPath(e.target.value)} placeholder="C:\...\bin\java.exe" style={{minWidth:200}} />}
+            <button className="primary" onClick={saveSettings} disabled={saving}>{saving ? t('inst.saving') : t('inst.save')}</button>
+          </div>
+          <div className="subhead"><span>{t('inst.backupsOf')} {settingsFor}</span><button className="mini" onClick={async()=>{await window.ferro.backupCreate({instanceName:settingsFor}); loadBackups(settingsFor);}}>{t('inst.createBk')}</button></div>
+          {bkList.length===0 ? <p style={{opacity:.6}}>{t('inst.noBk')}</p> : (<div className="sublist">{bkList.map((b)=><div key={b.file} className="subrow"><span className="grow" title={b.file}>{b.file}</span><span className="pill">{(b.size/1048576).toFixed(1)} MB</span><button className="mini" onClick={async()=>{await window.ferro.backupRestore({instanceName:settingsFor, file:b.file});}}>{t('inst.restore')}</button><button className="mini danger" onClick={async()=>{await window.ferro.backupDelete({instanceName:settingsFor, file:b.file}); loadBackups(settingsFor);}}><Trash2 size={12} /></button></div>)}</div>)}
+          <div className="subhead"><span>{t('inst.crashesOf')} {settingsFor}</span><button className="mini" onClick={async()=>{await window.ferro.openCrashes({instanceName:settingsFor});}}><FolderOpen size={12} /> {t('inst.folder')}</button></div>
+          {crList.length===0 ? <p style={{opacity:.6}}>{t('inst.noCrashes')}</p> : (<div className="sublist">{crList.map((c)=><div key={c.file} className="subrow"><span className="grow" title={c.description||c.file}>{c.description||c.file}</span><button className="mini" onClick={async()=>{const r = crOpen?.file===c.file ? null : await window.ferro.crashRead({instanceName:settingsFor, file:c.file}); setCrOpen(r);}}>{crOpen?.file===c.file ? t('mods.hide') : t('inst.view')}</button></div>)}</div>)}
+          {crOpen && <pre style={{marginTop:4}}>{crOpen.content}{crOpen.truncated ? '\n…(truncado)' : ''}</pre>}
+        </MorphModal>
+      )}
     </div>
   );
 }

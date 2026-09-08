@@ -2,12 +2,14 @@
   "name": "ferro-launcher",
   "version": "0.3.0",
   "description": "FerroLauncher - Launcher de Minecraft hecho desde 0",
+  "author": "Adrian Garcia Martinez",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
     "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build",
     "dist": "npm run build && electron-builder --win nsis portable",
+    "dist:full": "npm run build && electron-builder --win --dir && node scripts/brand-exe.js && electron-builder --win nsis portable --prepackaged release\\win-unpacked",
     "start": "electron ."
   },
   "dependencies": {

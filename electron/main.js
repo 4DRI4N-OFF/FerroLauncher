@@ -1,4 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell, dialog, screen } = require('electron');
+if (process.platform === 'win32') {
+  try { app.setAppUserModelId('com.ferro.launcher'); } catch {}
+}
 const path = require('path');
 const fs = require('fs');
 const { getDataDir, dirs } = require('../core/constants');
@@ -23,6 +26,7 @@ const skins = require('../core/skinService');
 const backups = require('../core/backupService');
 const discord = require('../core/discordService');
 const crashes = require('../core/crashService');
+const res = require('../core/resourceService');
 
 function findInstance(d, name) {
   const inst = listInstances(d.instances).find((i) => i.name === name);
@@ -251,6 +255,22 @@ ipcMain.handle('ferro:modUpdate', async (_, { instanceName, file, projectId }) =
   const inst = findInstance(d, instanceName);
   const send = (t) => win && win.webContents.send('ferro:log', t);
   return updateMod(inst.path, projectId, inst.versionId, inst.type === 'vanilla' ? 'fabric' : inst.type, file, send);
+});
+ipcMain.handle('ferro:rp', async (_, { instanceName }) => {
+  const inst = findInstance(getDirs(), instanceName);
+  return { enabled: res.getEnabledRP(inst.path), iris: res.hasIris(inst.path) };
+});
+ipcMain.handle('ferro:rpToggle', async (_, { instanceName, file, enable }) => {
+  const inst = findInstance(getDirs(), instanceName);
+  return res.setRPEnabled(inst.path, file, enable);
+});
+ipcMain.handle('ferro:shader', async (_, { instanceName }) => {
+  const inst = findInstance(getDirs(), instanceName);
+  return { ...res.getShader(inst.path), iris: res.hasIris(inst.path) };
+});
+ipcMain.handle('ferro:shaderSet', async (_, { instanceName, file }) => {
+  const inst = findInstance(getDirs(), instanceName);
+  return res.setShader(inst.path, file || null);
 });
 ipcMain.handle('ferro:packSearch', async (_, { query, mcVersion, loader, sort }) => searchModpacks(query || '', mcVersion, { loader: ['fabric', 'forge', 'neoforge', 'quilt'].includes(loader) ? loader : null, sort }));
 ipcMain.handle('ferro:packVersions', async (_, { projectId, mcVersion, loader }) => {

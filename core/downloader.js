@@ -22,12 +22,13 @@ async function fetchJson(url) {
   return res.json();
 }
 
-async function downloadFile(url, dest, onProgress) {
+async function downloadFile(url, dest, onProgress, expectedSize) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
-  // Skip si ya existe con tamaño > 0 (caché simple)
+  // Caché: si existe y coincide el tamaño esperado (o no lo conocemos y no está vacío), se reutiliza
   try {
     const st = fs.statSync(dest);
-    if (st.size > 0) return dest;
+    if (expectedSize ? st.size === expectedSize : st.size > 0) return dest;
+    if (expectedSize) fs.unlinkSync(dest); // corrupto o parcial: re-descargar
   } catch {}
 
   const res = await fetchRetry(url);
@@ -43,6 +44,13 @@ async function downloadFile(url, dest, onProgress) {
     if (onProgress && total) onProgress(done / total);
   });
   await pipeline(readable, file);
+  if (expectedSize) {
+    const got = fs.statSync(dest).size;
+    if (got !== expectedSize) {
+      try { fs.unlinkSync(dest); } catch {}
+      throw new Error(`Descarga incompleta (${got}/${expectedSize} bytes): ${url}`);
+    }
+  }
   return dest;
 }
 

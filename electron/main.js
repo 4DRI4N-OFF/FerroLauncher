@@ -16,12 +16,13 @@ function loaderApi(type) {
   if (type === 'quilt') return { list: quilt.listLoaders, meta: quilt.getLoaderMeta, resolve: quilt.resolveQuiltLibraries, label: 'quilt' };
   return { list: listLoaders, meta: getLoaderMeta, resolve: resolveFabricLibraries, label: 'fabric' };
 }
-const { searchMods, listMods, installMod, removeMod, toggleMod } = require('../core/modrinthService');
+const { searchMods, listMods, installMod, removeMod, toggleMod, checkModUpdates, updateMod } = require('../core/modrinthService');
 const { searchModpacks, packVersions, getPackVersion, installMrpack } = require('../core/modpackService');
 const auth = require('../core/authService');
 const skins = require('../core/skinService');
 const backups = require('../core/backupService');
 const discord = require('../core/discordService');
+const crashes = require('../core/crashService');
 
 function findInstance(d, name) {
   const inst = listInstances(d.instances).find((i) => i.name === name);
@@ -240,6 +241,17 @@ ipcMain.handle('ferro:modRemove', async (_, { instanceName, file, kind }) => {
   return true;
 });
 ipcMain.handle('ferro:modToggle', async (_, { instanceName, file, disable, kind }) => toggleMod(findInstance(getDirs(), instanceName).path, file, disable, kind));
+ipcMain.handle('ferro:modUpdates', async (event, { instanceName }) => {
+  const inst = findInstance(getDirs(), instanceName);
+  const send = (t) => win && win.webContents.send('ferro:log', t);
+  return checkModUpdates(inst.path, inst.versionId, inst.type === 'vanilla' ? 'fabric' : inst.type, (s) => send(`[ferro] revisando mods ${s.done}/${s.total}\n`));
+});
+ipcMain.handle('ferro:modUpdate', async (_, { instanceName, file, projectId }) => {
+  const d = getDirs();
+  const inst = findInstance(d, instanceName);
+  const send = (t) => win && win.webContents.send('ferro:log', t);
+  return updateMod(inst.path, projectId, inst.versionId, inst.type === 'vanilla' ? 'fabric' : inst.type, file, send);
+});
 ipcMain.handle('ferro:packSearch', async (_, { query, mcVersion, loader, sort }) => searchModpacks(query || '', mcVersion, { loader: ['fabric', 'forge', 'neoforge', 'quilt'].includes(loader) ? loader : null, sort }));
 ipcMain.handle('ferro:packVersions', async (_, { projectId, mcVersion, loader }) => {
   const vers = await packVersions(projectId, mcVersion, ['fabric', 'forge', 'neoforge', 'quilt'].includes(loader) ? [loader] : undefined);
@@ -435,6 +447,14 @@ ipcMain.handle('ferro:backupRestore', async (_, { instanceName, file }) => {
   return backups.restoreBackup(d.base, d.instances, instanceName, file, send);
 });
 ipcMain.handle('ferro:backupDelete', async (_, { instanceName, file }) => backups.deleteBackup(getDirs().base, instanceName, file));
+ipcMain.handle('ferro:crashes', async (_, { instanceName }) => crashes.listCrashes(findInstance(getDirs(), instanceName).path));
+ipcMain.handle('ferro:crashRead', async (_, { instanceName, file }) => crashes.readCrash(findInstance(getDirs(), instanceName).path, file));
+ipcMain.handle('ferro:openCrashes', async (_, { instanceName }) => {
+  const dir = crashes.crashDir(findInstance(getDirs(), instanceName).path);
+  require('fs').mkdirSync(dir, { recursive: true });
+  await shell.openPath(dir);
+  return true;
+});
 ipcMain.handle('ferro:stop', async () => {
   if (!activeChild || activeChild.killed || activeChild.exitCode !== null) return false;
   const send = (t) => win && win.webContents.send('ferro:log', t);
@@ -596,6 +616,9 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
     }
     activeChild = null; activeInstance = null; activeT0 = null;
     try { discord.clear(); } catch {}
+  });
+  activeChild.on('close', (code) => {
+    if (code !== 0 && code !== null) send(`[ferro] crash detectado en ${inst.name} (código ${code})\n`);
   });
   return true;
 });

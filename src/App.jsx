@@ -44,6 +44,9 @@ export default function App() {
   const [searching, setSearching] = useState(false);
   const [installingId, setInstallingId] = useState(null);
   const [installedIds, setInstalledIds] = useState([]);
+  const [updMap, setUpdMap] = useState({});
+  const [checkingUpd, setCheckingUpd] = useState(false);
+  const [updMsg, setUpdMsg] = useState('');
   const [packMc, setPackMc] = useState('1.21.1');
   const [packLoader, setPackLoader] = useState('');
   const [packSort, setPackSort] = useState('relevance');
@@ -63,6 +66,7 @@ export default function App() {
   const [sfxOn, setSfxOn] = useState(sfx.cfg.enabled);
   const [sfxVol, setSfxVol] = useState(sfx.cfg.volume);
   const [sfxHover, setSfxHover] = useState(sfx.cfg.hover);
+  const [sfxPack, setSfxPack] = useState(sfx.cfg.pack || 'cristal');
   const [dcId, setDcId] = useState('');
   const [dcOn, setDcOn] = useState(true);
   const [toasts, setToasts] = useState([]);
@@ -71,10 +75,10 @@ export default function App() {
   const toastId = useRef(0);
   const touchedVer = useRef({ create: false, filter: false, pack: false });
 
-  const pushToast = (type, msg) => {
+  const pushToast = (type, msg, action) => {
     const id = ++toastId.current;
-    setToasts((t) => [...t.slice(-3), { id, type, msg: String(msg).slice(0, 180) }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), type === 'error' ? 6000 : 4500);
+    setToasts((t) => [...t.slice(-3), { id, type, msg: String(msg).slice(0, 180), action }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), type === 'error' ? 8000 : 4500);
   };
 
   // Todo el log pasa por aquí: clasifica lo nuevo (error/éxito) para VFX+sonido
@@ -98,6 +102,14 @@ export default function App() {
           setScare({ name: nm.trim(), caseId: cs });
           setTimeout(() => setScare(null), 6000);
         }
+        const crashM = added.match(/crash detectado en (.+?) \(código (\d+)\)/);
+        if (crashM) {
+          const [, instName] = crashM;
+          pushToast('error', t('toast.crash', { n: instName }), {
+            label: t('inst.view'),
+            fn: () => { setTab('instancias'); setCrFor(instName); loadCrashes(instName); },
+          });
+        }
       }
       return next;
     });
@@ -109,6 +121,9 @@ export default function App() {
   const [skinBusy, setSkinBusy] = useState(false);
   const [bkFor, setBkFor] = useState('');
   const [bkList, setBkList] = useState([]);
+  const [crFor, setCrFor] = useState('');
+  const [crList, setCrList] = useState([]);
+  const [crOpen, setCrOpen] = useState(null);
   const [intro, setIntro] = useState(true);
   const introImgRef = useRef(null);
   const sideLogoRef = useRef(null);
@@ -180,6 +195,7 @@ export default function App() {
       if (inst[0] && !launchInstance) setLaunchInstance(inst[0].name);
       if (inst[0] && !modsFor) setModsFor(inst[0].name);
       if (inst[0] && !bkFor) { setBkFor(inst[0].name); loadBackups(inst[0].name); }
+      if (inst[0] && !crFor) { setCrFor(inst[0].name); loadCrashes(inst[0].name); }
       setJava(await window.ferro.java());
       try { setAccount(await window.ferro.authStatus()); } catch {}
     } catch (e) {
@@ -193,9 +209,39 @@ export default function App() {
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
+  const checkUpdates = async () => {
+    if (checkingUpd || !modsFor) return;
+    setCheckingUpd(true);
+    setUpdMsg('');
+    try {
+      const list = await window.ferro.modUpdates({ instanceName: modsFor });
+      const map = {};
+      for (const u of list) map[u.file] = u;
+      setUpdMap(map);
+      setUpdMsg(list.length === 0 ? t('mods.upToDate') : t('mods.nUpdates', { n: list.length }));
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+    finally { setCheckingUpd(false); }
+  };
+
+  const doModUpdate = async (u) => {
+    try {
+      setLog((l) => l + `[ferro] actualizando ${u.title || u.file}...\n`);
+      await window.ferro.modUpdate({ instanceName: modsFor, file: u.file, projectId: u.projectId });
+      setUpdMap((m) => { const n = { ...m }; delete n[u.file]; return n; });
+      loadMods(modsFor);
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
   const loadBackups = async (name) => {
     if (!name) return;
     try { setBkList(await window.ferro.backups({ instanceName: name })); }
+    catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const loadCrashes = async (name) => {
+    if (!name) return;
+    setCrOpen(null);
+    try { setCrList(await window.ferro.crashes({ instanceName: name })); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -556,7 +602,7 @@ export default function App() {
                 {nameState.status === 'free' && <span className="pill green"><Check size={12} /> {t('play.nameFree')}</span>}
                 {nameState.status === 'invalid' && <span className="pill">{t('play.nameInvalid')}</span>}
                 {nameState.status === 'unknown' && <span className="pill">{t('play.nameUnknown')}</span>}
-                {nameState.status === 'taken' && <><span className="pill">{t('play.nameTaken')}</span>{nameState.suggestions.map((s)=><button key={s} className="ghost" onClick={()=>setUsername(s)}>{s}</button>)}</>}
+                {nameState.status === 'taken' && <><span className="pill">{t('play.nameTaken')}</span>{nameState.suggestions.map((s)=><button key={s} className="mini" onClick={()=>setUsername(s)}>{s}</button>)}</>}
               </div>
             )}
             {instances.length===0 && <p>{t('play.noInst')}</p>}
@@ -571,8 +617,8 @@ export default function App() {
                 <option value="error">{t('play.lvError')}</option>
               </select>
               <input value={logSearch} onChange={(e)=>setLogSearch(e.target.value)} placeholder={t('play.filterPh')} />
-              <button className="ghost" onClick={()=>setAutoScroll(!autoScroll)}>{autoScroll ? '✓ Autoscroll' : 'Autoscroll'}</button>
-              <button className="ghost" onClick={()=>setLog('')}>{t('play.clear')}</button>
+              <button className="mini" onClick={()=>setAutoScroll(!autoScroll)}>{autoScroll ? '✓ Autoscroll' : 'Autoscroll'}</button>
+              <button className="mini" onClick={()=>setLog('')}>{t('play.clear')}</button>
             </div>
             <div className="log" ref={logRef}>{filteredLog}</div>
           </div>
@@ -622,14 +668,26 @@ export default function App() {
               <select value={bkFor} onChange={(e)=>{setBkFor(e.target.value); loadBackups(e.target.value);}}>
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name}</option>)}
               </select>
-              <button className="ghost" onClick={async()=>{await window.ferro.backupCreate({instanceName:bkFor}); loadBackups(bkFor);}} disabled={!bkFor}>{t('inst.createBk')}</button>
+              <button className="mini" onClick={async()=>{await window.ferro.backupCreate({instanceName:bkFor}); loadBackups(bkFor);}} disabled={!bkFor}>{t('inst.createBk')}</button>
             </div>
             {bkList.length===0 && <p style={{opacity:.6}}>{t('inst.noBk')}</p>}
             <div className="grid" style={{marginTop:10}}>
               {bkList.map((b)=><div key={b.file} className="card"><div className="card-title" title={b.file}>{b.file}</div><div className="meta"><span className="pill">{(b.size/1048576).toFixed(1)} MB</span></div><div className="actions">
-                <button className="ghost" onClick={async()=>{await window.ferro.backupRestore({instanceName:bkFor, file:b.file});}}>{t('inst.restore')}</button>
-                <button className="ghost danger" onClick={async()=>{await window.ferro.backupDelete({instanceName:bkFor, file:b.file}); loadBackups(bkFor);}}><Trash2 size={14} /> Eliminar</button>
+                <button className="mini" onClick={async()=>{await window.ferro.backupRestore({instanceName:bkFor, file:b.file});}}>{t('inst.restore')}</button>
+                <button className="mini danger" onClick={async()=>{await window.ferro.backupDelete({instanceName:bkFor, file:b.file}); loadBackups(bkFor);}}><Trash2 size={12} /> {t('inst.delete')}</button>
               </div></div>)}
+            </div>
+            <h3>{t('inst.crashesOf')} {crFor || '…'}</h3>
+            <div className="row">
+              <select value={crFor} onChange={(e)=>{setCrFor(e.target.value); loadCrashes(e.target.value);}}>
+                {instances.map((i)=><option key={i.name} value={i.name}>{i.name}</option>)}
+              </select>
+              <button className="ghost" onClick={async()=>{await window.ferro.openCrashes({instanceName:crFor});}} disabled={!crFor}><FolderOpen size={14} /> {t('inst.folder')}</button>
+            </div>
+            {crList.length===0 && <p style={{opacity:.6}}>{t('inst.noCrashes')}</p>}
+            <div className="grid" style={{marginTop:10}}>
+              {crList.map((c)=><div key={c.file} className="card"><div className="card-title" title={c.file}>{c.file}</div><div className="meta">{c.description && <span className="pill">{c.description}</span>}<span className="pill">{new Date(c.mtime).toLocaleString()}</span></div><div className="actions"><button className="mini" onClick={async()=>{const r = crOpen?.file===c.file ? null : await window.ferro.crashRead({instanceName:crFor, file:c.file}); setCrOpen(r);}}>{crOpen?.file===c.file ? t('mods.hide') : t('inst.view')}</button></div>
+              {crOpen?.file===c.file && <pre style={{marginTop:10}}>{crOpen.content}{crOpen.truncated ? '\n…(truncado)' : ''}</pre>}</div>)}
             </div>
             {settingsFor && (
               <>
@@ -653,10 +711,10 @@ export default function App() {
           <div className="card">
             <h2>{t('mods.title')}</h2>
             <div className="row">
-              <select value={modsFor} onChange={(e)=>{setModsFor(e.target.value); loadMods(e.target.value);}}>
+              <select value={modsFor} onChange={(e)=>{setModsFor(e.target.value); setUpdMap({}); setUpdMsg(''); loadMods(e.target.value);}}>
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' '+i.type})</option>)}
               </select>
-              <select value={kind} onChange={(e)=>{setKind(e.target.value); setModHits([]); setInstalledIds([]); loadMods(modsFor, e.target.value);}} title="Tipo">
+              <select value={kind} onChange={(e)=>{setKind(e.target.value); setModHits([]); setInstalledIds([]); setUpdMap({}); setUpdMsg(''); loadMods(modsFor, e.target.value);}} title="Tipo">
                 <option value="mod">{t('mods.tMods')}</option>
                 <option value="shader">{t('mods.tShaders')}</option>
                 <option value="resourcepack">{t('mods.tRp')}</option>
@@ -681,7 +739,7 @@ export default function App() {
                 <option value="updated">{t('mods.sUpdated')}</option>
               </select>
               <button className="primary" onClick={doSearch} disabled={searching || !modsFor}>{searching ? t('mods.searching') : <><Search size={14} /> {t('mods.search')}</>}</button>
-              <button className="ghost" onClick={()=>loadMods(modsFor)} disabled={!modsFor}>{t('mods.viewInstalled')}</button>
+              <button className="mini" onClick={()=>loadMods(modsFor)} disabled={!modsFor}>{t('mods.viewInstalled')}</button>
             </div>
             {!modsFor && <p>{t('mods.needLoader')}</p>}
             <h3>{t('mods.results')}{modTotal>0 && ` (${modTotal.toLocaleString()})`} · {fVersion} · {fLoader}</h3>
@@ -696,19 +754,26 @@ export default function App() {
                   <div className="desc">{m.description?.slice(0,120)}</div>
                   <div className="meta"><span className="pill"><Download size={12} /> {m.downloads?.toLocaleString?.() || m.downloads}</span>{m.updated && <span className="pill">↻ {new Date(m.updated).toLocaleDateString()}</span>}{m.client==='required' && <span className="pill green">{t('mods.client')}</span>}</div>
                   <div className="actions">
-                    <button className={done ? 'ghost ok' : 'ghost'} disabled={busy || done || !modsFor} onClick={()=>doInstall(m.id, m.title)}>
-                      {busy ? <><span className="spinner" />{t('mods.installing')}</> : done ? <><Check size={14} /> {t('mods.installedDone')}</> : <><Download size={14} /> {t('mods.install')}</>}
+                    <button className={done ? 'mini ok' : 'mini hot'} disabled={busy || done || !modsFor} onClick={()=>doInstall(m.id, m.title)}>
+                      {busy ? <><span className="spinner" />{t('mods.installing')}</> : done ? <><Check size={12} /> {t('mods.installedDone')}</> : <><Download size={12} /> {t('mods.install')}</>}
                     </button>
                   </div>
                 </div>);
               })}
             </div>
             <h3>{t('mods.installed')} ({mods.length})</h3>
+            {kind==='mod' && (
+            <div className="row" style={{marginBottom:10}}>
+              <button className="ghost" onClick={checkUpdates} disabled={checkingUpd || !modsFor}>{checkingUpd ? t('mods.updating') : t('mods.checkUpd')}</button>
+              {updMsg && <span className="pill green">{updMsg}</span>}
+            </div>
+            )}
             <div className="grid">
-              {mods.map((m)=><div key={m.file} className="card"><div className="card-title" title={m.file}>{m.file}</div><div className="meta"><span className="pill">{(m.size/1048576).toFixed(1)} MB{m.disabled?' · desactivado':''}</span></div><div className="actions">
-                <button className="ghost" onClick={async()=>{await window.ferro.modToggle({instanceName:modsFor, file:m.file, disable:!m.disabled, kind}); loadMods(modsFor);}}>{m.disabled?t('mods.activate'):t('mods.deactivate')}</button>
-                <button className="ghost danger" onClick={async()=>{await window.ferro.modRemove({instanceName:modsFor, file:m.file, kind}); loadMods(modsFor);}}><X size={14} /> {t('mods.remove')}</button>
-              </div></div>)}
+              {mods.map((m)=>{ const u = updMap[m.file]; return (<div key={m.file} className="card"><div className="card-title" title={m.file}>{m.file}</div><div className="meta"><span className="pill">{(m.size/1048576).toFixed(1)} MB{m.disabled?' · desactivado':''}</span>{u && <span className="pill green">→ {u.latest}</span>}</div><div className="actions">
+                {u && <button className="primary" onClick={()=>doModUpdate(u)}>{t('mods.update')}</button>}
+                <button className="mini" onClick={async()=>{await window.ferro.modToggle({instanceName:modsFor, file:m.file, disable:!m.disabled, kind}); loadMods(modsFor);}}>{m.disabled?t('mods.activate'):t('mods.deactivate')}</button>
+                <button className="mini danger" onClick={async()=>{await window.ferro.modRemove({instanceName:modsFor, file:m.file, kind}); loadMods(modsFor);}}><X size={12} /> {t('mods.remove')}</button>
+              </div></div>);})}
             </div>
           </div>
         )}
@@ -749,7 +814,7 @@ export default function App() {
                       <span className="pill">{v.number}</span>
                       {(v.loaders||[]).map((ld)=><span className="pill" key={ld}>{ld}</span>)}
                       {(v.game||[]).slice(0,3).map((g)=><span className="pill" key={g}>{g}</span>)}
-                      <button className="ghost" disabled={!!packBusy} onClick={()=>doPackInstall(p, v)}>
+                      <button className="mini hot" disabled={!!packBusy} onClick={()=>doPackInstall(p, v)}>
                         {packBusy===v.id ? <><span className="spinner" />{t('mods.installing')}</> : t('mods.install')}
                       </button>
                     </div>
@@ -771,8 +836,8 @@ export default function App() {
             {accts.length===0 && <p style={{opacity:.6}}>{t('acct.noAccounts')}</p>}
             <div className="grid">
               {accts.map((a)=><div key={a.uuid} className="card"><div className="mod-head"><img className="face" src={`https://visage.surgeplay.com/face/64/${a.uuid.replace(/-/g,'')}`} alt="" onError={(e)=>{e.currentTarget.src=`https://minotar.net/helm/${a.uuid.replace(/-/g,'')}/64.png`;}} /><div className="card-title">{a.name}</div></div><div className="meta">{a.active && <span className="pill green">✓ {t('acct.active')}</span>}</div><div className="actions">
-                {!a.active && <button className="ghost" onClick={async()=>{await window.ferro.authSelect({uuid:a.uuid}); loadAuth();}}>{t('acct.use')}</button>}
-                <button className="ghost danger" onClick={async()=>{await window.ferro.authRemove({uuid:a.uuid}); loadAuth();}}><X size={14} /> {t('acct.remove')}</button>
+                {!a.active && <button className="mini" onClick={async()=>{await window.ferro.authSelect({uuid:a.uuid}); loadAuth();}}>{t('acct.use')}</button>}
+                <button className="mini danger" onClick={async()=>{await window.ferro.authRemove({uuid:a.uuid}); loadAuth();}}><X size={12} /> {t('acct.remove')}</button>
               </div></div>)}
             </div>
             <h3>{t('acct.status')}</h3>
@@ -797,8 +862,8 @@ export default function App() {
                     <p>2. {t('acct.step2')} <b style={{fontSize:22, letterSpacing:2}}>{authStep.userCode}</b></p>
                     <p style={{opacity:.65}}><span className="spinner" />{t('acct.waiting')} ({t('acct.checkN')} {pollCount})</p>
                     <div className="row">
-                      <button className="ghost" onClick={()=>doAuthPollOnce()}>{t('acct.checkNow')}</button>
-                      <button className="ghost" onClick={()=>{stopPoll(); setAuthStep(null);}}>{t('acct.cancel')}</button>
+                      <button className="mini" onClick={()=>doAuthPollOnce()}>{t('acct.checkNow')}</button>
+                      <button className="mini" onClick={()=>{stopPoll(); setAuthStep(null);}}>{t('acct.cancel')}</button>
                     </div>
                   </div>)}
           </div>
@@ -808,7 +873,7 @@ export default function App() {
             <h2>{t('skin.title')}</h2>
             <div className="row">
               <input value={skinName} onChange={(e)=>setSkinName(e.target.value)} placeholder={t('skin.namePh')} />
-              <button className="ghost" onClick={()=>loadSkin()}>{t('skin.view')}</button>
+              <button className="mini" onClick={()=>loadSkin()}>{t('skin.view')}</button>
               {skinInfo?.online && <span className="pill green">✓ {t('skin.online')}</span>}
             </div>
             {!skinInfo && <p style={{opacity:.65}}>{t('skin.pressView')}</p>}
@@ -829,7 +894,7 @@ export default function App() {
                 <option value="slim">{t('skin.slim')}</option>
               </select>
               <button className="primary" onClick={applySkin} disabled={skinBusy || !skinUrl}>{skinBusy ? t('skin.applying') : t('skin.apply')}</button>
-              <button className="ghost danger" onClick={resetSkin}>{t('skin.reset')}</button>
+              <button className="mini danger" onClick={resetSkin}>{t('skin.reset')}</button>
             </div>
           </div>
         )}
@@ -860,6 +925,10 @@ export default function App() {
             <h2>{t('set.sound')}</h2>
             <div className="row">
               <button className="ghost" onClick={()=>{sfx.cfg.enabled=!sfx.cfg.enabled; sfx.save(); setSfxOn(sfx.cfg.enabled); if(sfx.cfg.enabled) sfx.play('success');}}>{sfxOn ? `✓ ${t('set.sfxOn')}` : t('set.sfxOff')}</button>
+              <select value={sfxPack} onChange={(e)=>{sfx.cfg.pack=e.target.value; sfx.save(); setSfxPack(sfx.cfg.pack); sfx.play('success');}} title={t('set.pack')}>
+                <option value="cristal">{t('set.packCristal')}</option>
+                <option value="asmr">{t('set.packAsmr')}</option>
+              </select>
               <button className="ghost" onClick={()=>{sfx.cfg.hover=!sfx.cfg.hover; sfx.save(); setSfxHover(sfx.cfg.hover);}}>{t('set.hover')}: {sfxHover ? t('set.yes') : t('set.no')}</button>
               <label>{t('set.volume')} <input type="range" min={0} max={1} step={0.05} value={sfxVol} onChange={(e)=>{sfx.cfg.volume=Number(e.target.value); sfx.save(); setSfxVol(sfx.cfg.volume);}} style={{width:130}} /></label>
               <button className="ghost" onClick={()=>sfx.play('launch')}>{t('set.test')}</button>
@@ -902,6 +971,7 @@ export default function App() {
           <div key={t.id} className={`toast ${t.type}`}>
             {t.type === 'error' ? <AlertTriangle size={16} /> : t.type === 'success' ? <Check size={16} /> : <Info size={16} />}
             <span>{t.msg}</span>
+            {t.action && <button className="mini hot" onClick={() => { t.action.fn(); setToasts((x) => x.filter((y) => y.id !== t.id)); }}>{t.action.label}</button>}
             <div className="t-bar" />
           </div>
         ))}

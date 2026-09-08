@@ -309,6 +309,30 @@ button.ghost:disabled { opacity: 0.55; cursor: default; }
 button.ghost.ok { border-color: rgba(52, 211, 153, 0.5); color: #a7f3d0; }
 button.ghost.danger:hover:not(:disabled) { border-color: rgba(248, 113, 113, 0.6); color: #fecaca; }
 
+/* ——— Mini: acciones terciarias en fila ——— */
+.mini {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: inherit; font-size: 12.5px; font-weight: 600;
+  padding: 6px 12px; border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--stroke-soft);
+  color: var(--ink); cursor: pointer;
+  transition: all 0.18s ease;
+}
+.mini:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); transform: translateY(-1px); }
+.mini:active:not(:disabled) { transform: scale(0.96); }
+.mini:disabled { opacity: 0.5; cursor: default; }
+.mini svg { vertical-align: -2px; }
+.mini.hot {
+  background: linear-gradient(135deg, var(--gold), var(--amber) 55%, var(--ember));
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #1c0d05; font-weight: 800;
+  box-shadow: 0 4px 14px rgba(255, 110, 30, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+.mini.hot:hover:not(:disabled) { filter: brightness(1.08); background: linear-gradient(135deg, var(--gold), var(--amber) 55%, var(--ember)); }
+.mini.ok { border-color: rgba(52, 211, 153, 0.5); color: #a7f3d0; }
+.mini.danger:hover:not(:disabled) { border-color: rgba(248, 113, 113, 0.6); color: #fecaca; }
+
 /* ——— Tarjetas internas / resultados ——— */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .grid .card {

@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('ferro', {
   modInstall: (data) => ipcRenderer.invoke('ferro:modInstall', data),
   modRemove: (data) => ipcRenderer.invoke('ferro:modRemove', data),
   modToggle: (data) => ipcRenderer.invoke('ferro:modToggle', data),
+  modUpdates: (data) => ipcRenderer.invoke('ferro:modUpdates', data),
+  modUpdate: (data) => ipcRenderer.invoke('ferro:modUpdate', data),
   packSearch: (data) => ipcRenderer.invoke('ferro:packSearch', data),
   packVersions: (data) => ipcRenderer.invoke('ferro:packVersions', data),
   packInstall: (data) => ipcRenderer.invoke('ferro:packInstall', data),
@@ -44,6 +46,9 @@ contextBridge.exposeInMainWorld('ferro', {
   backupCreate: (data) => ipcRenderer.invoke('ferro:backupCreate', data),
   backupRestore: (data) => ipcRenderer.invoke('ferro:backupRestore', data),
   backupDelete: (data) => ipcRenderer.invoke('ferro:backupDelete', data),
+  crashes: (data) => ipcRenderer.invoke('ferro:crashes', data),
+  crashRead: (data) => ipcRenderer.invoke('ferro:crashRead', data),
+  openCrashes: (data) => ipcRenderer.invoke('ferro:openCrashes', data),
   onAuthResult: (cb) => {
     ipcRenderer.on('ferro:auth-done', (_, d) => cb(null, d));
     ipcRenderer.on('ferro:auth-error', (_, e) => cb(e, null));

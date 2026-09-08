@@ -45,7 +45,7 @@ async function resolveLibraries(versionDetails, librariesDir, onProgress) {
     const art = libArtifact(lib);
     if (!art) continue;
     const dest = path.join(librariesDir, art.path);
-    await downloadFile(art.url, dest, (p) => onProgress && onProgress({ lib: lib.name, done: ++done, total: libs.length, p }));
+    await downloadFile(art.url, dest, (p) => onProgress && onProgress({ lib: lib.name, done: ++done, total: libs.length, p }), art.size);
     cp.push(dest);
   }
   return cp;

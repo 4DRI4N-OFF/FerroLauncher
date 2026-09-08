@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const { downloadFile } = require('./downloader');
 
 const API = 'https://api.modrinth.com/v2';
@@ -69,9 +70,9 @@ function listMods(instanceDir, kind = 'mod') {
     );
 }
 
-async function installModFile(instanceDir, fileUrl, fileName, onProgress, kind = 'mod') {
+async function installModFile(instanceDir, fileUrl, fileName, onProgress, kind = 'mod', expectedSize) {
   const safe = String(fileName).replace(/[^\w\-.+() \[\]]+/g, '_');
-  return downloadFile(fileUrl, path.join(contentDir(instanceDir, kind), safe), onProgress);
+  return downloadFile(fileUrl, path.join(contentDir(instanceDir, kind), safe), onProgress, expectedSize);
 }
 
 async function installMod(instanceDir, projectId, mcVersion, loader = 'fabric', onLog, kind = 'mod') {
@@ -81,7 +82,7 @@ async function installMod(instanceDir, projectId, mcVersion, loader = 'fabric', 
   const file = (v.files || []).find((f) => f.primary) || v.files?.[0];
   if (!file?.url) throw new Error('Versión sin archivo');
   onLog && onLog(`[ferro] ${kind} ${v.name} (${file.filename})\n`);
-  await installModFile(instanceDir, file.url, file.filename, undefined, kind);
+  await installModFile(instanceDir, file.url, file.filename, undefined, kind, file.size);
   return { version: v.version_number, file: file.filename };
 }
 
@@ -97,4 +98,65 @@ function removeMod(instanceDir, file, kind = 'mod') {
   fs.unlinkSync(path.join(contentDir(instanceDir, kind), file));
 }
 
-module.exports = { searchMods, projectVersions, pickVersion, listMods, installModFile, installMod, toggleMod, removeMod };
+function sha1File(p) {
+  return new Promise((resolve, reject) => {
+    const h = crypto.createHash('sha1');
+    const s = fs.createReadStream(p);
+    s.on('data', (c) => h.update(c));
+    s.on('end', () => resolve(h.digest('hex')));
+    s.on('error', reject);
+  });
+}
+
+async function versionFromHash(hash) {
+  return apiJson(`${API}/version_file/${hash}?algorithm=sha1`);
+}
+
+const projectCache = new Map();
+async function projectTitle(id) {
+  if (!projectCache.has(id)) {
+    try {
+      const p = await apiJson(`${API}/project/${encodeURIComponent(id)}`);
+      projectCache.set(id, p.title || id);
+    } catch { projectCache.set(id, id); }
+  }
+  return projectCache.get(id);
+}
+
+// Compara cada .jar instalado con la última release para MC+loader
+async function checkModUpdates(instanceDir, mcVersion, loader = 'fabric', onProgress) {
+  const dir = contentDir(instanceDir, 'mod');
+  const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.jar')) : [];
+  const out = [];
+  let done = 0;
+  for (const file of files) {
+    try {
+      const hash = await sha1File(path.join(dir, file));
+      let ver = null;
+      try { ver = await versionFromHash(hash); } catch { ver = null; } // 404 = no es de Modrinth
+      if (ver?.project_id) {
+        const latest = pickVersion(await projectVersions(ver.project_id, mcVersion, loader));
+        if (latest && latest.id !== ver.id) {
+          out.push({ file, projectId: ver.project_id, title: await projectTitle(ver.project_id), current: ver.version_number, latest: latest.version_number });
+        }
+      }
+    } catch {}
+    done++;
+    onProgress && onProgress({ done, total: files.length, file });
+  }
+  return out;
+}
+
+async function updateMod(instanceDir, projectId, mcVersion, loader, oldFile, onLog) {
+  const versions = await projectVersions(projectId, mcVersion, loader);
+  const v = pickVersion(versions);
+  if (!v) throw new Error('Sin versión compatible');
+  const file = (v.files || []).find((f) => f.primary) || v.files?.[0];
+  if (!file?.url) throw new Error('Versión sin archivo');
+  await installModFile(instanceDir, file.url, file.filename);
+  try { fs.unlinkSync(path.join(contentDir(instanceDir, 'mod'), oldFile)); } catch {}
+  onLog && onLog(`[ferro] actualizado a ${file.filename}\n`);
+  return { version: v.version_number, file: file.filename };
+}
+
+module.exports = { searchMods, projectVersions, pickVersion, listMods, installModFile, installMod, toggleMod, removeMod, checkModUpdates, updateMod };

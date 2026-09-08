@@ -54,6 +54,7 @@ export default function App() {
   const [dcOn, setDcOn] = useState(true);
   const [toasts, setToasts] = useState([]);
   const [flashKey, setFlashKey] = useState(0);
+  const [scare, setScare] = useState(null);
   const toastId = useRef(0);
 
   const pushToast = (type, msg) => {
@@ -75,6 +76,14 @@ export default function App() {
           setFlashKey((k) => k + 1);
         } else if (/lanzando\.\.\./.test(added)) sfx.play('launch');
         else if (/instalad[oa]|creada|iniciada|guardados|restaurada|importada|list[oa]|aplicada|restablecida/i.test(added)) sfx.play('success');
+        if (/protocolo anti-suplantaci.n/i.test(added)) sfx.play('alarm');
+        if (/Acceso DENEGADO/.test(added)) {
+          const full = prev + added;
+          const nm = (full.match(/NOMBRE PREMIUM DETECTADO:\s*(.+?)\s*!!/) || [])[1] || '???';
+          const cs = (full.match(/Reporte\s+(F-[0-9A-F]+)/) || [])[1] || 'F-????';
+          setScare({ name: nm.trim(), caseId: cs });
+          setTimeout(() => setScare(null), 6000);
+        }
       }
       return next;
     });
@@ -93,6 +102,40 @@ export default function App() {
   const pollRef = useRef(null);
   const [launchInstance, setLaunchInstance] = useState('');
   const [log, setLogRaw] = useState('[ferro] listo\n');
+  const [playFace, setPlayFace] = useState(null);
+  const [nameState, setNameState] = useState({ status: 'idle', suggestions: [] });
+
+  useEffect(() => {
+    const name = (account?.name || username || '').trim();
+    if (!name) { setPlayFace(null); return; }
+    if (account) { setPlayFace(`https://visage.surgeplay.com/face/64/${account.uuid.replace(/-/g, '')}`); return; }
+    const t = setTimeout(async () => {
+      try {
+        const s = await window.ferro.skin({ name });
+        setPlayFace(s?.renders ? s.renders.face : null);
+      } catch { setPlayFace(null); }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [username, account]);
+
+  // Comprueba si el nombre offline está libre y sugiere alternativas
+  useEffect(() => {
+    if (account) { setNameState({ status: 'idle', suggestions: [] }); return; }
+    const name = (username || '').trim();
+    if (name.length < 3) { setNameState({ status: 'idle', suggestions: [] }); return; }
+    setNameState({ status: 'checking', suggestions: [] });
+    const t = setTimeout(async () => {
+      try {
+        const r = await window.ferro.nameCheck({ name });
+        if (!r.valid) { setNameState({ status: 'invalid', suggestions: [] }); return; }
+        if (r.unknown) { setNameState({ status: 'unknown', suggestions: [] }); return; }
+        if (!r.premium) { setNameState({ status: 'free', suggestions: [] }); return; }
+        const sug = await window.ferro.nameSuggest({ base: name }).catch(() => []);
+        setNameState({ status: 'taken', suggestions: sug });
+      } catch { setNameState({ status: 'unknown', suggestions: [] }); }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [username, account]);
   const [running, setRunning] = useState(false);
   const [logLevel, setLogLevel] = useState('todo');
   const [logSearch, setLogSearch] = useState('');
@@ -451,6 +494,7 @@ export default function App() {
           <div className="card">
             <h2>Jugar (offline)</h2>
             <div className="row">
+              {playFace && <img className="face lg" src={playFace} alt="" onError={()=>setPlayFace(null)} />}
               <input value={username} onChange={(e)=>setUsername(e.target.value)} placeholder="Usuario" />
               <select value={launchInstance} onChange={(e)=>setLaunchInstance(e.target.value)}>
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' · '+i.type})</option>)}
@@ -460,8 +504,17 @@ export default function App() {
                 : <button className="primary" onClick={stop} style={{filter:'hue-rotate(140deg)'}}><Square size={16} /> DETENER</button>}
               <button className="ghost" onClick={refresh}><RefreshCw size={14} /> Recargar</button>
               {running && <span className="pill green"><span className="spinner" />en ejecución</span>}
-              {account ? <span className="pill green">✓ {account.name} (online)</span> : <span className="pill">offline</span>}
+              {account ? <span className="pill green"><Check size={12} /> {account.name} (online)</span> : <span className="pill">offline</span>}
             </div>
+            {!account && nameState.status !== 'idle' && (
+              <div className="row" style={{marginTop:8}}>
+                {nameState.status === 'checking' && <span className="pill"><span className="spinner" />comprobando nombre…</span>}
+                {nameState.status === 'free' && <span className="pill green"><Check size={12} /> nombre libre</span>}
+                {nameState.status === 'invalid' && <span className="pill">3-16 caracteres: letras, números y _</span>}
+                {nameState.status === 'unknown' && <span className="pill">sin conexión para verificar</span>}
+                {nameState.status === 'taken' && <><span className="pill">premium: elige otro</span>{nameState.suggestions.map((s)=><button key={s} className="ghost" onClick={()=>setUsername(s)}>{s}</button>)}</>}
+              </div>
+            )}
             {instances.length===0 && <p>Crea tu primera instancia en Instancias.</p>}
             <h3>Consola</h3>
             <div className="row" style={{marginBottom:8}}>
@@ -671,7 +724,7 @@ export default function App() {
             <h3>Cuentas ({accts.length})</h3>
             {accts.length===0 && <p style={{opacity:.6}}>Sin cuentas. Inicia sesión abajo para añadir la primera.</p>}
             <div className="grid">
-              {accts.map((a)=><div key={a.uuid} className="card"><div className="card-title">{a.name}</div><div className="meta">{a.active && <span className="pill green">✓ activa</span>}</div><div className="actions">
+              {accts.map((a)=><div key={a.uuid} className="card"><div className="mod-head"><img className="face" src={`https://visage.surgeplay.com/face/64/${a.uuid.replace(/-/g,'')}`} alt="" onError={(e)=>{e.currentTarget.src=`https://minotar.net/helm/${a.uuid.replace(/-/g,'')}/64.png`;}} /><div className="card-title">{a.name}</div></div><div className="meta">{a.active && <span className="pill green">✓ activa</span>}</div><div className="actions">
                 {!a.active && <button className="ghost" onClick={async()=>{await window.ferro.authSelect({uuid:a.uuid}); loadAuth();}}>Usar</button>}
                 <button className="ghost danger" onClick={async()=>{await window.ferro.authRemove({uuid:a.uuid}); loadAuth();}}><X size={14} /> Quitar</button>
               </div></div>)}
@@ -780,6 +833,14 @@ export default function App() {
         </div>
       )}
       {flashKey > 0 && <div key={flashKey} className="vignette" />}
+      {scare && (
+        <div className="scare" onClick={() => setScare(null)}>
+          <div className="scare-title">ACCESO DENEGADO</div>
+          <div className="scare-sub">Suplantación detectada: <b>{scare.name}</b></div>
+          <div className="scare-case">Reporte {scare.caseId} · archivado</div>
+          <div className="scare-warn">Usar la cuenta de otra persona va contra los Términos de Mojang y puede acabar en baneo. Usa tu propia cuenta o inicia sesión con Microsoft. Pulsa para continuar.</div>
+        </div>
+      )}
       <div className="toasts">
         {toasts.map((t)=>(
           <div key={t.id} className={`toast ${t.type}`}>

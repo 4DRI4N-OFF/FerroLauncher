@@ -29,6 +29,35 @@ function findInstance(d, name) {
   return inst;
 }
 
+// Caché de nombres premium (sesión): name.lower -> uuid | null | 'unknown' (sin red)
+const premiumCache = new Map();
+async function premiumUuidOf(name) {
+  const key = String(name || '').toLowerCase();
+  if (premiumCache.has(key)) return premiumCache.get(key);
+  let out = null;
+  try {
+    const res = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
+    if (res.status === 200) out = (await res.json()).id || null;
+    else if (res.status === 404 || res.status === 204 || res.status === 400) out = null;
+    else out = 'unknown';
+  } catch {
+    out = 'unknown';
+  }
+  premiumCache.set(key, out);
+  return out;
+}
+
+// Susto teatral: sacude la ventana unos ms (solo si no está maximizada)
+function shakeWindow() {
+  try {
+    if (!win || win.isDestroyed() || win.isMaximized() || win.isMinimized() || win.isFullScreen()) return;
+    const [x0, y0] = win.getPosition();
+    [[-9, 4], [8, -6], [-6, 3], [5, -2], [-3, 1], [0, 0]].forEach(([dx, dy], i) => {
+      setTimeout(() => { try { win.setPosition(x0 + dx, y0 + dy); } catch {} }, i * 55);
+    });
+  } catch {}
+}
+
 let win = null;
 let splash = null;
 let D = null;
@@ -409,6 +438,27 @@ ipcMain.handle('ferro:stop', async () => {
 });
 ipcMain.handle('ferro:status', async () => ({ running: !!activeChild && activeChild.exitCode === null && !activeChild.killed, instance: activeInstance }));
 
+const NAME_RE = /^[a-zA-Z0-9_]{3,16}$/;
+ipcMain.handle('ferro:nameCheck', async (_, { name }) => {
+  const clean = String(name || '').trim();
+  if (!NAME_RE.test(clean)) return { name: clean, valid: false };
+  const uuid = await premiumUuidOf(clean).catch(() => 'unknown');
+  return { name: clean, valid: true, premium: !!uuid && uuid !== 'unknown', unknown: uuid === 'unknown' };
+});
+ipcMain.handle('ferro:nameSuggest', async (_, { base }) => {
+  const b = String(base || '').trim().replace(/[^a-zA-Z0-9_]/g, '').slice(0, 12) || 'Ferro';
+  const cap = b.charAt(0).toUpperCase() + b.slice(1);
+  const r2 = () => String(Math.floor(Math.random() * 90) + 10);
+  const raw = [`${b}_`, `_${b}`, `${b}${r2()}`, `${b}HD`, `${b}YT`, `${b}MC`, `${b}GG`, `${b}Pro`, `xX${b}Xx`.slice(0, 16), `The${cap}`.slice(0, 16), `${b}x`, `${cap}Gamer`.slice(0, 16)];
+  const cands = [...new Set(raw)].filter((n) => NAME_RE.test(n) && n.toLowerCase() !== b.toLowerCase()).slice(0, 10);
+  const out = [];
+  await Promise.all(cands.map(async (n) => {
+    const u = await premiumUuidOf(n).catch(() => 'unknown');
+    if (u === null) out.push(n);
+  }));
+  return out.slice(0, 4);
+});
+
 ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, width, height }) => {
   if (activeChild && activeChild.exitCode === null && !activeChild.killed) throw new Error('Ya hay una instancia en ejecución. Deténla primero.');
   const d = getDirs();
@@ -498,6 +548,27 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
     }
   } catch (e) {
     send(`[ferro] refresh falló, modo offline (${e.message})\n`);
+  }
+  if (!authArg) {
+    // Anti-suplantación: en offline no se permite un nombre premium (de nadie)
+    const uname = (username || 'Ferro').trim();
+    const premiumUuid = await premiumUuidOf(uname).catch(() => null);
+    if (premiumUuid === 'unknown') {
+      send('[ferro] aviso: sin conexión, no se pudo verificar si el nombre es premium\n');
+    } else if (premiumUuid) {
+      const caseId = 'F-' + require('crypto').randomBytes(2).toString('hex').toUpperCase();
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      send(`[ferro] !! NOMBRE PREMIUM DETECTADO: ${uname} !!\n`);
+      await sleep(450);
+      send('[ferro] Iniciando protocolo anti-suplantación…\n');
+      shakeWindow();
+      await sleep(700);
+      send(`[ferro] Identidad verificada contra Mojang. Reporte ${caseId} archivado.\n`);
+      await sleep(700);
+      send('[ferro] Acceso DENEGADO. Usa tu propia cuenta o inicia sesión con Microsoft.\n');
+      await sleep(300);
+      throw new Error(`"${uname}" es premium (${caseId}). Ni lo intentes.`);
+    }
   }
   activeChild = await launch({ javaPath: javaBin, versionDetails: details, clientJar, librariesCp: cp, nativesDir, loggingPath, instanceDir: inst.path, dataDirs: d, username: username || 'Ferro', ramMb: effRam, width: effW, height: effH, onLog: send, mainClassOverride, extraClasspath, auth: authArg });
   activeInstance = inst.name;

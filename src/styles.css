@@ -232,6 +232,8 @@ button.ghost.danger:hover:not(:disabled) { border-color: rgba(248, 113, 113, 0.6
 .pill.green { background: rgba(52, 211, 153, 0.16); border-color: rgba(52, 211, 153, 0.4); color: #a7f3d0; }
 .mod-head { display: flex; gap: 10px; align-items: center; margin-bottom: 2px; }
 .mod-icon { width: 38px; height: 38px; border-radius: 12px; object-fit: cover; background: rgba(255,255,255,.08); border: 1px solid var(--stroke-soft); }
+.face { width: 38px; height: 38px; border-radius: 12px; image-rendering: pixelated; background: rgba(255,255,255,.08); border: 1px solid var(--stroke-soft); flex-shrink: 0; }
+.face.lg { width: 44px; height: 44px; }
 .spinner {
   width: 14px; height: 14px;
   border: 2px solid rgba(255, 255, 255, 0.35);
@@ -315,3 +317,33 @@ pre {
   animation: vig 0.9s ease both;
 }
 @keyframes vig { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ——— Pantalla DENEGADO ——— */
+.scare {
+  position: fixed; inset: 0; z-index: 300;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; text-align: center; padding: 24px;
+  background: rgba(8, 2, 2, 0.9);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  animation: scare-in 0.3s ease both;
+  cursor: pointer;
+}
+@keyframes scare-in { from { opacity: 0; } to { opacity: 1; } }
+.scare-title {
+  font-size: clamp(42px, 8vw, 96px); font-weight: 900; letter-spacing: 6px;
+  color: #ff2d2d;
+  text-shadow: 3px 0 0 rgba(0, 255, 255, 0.55), -3px 0 0 rgba(255, 0, 255, 0.55), 0 0 46px rgba(255, 45, 45, 0.8);
+  animation: glitch 1.6s steps(2) infinite;
+}
+@keyframes glitch {
+  0%, 100% { transform: translate(0); }
+  20% { transform: translate(-3px, 2px) skewX(2deg); }
+  40% { transform: translate(3px, -2px); }
+  60% { transform: translate(-2px, -1px) skewX(-2deg); }
+  80% { transform: translate(2px, 1px); }
+}
+.scare-sub { font-size: 17px; color: #f6f1e8; }
+.scare-sub b { color: #ffb62e; }
+.scare-warn { font-size: 13px; color: rgba(243, 232, 214, 0.6); max-width: 520px; line-height: 1.6; }
+.scare-case { font-family: Consolas, monospace; font-size: 13px; color: #fca5a5; border: 1px solid rgba(248,113,113,.4); padding: 6px 14px; border-radius: 10px; }

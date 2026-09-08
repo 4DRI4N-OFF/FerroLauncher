@@ -61,8 +61,26 @@ function extractJar(dest, nativesDir, lib) {
   }
 }
 
+// Las versiones nuevas (p. ej. 26.x) piden subcarpetas: -Djava.library.path=${natives_directory}/java
+// Las viejas usan el dir en plano. Se detecta desde los propios JVM args de la versión.
+function nativesTarget(versionDetails, nativesDir) {
+  const jvm = versionDetails.arguments?.jvm || [];
+  for (const a of jvm) {
+    const vals = typeof a === 'string' ? [a] : (Array.isArray(a.value) ? a.value : [a.value]);
+    for (const v of vals || []) {
+      const m = String(v || '').match(/^-Djava\.library\.path=(.+)$/);
+      if (m) {
+        const p = m[1].replace(/\$\{natives_directory\}/g, nativesDir);
+        if (!p.includes('${')) return p;
+      }
+    }
+  }
+  return nativesDir;
+}
+
 async function resolveNatives(versionDetails, librariesDir, nativesDir, onProgress) {
-  fs.mkdirSync(nativesDir, { recursive: true });
+  const target = nativesTarget(versionDetails, nativesDir);
+  fs.mkdirSync(target, { recursive: true });
   // Limpia extracciones previas de esta versión para evitar DLLs viejas
   let done = 0;
   const libs = (versionDetails.libraries || []).filter((l) => ruleAllows(l.rules));
@@ -80,14 +98,14 @@ async function resolveNatives(versionDetails, librariesDir, nativesDir, onProgre
     const dest = path.join(librariesDir, art.path);
     await downloadFile(art.url, dest);
     try {
-      extractJar(dest, nativesDir, lib);
+      extractJar(dest, target, lib);
     } catch (err) {
       throw new Error(`Natives ${lib.name}: ${err.message}`);
     }
     done++;
     onProgress && onProgress({ done, total: jobs.length, lib: lib.name });
   }
-  return { nativesDir, count: jobs.length };
+  return { nativesDir, target, count: jobs.length };
 }
 
-module.exports = { resolveNatives, pickNativeClassifier, isNativeForCurrentArch, isAnyNativeLib };
+module.exports = { resolveNatives, pickNativeClassifier, isNativeForCurrentArch, isAnyNativeLib, nativesTarget };

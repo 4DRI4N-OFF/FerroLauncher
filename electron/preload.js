@@ -52,6 +52,8 @@ contextBridge.exposeInMainWorld('ferro', {
   launch: (data) => ipcRenderer.invoke('ferro:launch', data),
   stop: () => ipcRenderer.invoke('ferro:stop'),
   status: () => ipcRenderer.invoke('ferro:status'),
+  nameCheck: (data) => ipcRenderer.invoke('ferro:nameCheck', data),
+  nameSuggest: (data) => ipcRenderer.invoke('ferro:nameSuggest', data),
   updateSettings: (data) => ipcRenderer.invoke('ferro:updateSettings', data),
   openFolder: (data) => ipcRenderer.invoke('ferro:openFolder', data),
   duplicateInstance: (data) => ipcRenderer.invoke('ferro:duplicateInstance', data),

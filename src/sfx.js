@@ -42,5 +42,11 @@ const RECIPES = {
   hover: (m) => tone({ f: 980, t: 0.035, type: 'sine', v: 0.12, master: m }),
   success: (m) => { tone({ f: 523, t: 0.09, v: 0.6, master: m }); tone({ f: 784, t: 0.12, v: 0.6, delay: 0.09, master: m }); },
   error: (m) => tone({ f: 190, f2: 130, t: 0.18, type: 'sawtooth', v: 0.4, master: m }),
+  alarm: (m) => {
+    for (let i = 0; i < 3; i++) {
+      tone({ f: 620, f2: 310, t: 0.22, type: 'sawtooth', v: 0.5, delay: i * 0.28, master: m });
+      tone({ f: 155, t: 0.22, type: 'square', v: 0.25, delay: i * 0.28, master: m });
+    }
+  },
   launch: (m) => { tone({ f: 280, f2: 920, t: 0.35, type: 'triangle', v: 0.55, master: m }); tone({ f: 140, f2: 460, t: 0.35, type: 'sine', v: 0.4, master: m }); },
 };

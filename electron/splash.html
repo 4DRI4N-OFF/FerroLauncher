@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<style>
+  * { margin: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: transparent; overflow: hidden;
+    font-family: "Segoe UI", system-ui, sans-serif; }
+  .wrap {
+    height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px; color: #f6f1e8;
+    background: radial-gradient(420px 260px at 50% 30%, rgba(255,110,40,.25), transparent 70%),
+      rgba(13, 9, 8, 0.92);
+    border: 1px solid rgba(255,255,255,.1); border-radius: 24px;
+  }
+  img.logo {
+    width: 300px; aspect-ratio: 2048 / 887; height: auto; display: block;
+    border-radius: 18px;
+    animation: breathe 2.2s ease-in-out infinite;
+  }
+  @keyframes breathe {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 10px 26px rgba(255,140,30,.35)) brightness(1); }
+    50% { transform: scale(1.045); filter: drop-shadow(0 16px 44px rgba(255,110,25,.65)) brightness(1.12); }
+  }
+  .bar { width: 240px; height: 8px; border-radius: 99px; overflow: hidden;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.12); }
+  .bar i { display: block; height: 100%; width: 40%; border-radius: 99px;
+    background: linear-gradient(90deg, #ffe27a, #ffb62e, #e23a1a);
+    animation: slide 1.2s ease-in-out infinite; }
+  @keyframes slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+  .t { font-size: 13px; letter-spacing: 2.5px; text-transform: uppercase; color: rgba(243,232,214,.6); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <img class="logo" src="../build/brand.png" alt="FerroLauncher" />
+    <div class="bar"><i></i></div>
+    <div class="t">Cargando</div>
+  </div>
+</body>
+</html>

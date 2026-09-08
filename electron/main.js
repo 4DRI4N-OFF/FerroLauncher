@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { getDataDir, dirs } = require('../core/constants');
@@ -29,6 +29,7 @@ function findInstance(d, name) {
 }
 
 let win = null;
+let splash = null;
 let D = null;
 let activeChild = null;
 let activeInstance = null;
@@ -42,11 +43,47 @@ function getDirs() {
   return D;
 }
 
+function createSplash() {
+  splash = new BrowserWindow({
+    width: 380, height: 430,
+    frame: false, transparent: true, alwaysOnTop: true,
+    resizable: false, skipTaskbar: true,
+    webPreferences: { nodeIntegration: false, contextIsolation: true },
+  });
+  splash.loadFile(path.join(__dirname, 'splash.html'));
+  splash._t0 = Date.now();
+}
+
+// Expande la ventana desde un rect inicial hasta el final con fade-in (morph splash -> app).
+// El centro queda clavado: solo crece el tamaño, así el logo centrado no deriva.
+function morphWindow(target, from, to, ms, done) {
+  const t0 = Date.now();
+  const cx = from.x + from.width / 2;
+  const cy = from.y + from.height / 2;
+  const ease = (t) => 1 - Math.pow(1 - t, 3);
+  const timer = setInterval(() => {
+    const t = Math.min(1, (Date.now() - t0) / ms);
+    const e = ease(t);
+    try {
+      const w = Math.round(from.width + (to.width - from.width) * e);
+      const h = Math.round(from.height + (to.height - from.height) * e);
+      target.setBounds({ x: Math.round(cx - w / 2), y: Math.round(cy - h / 2), width: w, height: h });
+      target.setOpacity(Math.max(0, Math.min(1, e)));
+    } catch { clearInterval(timer); return; }
+    if (t >= 1) {
+      clearInterval(timer);
+      try { target.setOpacity(1); } catch {}
+      done && done();
+    }
+  }, 16);
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1100, height: 700,
     autoHideMenuBar: true,
-    backgroundColor: '#0f1115',
+    backgroundColor: '#0d0908',
+    show: false,
     icon: path.join(__dirname, '../build/icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -57,10 +94,52 @@ function createWindow() {
   const dev = !app.isPackaged;
   if (dev) win.loadURL('http://localhost:5173');
   else win.loadFile(path.join(__dirname, '../dist/index.html'));
+  win.once('ready-to-show', () => {
+    // Tiempo mínimo para que la animación del splash se aprecie
+    const wait = Math.max(0, 2400 - (Date.now() - ((splash && splash._t0) || Date.now())));
+    setTimeout(() => {
+      try {
+        if (win && !win.isDestroyed()) {
+          // La ventana nace con el tamaño del splash y crece hasta la app (morph)
+          let from = null;
+          const target = { width: 1100, height: 700, x: undefined, y: undefined };
+          try {
+            if (splash && !splash.isDestroyed()) {
+              from = splash.getBounds();
+              const area = screen.getDisplayMatching(from).workArea;
+              target.x = Math.round(area.x + (area.width - 1100) / 2);
+              target.y = Math.round(area.y + (area.height - 700) / 2);
+              win.setBounds(from);
+            }
+          } catch {}
+          win.setOpacity(0);
+          win.show();
+          win.webContents.send('ferro:shown');
+          const settled = () => { try { win.webContents.send('ferro:settled'); } catch {} };
+          if (from) morphWindow(win, from, target, 650, settled);
+          else { try { win.setOpacity(1); } catch {} settled(); }
+          // Solape: el splash tapa el primer tramo para que no haya corte
+          setTimeout(() => {
+            try { if (splash && !splash.isDestroyed()) splash.close(); } catch {}
+            splash = null;
+          }, 250);
+        }
+      } catch {}
+    }, wait);
+  });
+  // Seguridad: si la ventana no carga (p. ej. sin servidor dev), no dejar el splash colgado
+  setTimeout(() => {
+    try {
+      if (splash && !splash.isDestroyed() && win && !win.isVisible()) {
+        splash.close(); splash = null; win.show(); win.webContents.send('ferro:shown'); win.webContents.send('ferro:settled');
+      }
+    } catch {}
+  }, 25000);
 }
 
 app.whenReady().then(() => {
   getDirs();
+  createSplash();
   createWindow();
   initUpdater();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
@@ -110,19 +189,20 @@ ipcMain.handle('ferro:loaders', async (_, { mcVersion, type }) => {
   return loaderApi(type).list(mcVersion);
 });
 
-ipcMain.handle('ferro:modSearch', async (_, { query, mcVersion, loader, sort }) => searchMods(query || '', mcVersion, ['quilt', 'forge', 'neoforge'].includes(loader) ? loader : 'fabric', { sort }));
-ipcMain.handle('ferro:mods', async (_, { instanceName }) => listMods(findInstance(getDirs(), instanceName).path));
-ipcMain.handle('ferro:modInstall', async (event, { instanceName, projectId }) => {
+ipcMain.handle('ferro:modSearch', async (_, { query, mcVersion, loader, sort, kind }) => searchMods(query || '', mcVersion, ['quilt', 'forge', 'neoforge'].includes(loader) ? loader : 'fabric', { sort, kind: ['shader', 'resourcepack'].includes(kind) ? kind : 'mod' }));
+ipcMain.handle('ferro:mods', async (_, { instanceName, kind }) => listMods(findInstance(getDirs(), instanceName).path, kind));
+ipcMain.handle('ferro:modInstall', async (event, { instanceName, projectId, kind }) => {
+  const k = ['shader', 'resourcepack'].includes(kind) ? kind : 'mod';
   const inst = findInstance(getDirs(), instanceName);
-  if (inst.type === 'vanilla') throw new Error('Los mods requieren instancia con loader');
+  if (k === 'mod' && inst.type === 'vanilla') throw new Error('Los mods requieren instancia con loader');
   const send = (t) => win && win.webContents.send('ferro:log', t);
-  return installMod(inst.path, projectId, inst.versionId, inst.type, send);
+  return installMod(inst.path, projectId, inst.versionId, inst.type, send, k);
 });
-ipcMain.handle('ferro:modRemove', async (_, { instanceName, file }) => {
-  removeMod(findInstance(getDirs(), instanceName).path, file);
+ipcMain.handle('ferro:modRemove', async (_, { instanceName, file, kind }) => {
+  removeMod(findInstance(getDirs(), instanceName).path, file, kind);
   return true;
 });
-ipcMain.handle('ferro:modToggle', async (_, { instanceName, file, disable }) => toggleMod(findInstance(getDirs(), instanceName).path, file, disable));
+ipcMain.handle('ferro:modToggle', async (_, { instanceName, file, disable, kind }) => toggleMod(findInstance(getDirs(), instanceName).path, file, disable, kind));
 ipcMain.handle('ferro:packSearch', async (_, { query, mcVersion, loader, sort }) => searchModpacks(query || '', mcVersion, { loader: ['fabric', 'forge', 'neoforge', 'quilt'].includes(loader) ? loader : null, sort }));
 ipcMain.handle('ferro:packVersions', async (_, { projectId, mcVersion, loader }) => {
   const vers = await packVersions(projectId, mcVersion, ['fabric', 'forge', 'neoforge', 'quilt'].includes(loader) ? [loader] : undefined);

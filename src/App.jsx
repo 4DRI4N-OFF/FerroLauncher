@@ -18,6 +18,8 @@ export default function App() {
   const [fVersion, setFVersion] = useState('1.21.1');
   const [fLoader, setFLoader] = useState('fabric');
   const [fSort, setFSort] = useState('relevance');
+  const [kind, setKind] = useState('mod');
+  const kindName = kind === 'shader' ? 'shaders' : kind === 'resourcepack' ? 'resource packs' : 'mods';
   const [mods, setMods] = useState([]);
   const [modsFor, setModsFor] = useState('');
   const [searching, setSearching] = useState(false);
@@ -46,6 +48,10 @@ export default function App() {
   const [skinBusy, setSkinBusy] = useState(false);
   const [bkFor, setBkFor] = useState('');
   const [bkList, setBkList] = useState([]);
+  const [intro, setIntro] = useState(true);
+  const introImgRef = useRef(null);
+  const sideLogoRef = useRef(null);
+  const overlayRef = useRef(null);
   const pollRef = useRef(null);
   const [launchInstance, setLaunchInstance] = useState('');
   const [log, setLog] = useState('[ferro] listo\n');
@@ -77,9 +83,9 @@ export default function App() {
     }
   };
 
-  const loadMods = async (name) => {
+  const loadMods = async (name, k) => {
     if (!name) return;
-    try { setMods(await window.ferro.mods({ instanceName: name })); }
+    try { setMods(await window.ferro.mods({ instanceName: name, kind: k || kind })); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -102,7 +108,7 @@ export default function App() {
   const doSearch = async () => {
     setSearching(true);
     try {
-      const r = await window.ferro.modSearch({ query: modQuery, mcVersion: fVersion, loader: fLoader, sort: fSort });
+      const r = await window.ferro.modSearch({ query: modQuery, mcVersion: fVersion, loader: fLoader, sort: fSort, kind });
       setModHits(r.hits || r);
       setModTotal(r.total || (r.hits || r).length);
       setInstalledIds([]);
@@ -115,7 +121,7 @@ export default function App() {
     setInstallingId(projectId);
     try {
       setLog((l) => l + `[ferro] instalando ${title} en ${modsFor}...\n`);
-      const r = await window.ferro.modInstall({ instanceName: modsFor, projectId });
+      const r = await window.ferro.modInstall({ instanceName: modsFor, projectId, kind });
       setLog((l) => l + `[ferro] instalado ${r.file}\n`);
       setInstalledIds((s) => [...s, projectId]);
       await loadMods(modsFor);
@@ -188,6 +194,46 @@ export default function App() {
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
   useEffect(() => stopPoll, []);
+
+  // Intro: el logo vuela del centro (donde estaba el splash) al sidebar
+  useEffect(() => {
+    document.body.classList.add('intro-lock');
+    const unlock = () => document.body.classList.remove('intro-lock');
+    let done = false;
+    const fly = async () => {
+      if (done) return;
+      done = true;
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const img = introImgRef.current, target = sideLogoRef.current, ov = overlayRef.current;
+      if (!img || !target) { unlock(); setIntro(false); return; }
+      const r1 = img.getBoundingClientRect(), r2 = target.getBoundingClientRect();
+      const dx = r2.left + r2.width / 2 - (r1.left + r1.width / 2);
+      const dy = r2.top + r2.height / 2 - (r1.top + r1.height / 2);
+      const s = r2.width / r1.width;
+      try {
+        const anim = img.animate([
+          { transform: 'translate(0, 0) scale(1) rotate(0deg)' },
+          { transform: `translate(${dx}px, ${dy}px) scale(${s}) rotate(-360deg)` },
+        ], { duration: 1100, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'forwards' });
+        await anim.finished;
+      } catch {}
+      // Corte seco al logo real: sin fundido que delate 1px de diferencia
+      unlock();
+      setIntro(false);
+    };
+    if (window.ferro?.onShown) {
+      let fallback;
+      // El vuelo arranca cuando la ventana deja de crecer (medidas ya estables)
+      window.ferro.onSettled?.(() => fly());
+      window.ferro.onShown(() => {
+        fallback = setTimeout(fly, 2000); // por si settled no llega
+      });
+      const t = setTimeout(fly, 9000); // salvavidas
+      return () => { clearTimeout(t); clearTimeout(fallback); unlock(); };
+    }
+    const t = setTimeout(fly, 600); // fuera de Electron
+    return () => { clearTimeout(t); unlock(); };
+  }, []);
 
   useEffect(() => {
     window.ferro.onAuthResult?.((err, data) => {
@@ -328,11 +374,11 @@ export default function App() {
   return (
     <div className="layout">
       <div className="side">
-        <img className="brand-logo" src={brand} alt="FerroLauncher" />
+        <img ref={sideLogoRef} className="brand-logo" src={brand} alt="FerroLauncher" />
         <button className={tab==='jugar'?'active':''} onClick={()=>setTab('jugar')}>▶ Jugar</button>
         <button className={tab==='versiones'?'active':''} onClick={()=>setTab('versiones')}>🧊 Versiones</button>
         <button className={tab==='instancias'?'active':''} onClick={()=>setTab('instancias')}>📦 Instancias</button>
-        <button className={tab==='mods'?'active':''} onClick={()=>{setTab('mods'); if(modsFor) loadMods(modsFor);}}>🧩 Mods</button>
+        <button className={tab==='mods'?'active':''} onClick={()=>{setTab('mods'); if(modsFor) loadMods(modsFor);}}>🧩 Contenido</button>
         <button className={tab==='packs'?'active':''} onClick={()=>setTab('packs')}>🎁 Modpacks</button>
         <button className={tab==='cuenta'?'active':''} onClick={()=>{setTab('cuenta'); loadAuth();}}>👤 Cuenta</button>
         <button className={tab==='skin'?'active':''} onClick={()=>{setTab('skin'); loadSkin();}}>🎨 Skin</button>
@@ -442,21 +488,28 @@ export default function App() {
         )}
         {tab==='mods' && (
           <div className="card">
-            <h2>Mods (Modrinth)</h2>
+            <h2>Contenido (Modrinth)</h2>
             <div className="row">
               <select value={modsFor} onChange={(e)=>{setModsFor(e.target.value); loadMods(e.target.value);}}>
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' '+i.type})</option>)}
               </select>
-              <input value={modQuery} onChange={(e)=>setModQuery(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter') doSearch();}} placeholder="Buscar mod..." />
+              <select value={kind} onChange={(e)=>{setKind(e.target.value); setModHits([]); setInstalledIds([]); loadMods(modsFor, e.target.value);}} title="Tipo">
+                <option value="mod">Mods</option>
+                <option value="shader">Shaders</option>
+                <option value="resourcepack">Resource packs</option>
+              </select>
+              <input value={modQuery} onChange={(e)=>setModQuery(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter') doSearch();}} placeholder={`Buscar ${kindName}...`} />
               <select value={fVersion} onChange={(e)=>setFVersion(e.target.value)} title="Versión de Minecraft">
                 {versions.map((v)=><option key={v.id} value={v.id}>{v.id}</option>)}
               </select>
+              {kind==='mod' && (
               <select value={fLoader} onChange={(e)=>setFLoader(e.target.value)} title="Loader">
                 <option value="fabric">Fabric</option>
                 <option value="quilt">Quilt</option>
                 <option value="forge">Forge</option>
                 <option value="neoforge">NeoForge</option>
               </select>
+              )}
               <select value={fSort} onChange={(e)=>setFSort(e.target.value)} title="Orden">
                 <option value="relevance">Relevancia</option>
                 <option value="downloads">Descargas</option>
@@ -490,8 +543,8 @@ export default function App() {
             <h3>Instalados ({mods.length})</h3>
             <div className="grid">
               {mods.map((m)=><div key={m.file} className="card"><div className="card-title" title={m.file}>{m.file}</div><div className="meta"><span className="pill">{(m.size/1048576).toFixed(1)} MB{m.disabled?' · desactivado':''}</span></div><div className="actions">
-                <button className="ghost" onClick={async()=>{await window.ferro.modToggle({instanceName:modsFor, file:m.file, disable:!m.disabled}); loadMods(modsFor);}}>{m.disabled?'Activar':'Desactivar'}</button>
-                <button className="ghost danger" onClick={async()=>{await window.ferro.modRemove({instanceName:modsFor, file:m.file}); loadMods(modsFor);}}>Quitar</button>
+                <button className="ghost" onClick={async()=>{await window.ferro.modToggle({instanceName:modsFor, file:m.file, disable:!m.disabled, kind}); loadMods(modsFor);}}>{m.disabled?'Activar':'Desactivar'}</button>
+                <button className="ghost danger" onClick={async()=>{await window.ferro.modRemove({instanceName:modsFor, file:m.file, kind}); loadMods(modsFor);}}>Quitar</button>
               </div></div>)}
             </div>
           </div>
@@ -639,6 +692,11 @@ export default function App() {
           </>
         )}
       </div>
+      {intro && (
+        <div className="intro-overlay" ref={overlayRef}>
+          <img ref={introImgRef} className="intro-logo" src={brand} alt="" />
+        </div>
+      )}
     </div>
   );
 }

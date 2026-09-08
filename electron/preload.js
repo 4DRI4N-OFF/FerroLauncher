@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('ferro', {
   checkUpdate: () => ipcRenderer.invoke('ferro:checkUpdate'),
   quitAndInstall: () => ipcRenderer.invoke('ferro:quitAndInstall'),
   onUpdate: (cb) => ipcRenderer.on('ferro:update', (_, d) => cb(d)),
+  onShown: (cb) => ipcRenderer.once('ferro:shown', () => cb()),
+  onSettled: (cb) => ipcRenderer.once('ferro:settled', () => cb()),
   skin: (data) => ipcRenderer.invoke('ferro:skin', data),
   skinApply: (data) => ipcRenderer.invoke('ferro:skinApply', data),
   skinReset: () => ipcRenderer.invoke('ferro:skinReset'),

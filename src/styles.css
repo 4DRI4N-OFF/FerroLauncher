@@ -63,6 +63,9 @@ body::before {
 }
 .brand-logo {
   width: 100%;
+  aspect-ratio: 2048 / 887;
+  height: auto;
+  display: block;
   border-radius: 16px;
   margin: 2px 0 12px;
   filter: drop-shadow(0 8px 22px rgba(255, 160, 40, 0.35));
@@ -71,6 +74,19 @@ body::before {
 .brand-logo:hover {
   transform: scale(1.03) translateY(-1px);
   filter: drop-shadow(0 12px 30px rgba(255, 130, 25, 0.6)) brightness(1.1);
+}
+
+/* ——— Intro: el logo vuela del splash al sidebar ——— */
+body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
+.intro-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(420px 260px at 50% 30%, rgba(255,110,40,.25), transparent 70%), rgba(13, 9, 8, 0.92);
+}
+.intro-logo {
+  width: 300px; aspect-ratio: 2048 / 887; height: auto; display: block;
+  border-radius: 18px;
+  filter: drop-shadow(0 12px 34px rgba(255, 120, 25, 0.5));
 }
 .side button {
   display: flex;

@@ -570,7 +570,7 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
       send('[ferro] Iniciando protocolo anti-suplantación…\n');
       shakeWindow();
       await sleep(700);
-      send(`[ferro] Identidad verificada contra Mojang. Reporte ${caseId} archivado.\n`);
+      send(`[ferro] Identidad comprobada. Evidencia guardada en este equipo. Caso ${caseId}.\n`);
       await sleep(700);
       send('[ferro] Acceso DENEGADO. Usa tu propia cuenta o inicia sesión con Microsoft.\n');
       await sleep(300);

@@ -12,7 +12,7 @@
 </p>
 
 Open-source **Minecraft: Java Edition** launcher for Windows, built with Electron + React + Node.js.
-A Prism-style launcher: instances, loaders, mods and modpacks in one place.
+An independent open-source launcher: instances, loaders, mods and modpacks in one place.
 
 > ⚠️ Work in progress — not the final app. Loader and feature coverage is growing.
 

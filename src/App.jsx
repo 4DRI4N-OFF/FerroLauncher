@@ -94,7 +94,7 @@ export default function App() {
         if (/Acceso DENEGADO/.test(added)) {
           const full = prev + added;
           const nm = (full.match(/NOMBRE PREMIUM DETECTADO:\s*(.+?)\s*!!/) || [])[1] || '???';
-          const cs = (full.match(/Reporte\s+(F-[0-9A-F]+)/) || [])[1] || 'F-????';
+          const cs = (full.match(/(?:Reporte|Caso)\s+(F-[0-9A-F]+)/) || [])[1] || 'F-????';
           setScare({ name: nm.trim(), caseId: cs });
           setTimeout(() => setScare(null), 6000);
         }

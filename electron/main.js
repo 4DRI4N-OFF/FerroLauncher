@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain, shell, dialog, screen } = require('electron
 const path = require('path');
 const fs = require('fs');
 const { getDataDir, dirs } = require('../core/constants');
-const { ensureDirs, listInstances, createInstance, updateInstanceSettings, setForgeProfile } = require('../core/instanceManager');
+const { ensureDirs, listInstances, createInstance, updateInstanceSettings, setForgeProfile, duplicateInstance, deleteInstance, renameInstance, touchPlayed } = require('../core/instanceManager');
 const { listVersions, getVersionDetails, downloadClientJar } = require('../core/mojangService');
 const { findJava, ensureJava } = require('../core/javaManager');
 const { resolveLibraries, launch } = require('../core/launcher');
@@ -21,6 +21,7 @@ const { searchModpacks, packVersions, getPackVersion, installMrpack } = require(
 const auth = require('../core/authService');
 const skins = require('../core/skinService');
 const backups = require('../core/backupService');
+const discord = require('../core/discordService');
 
 function findInstance(d, name) {
   const inst = listInstances(d.instances).find((i) => i.name === name);
@@ -232,6 +233,8 @@ ipcMain.handle('ferro:packInstall', async (_, { name, projectId, packVersionId, 
 ipcMain.handle('ferro:java', async () => (await findJava()) || null);
 
 ipcMain.handle('ferro:clientId', async () => auth.getClientId(getDirs().base));
+ipcMain.handle('ferro:discord', async () => auth.getDiscord(getDirs().base));
+ipcMain.handle('ferro:setDiscord', async (_, patch) => auth.setDiscord(getDirs().base, patch || {}));
 ipcMain.handle('ferro:setClientId', async (_, { clientId }) => auth.setClientId(getDirs().base, clientId));
 ipcMain.handle('ferro:authStatus', async () => {
   const acc = auth.loadAccount(getDirs().base);
@@ -360,6 +363,14 @@ ipcMain.handle('ferro:authWindow', async () => {
 });
 
 ipcMain.handle('ferro:updateSettings', async (_, { instanceName, patch }) => updateInstanceSettings(getDirs().instances, instanceName, patch || {}));
+ipcMain.handle('ferro:openFolder', async (_, { instanceName }) => {
+  const p = findInstance(getDirs(), instanceName).path;
+  await shell.openPath(p);
+  return true;
+});
+ipcMain.handle('ferro:duplicateInstance', async (_, { instanceName }) => duplicateInstance(getDirs().instances, instanceName));
+ipcMain.handle('ferro:deleteInstance', async (_, { instanceName }) => deleteInstance(getDirs().instances, instanceName));
+ipcMain.handle('ferro:renameInstance', async (_, { instanceName, newName }) => renameInstance(getDirs().instances, instanceName, newName));
 
 ipcMain.handle('ferro:exportInstance', async (_, { instanceName }) => {
   const d = getDirs();
@@ -490,6 +501,14 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
   }
   activeChild = await launch({ javaPath: javaBin, versionDetails: details, clientJar, librariesCp: cp, nativesDir, loggingPath, instanceDir: inst.path, dataDirs: d, username: username || 'Ferro', ramMb: effRam, width: effW, height: effH, onLog: send, mainClassOverride, extraClasspath, auth: authArg });
   activeInstance = inst.name;
-  activeChild.on('close', () => { activeChild = null; activeInstance = null; });
+  touchPlayed(d.instances, inst.name);
+  // Discord RPC (no bloquea; falla en silencio sin cliente Discord)
+  try {
+    const dc = auth.getDiscord(d.base);
+    if (dc.enabled && dc.clientId) {
+      discord.setPlaying(dc.clientId, { version: details.id, instance: inst.name, loader: inst.type, username: (authArg && authArg.username) || username || 'Ferro' }, send);
+    }
+  } catch {}
+  activeChild.on('close', () => { activeChild = null; activeInstance = null; try { discord.clear(); } catch {} });
   return true;
 });

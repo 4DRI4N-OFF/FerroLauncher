@@ -56,7 +56,58 @@ function updateInstanceSettings(instancesDir, name, patch) {
   return withSettings({ name, path: dir, ...cfg });
 }
 
-module.exports = { ensureDirs, listInstances, createInstance, updateInstanceSettings, defaultSettings, setForgeProfile };
+module.exports = { ensureDirs, listInstances, createInstance, updateInstanceSettings, defaultSettings, setForgeProfile, duplicateInstance, deleteInstance, renameInstance, touchPlayed };
+
+function copyDir(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const e of fs.readdirSync(src, { withFileTypes: true })) {
+    const s = path.join(src, e.name), d = path.join(dest, e.name);
+    if (e.isDirectory()) copyDir(s, d);
+    else fs.copyFileSync(s, d);
+  }
+}
+
+function duplicateInstance(instancesDir, name) {
+  const src = path.join(instancesDir, name);
+  const cfg = withSettings(JSON.parse(fs.readFileSync(path.join(src, 'ferro.json'), 'utf8')));
+  const safe = `${cfg.name} copia`.replace(/[^\w\-. ]+/g, '_').trim();
+  let dest = safe, i = 2;
+  while (fs.existsSync(path.join(instancesDir, dest))) dest = `${safe} (${i++})`;
+  copyDir(src, path.join(instancesDir, dest));
+  const cfgPath = path.join(instancesDir, dest, 'ferro.json');
+  const c2 = withSettings(JSON.parse(fs.readFileSync(cfgPath, 'utf8')));
+  c2.name = dest;
+  delete c2.lastPlayed;
+  fs.writeFileSync(cfgPath, JSON.stringify(c2, null, 2));
+  return dest;
+}
+
+function deleteInstance(instancesDir, name) {
+  fs.rmSync(path.join(instancesDir, name), { recursive: true, force: true });
+  return true;
+}
+
+function renameInstance(instancesDir, oldName, newName) {
+  const safe = String(newName).replace(/[^\w\-. ]+/g, '_').trim();
+  if (!safe) throw new Error('Nombre vacío');
+  if (fs.existsSync(path.join(instancesDir, safe))) throw new Error('Ya existe ese nombre');
+  fs.renameSync(path.join(instancesDir, oldName), path.join(instancesDir, safe));
+  const cfgPath = path.join(instancesDir, safe, 'ferro.json');
+  const cfg = withSettings(JSON.parse(fs.readFileSync(cfgPath, 'utf8')));
+  cfg.name = safe;
+  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+  return safe;
+}
+
+function touchPlayed(instancesDir, name) {
+  try {
+    const cfgPath = path.join(instancesDir, name, 'ferro.json');
+    const cfg = withSettings(JSON.parse(fs.readFileSync(cfgPath, 'utf8')));
+    cfg.lastPlayed = Date.now();
+    cfg.plays = (cfg.plays || 0) + 1;
+    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+  } catch {}
+}
 
 function setForgeProfile(instancesDir, name, patch) {
   const dir = path.join(instancesDir, name);

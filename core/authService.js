@@ -6,6 +6,9 @@ const http = require('http');
 // Client ID integrado (el de tu app Azure): los usuarios finales no registran nada.
 // Se puede sobreescribir desde la UI (pestaña Cuentas) y se guarda en ferro-config.json.
 const DEFAULT_CLIENT_ID = 'e38aa735-6b06-4111-9d58-5190f3d754db';
+// Discord App ID integrado: RPC funciona para todos sin configurar.
+// Opcional por usuario desde Ajustes → Discord.
+const DEFAULT_DISCORD_ID = '1546684646656446576';
 
 const MS_DEVICE = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode';
 const MS_TOKEN = 'https://login.microsoftonline.com/consumers/oauth2/v2.0/token';
@@ -40,6 +43,21 @@ function setClientId(baseDir, clientId) {
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
   return cfg.clientId;
+}
+
+function getDiscord(baseDir) {
+  const cfg = readJson(authPaths(baseDir).config, {});
+  return { clientId: cfg.discordClientId || process.env.FERRO_DISCORD_ID || DEFAULT_DISCORD_ID, enabled: cfg.discordEnabled !== false };
+}
+
+function setDiscord(baseDir, patch) {
+  const p = authPaths(baseDir).config;
+  const cfg = readJson(p, {});
+  if (patch.clientId !== undefined) cfg.discordClientId = String(patch.clientId || '').trim();
+  if (patch.enabled !== undefined) cfg.discordEnabled = !!patch.enabled;
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
+  return getDiscord(baseDir);
 }
 
 async function form(url, params) {
@@ -226,7 +244,7 @@ async function validAccount(baseDir, clientId) {
 }
 
 module.exports = {
-  getClientId, setClientId, deviceStart, devicePollOnce,
+  getClientId, setClientId, getDiscord, setDiscord, deviceStart, devicePollOnce,
   completeLogin, validAccount, loadAccount, clearAccount,
   listAccounts, setActive, removeAccount,
   browserLogin, exchangeCode, authorizeUrl, NATIVE_REDIRECT, SCOPE,

@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import brand from './assets/brand.png';
+import { sfx } from './sfx.js';
+import {
+  Play, Square, Layers, Package, LayoutGrid, Gift, User, Palette,
+  Settings, Search, Plus, RefreshCw, FolderOpen, Copy, Pencil, Trash2,
+  Download, Upload, Check, X, AlertTriangle, Info,
+} from 'lucide-react';
 
 export default function App() {
   const [tab, setTab] = useState('jugar');
@@ -41,6 +47,38 @@ export default function App() {
   const [pollCount, setPollCount] = useState(0);
   const [appVer, setAppVer] = useState('');
   const [upd, setUpd] = useState({ state: 'idle' });
+  const [sfxOn, setSfxOn] = useState(sfx.cfg.enabled);
+  const [sfxVol, setSfxVol] = useState(sfx.cfg.volume);
+  const [sfxHover, setSfxHover] = useState(sfx.cfg.hover);
+  const [dcId, setDcId] = useState('');
+  const [dcOn, setDcOn] = useState(true);
+  const [toasts, setToasts] = useState([]);
+  const [flashKey, setFlashKey] = useState(0);
+  const toastId = useRef(0);
+
+  const pushToast = (type, msg) => {
+    const id = ++toastId.current;
+    setToasts((t) => [...t.slice(-3), { id, type, msg: String(msg).slice(0, 180) }]);
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), type === 'error' ? 6000 : 4500);
+  };
+
+  // Todo el log pasa por aquí: clasifica lo nuevo (error/éxito) para VFX+sonido
+  const setLog = (updater) => {
+    setLogRaw((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      const added = typeof next === 'string' ? next.slice(prev.length) : '';
+      if (added) {
+        const errLine = added.split('\n').find((ln) => /^\[error\]/.test(ln));
+        if (errLine) {
+          sfx.play('error');
+          pushToast('error', errLine.replace(/^\[error\]\s*/, ''));
+          setFlashKey((k) => k + 1);
+        } else if (/lanzando\.\.\./.test(added)) sfx.play('launch');
+        else if (/instalad[oa]|creada|iniciada|guardados|restaurada|importada|list[oa]|aplicada|restablecida/i.test(added)) sfx.play('success');
+      }
+      return next;
+    });
+  };
   const [skinInfo, setSkinInfo] = useState(null);
   const [skinName, setSkinName] = useState('');
   const [skinUrl, setSkinUrl] = useState('');
@@ -54,7 +92,7 @@ export default function App() {
   const overlayRef = useRef(null);
   const pollRef = useRef(null);
   const [launchInstance, setLaunchInstance] = useState('');
-  const [log, setLog] = useState('[ferro] listo\n');
+  const [log, setLogRaw] = useState('[ferro] listo\n');
   const [running, setRunning] = useState(false);
   const [logLevel, setLogLevel] = useState('todo');
   const [logSearch, setLogSearch] = useState('');
@@ -66,6 +104,7 @@ export default function App() {
   const [sJavaMode, setSJavaMode] = useState('auto');
   const [sJavaPath, setSJavaPath] = useState('');
   const [saving, setSaving] = useState(false);
+  const [instFilter, setInstFilter] = useState('');
   const logRef = useRef(null);
 
   const refresh = async () => {
@@ -123,6 +162,7 @@ export default function App() {
       setLog((l) => l + `[ferro] instalando ${title} en ${modsFor}...\n`);
       const r = await window.ferro.modInstall({ instanceName: modsFor, projectId, kind });
       setLog((l) => l + `[ferro] instalado ${r.file}\n`);
+      pushToast('success', `${title} instalado`);
       setInstalledIds((s) => [...s, projectId]);
       await loadMods(modsFor);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -154,6 +194,7 @@ export default function App() {
       setTab('jugar');
       const r = await window.ferro.packInstall({ name: `${pack.title} ${v.number}`, projectId: pack.id, packVersionId: v.id, mcVersion: packMc });
       setLog((l) => l + `[ferro] instancia ${r.name} creada desde modpack\n`);
+      pushToast('success', `Modpack instalado: ${r.name}`);
       await refresh();
       setLaunchInstance(r.name);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -165,6 +206,8 @@ export default function App() {
       setClientId(await window.ferro.clientId() || '');
       setAccount(await window.ferro.authStatus());
       setAccts(await window.ferro.accounts());
+      const dc = await window.ferro.discord().catch(()=>({clientId:'',enabled:true}));
+      setDcId(dc.clientId || ''); setDcOn(dc.enabled !== false);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -241,6 +284,7 @@ export default function App() {
       if (err) setLog((l) => l + `[error] ${err.error || err}\n`);
       else {
         setLog((l) => l + `[ferro] sesión iniciada: ${data.name}\n`);
+        pushToast('success', `Sesión: ${data.name}`);
         loadAuth();
       }
     });
@@ -306,6 +350,22 @@ export default function App() {
     window.ferro.status?.().then((s) => setRunning(!!s?.running)).catch(()=>{});
   }, []);
 
+  // Clics y hover globales en botones
+  useEffect(() => {
+    let lastHover = 0;
+    const onClick = (e) => { if (e.target.closest('button:not(:disabled)')) sfx.play('click'); };
+    const onOver = (e) => {
+      if (!e.target.closest('button:not(:disabled)')) return;
+      const now = Date.now();
+      if (now - lastHover < 90) return;
+      lastHover = now;
+      sfx.play('hover');
+    };
+    document.addEventListener('click', onClick);
+    document.addEventListener('mouseover', onOver);
+    return () => { document.removeEventListener('click', onClick); document.removeEventListener('mouseover', onOver); };
+  }, []);
+
   useEffect(() => {
     if (instanceType === 'vanilla') return;
     window.ferro.loaders({ mcVersion: versionId, type: instanceType }).then((l) => {
@@ -318,6 +378,7 @@ export default function App() {
     try {
       await window.ferro.createInstance({ name: instanceName, versionId, type: instanceType, loaderVersion: instanceType === 'vanilla' ? undefined : loaderVersion });
       setLog((l) => l + `[ferro] instancia creada: ${instanceName} (${versionId}${instanceType === 'vanilla' ? '' : ` + ${instanceType} ${loaderVersion}`})\n`);
+      pushToast('success', `Instancia ${instanceName} creada`);
       refresh();
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
@@ -375,14 +436,14 @@ export default function App() {
     <div className="layout">
       <div className="side">
         <img ref={sideLogoRef} className="brand-logo" src={brand} alt="FerroLauncher" />
-        <button className={tab==='jugar'?'active':''} onClick={()=>setTab('jugar')}>▶ Jugar</button>
-        <button className={tab==='versiones'?'active':''} onClick={()=>setTab('versiones')}>🧊 Versiones</button>
-        <button className={tab==='instancias'?'active':''} onClick={()=>setTab('instancias')}>📦 Instancias</button>
-        <button className={tab==='mods'?'active':''} onClick={()=>{setTab('mods'); if(modsFor) loadMods(modsFor);}}>🧩 Contenido</button>
-        <button className={tab==='packs'?'active':''} onClick={()=>setTab('packs')}>🎁 Modpacks</button>
-        <button className={tab==='cuenta'?'active':''} onClick={()=>{setTab('cuenta'); loadAuth();}}>👤 Cuenta</button>
-        <button className={tab==='skin'?'active':''} onClick={()=>{setTab('skin'); loadSkin();}}>🎨 Skin</button>
-        <button className={tab==='ajustes'?'active':''} onClick={()=>setTab('ajustes')}>⚙️ Ajustes</button>
+        <button className={tab==='jugar'?'active':''} onClick={()=>setTab('jugar')}><Play size={16} /> Jugar</button>
+        <button className={tab==='versiones'?'active':''} onClick={()=>setTab('versiones')}><Layers size={16} /> Versiones</button>
+        <button className={tab==='instancias'?'active':''} onClick={()=>setTab('instancias')}><Package size={16} /> Instancias</button>
+        <button className={tab==='mods'?'active':''} onClick={()=>{setTab('mods'); if(modsFor) loadMods(modsFor);}}><LayoutGrid size={16} /> Contenido</button>
+        <button className={tab==='packs'?'active':''} onClick={()=>setTab('packs')}><Gift size={16} /> Modpacks</button>
+        <button className={tab==='cuenta'?'active':''} onClick={()=>{setTab('cuenta'); loadAuth();}}><User size={16} /> Cuenta</button>
+        <button className={tab==='skin'?'active':''} onClick={()=>{setTab('skin'); loadSkin();}}><Palette size={16} /> Skin</button>
+        <button className={tab==='ajustes'?'active':''} onClick={()=>setTab('ajustes')}><Settings size={16} /> Ajustes</button>
         <div className="ver">v0.3.0 · ajustes + consola</div>
       </div>
       <div className="main">
@@ -395,13 +456,13 @@ export default function App() {
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' · '+i.type})</option>)}
               </select>
               {!running
-                ? <button className="primary" onClick={play} disabled={!launchInstance}>▶ JUGAR</button>
-                : <button className="primary" onClick={stop} style={{filter:'hue-rotate(140deg)'}}>⏹ DETENER</button>}
-              <button className="ghost" onClick={refresh}>Recargar</button>
+                ? <button className="primary" onClick={play} disabled={!launchInstance}><Play size={16} /> JUGAR</button>
+                : <button className="primary" onClick={stop} style={{filter:'hue-rotate(140deg)'}}><Square size={16} /> DETENER</button>}
+              <button className="ghost" onClick={refresh}><RefreshCw size={14} /> Recargar</button>
               {running && <span className="pill green"><span className="spinner" />en ejecución</span>}
               {account ? <span className="pill green">✓ {account.name} (online)</span> : <span className="pill">offline</span>}
             </div>
-            {instances.length===0 && <p>Crea tu primera instancia en 📦 Instancias.</p>}
+            {instances.length===0 && <p>Crea tu primera instancia en Instancias.</p>}
             <h3>Consola</h3>
             <div className="row" style={{marginBottom:8}}>
               <select value={logLevel} onChange={(e)=>setLogLevel(e.target.value)}>
@@ -445,14 +506,17 @@ export default function App() {
                   {loaders.map((l)=><option key={l.loader} value={l.loader}>{l.loader}{l.tag?` (${l.tag})`:''}{l.stable && !l.tag?' (estable)':''}</option>)}
                 </select>
               )}
-              <button className="primary" onClick={create}>Crear</button>
+              <button className="primary" onClick={create}><Plus size={14} /> Crear</button>
             </div>
             <h3>Instaladas ({instances.length})</h3>
+            <div className="row" style={{marginBottom:10}}>
+              <input value={instFilter} onChange={(e)=>setInstFilter(e.target.value)} placeholder="Filtrar instancias..." />
+            </div>
             <div className="grid">
-              {instances.map((i)=><div key={i.name} className="card"><div className="card-title" title={i.name}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}{i.type==='vanilla' ? '' : ` + ${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span></div><div className="actions"><button className="ghost" onClick={()=>editSettings(i.name)}>⚙ Ajustes</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}>Exportar</button></div></div>)}
+              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className="card"><div className="card-title" title={i.name}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}{i.type==='vanilla' ? '' : ` + ${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}</span> : <span className="pill">sin jugar</span>}</div><div className="actions"><button className="ghost" onClick={()=>editSettings(i.name)}><Settings size={14} /> Ajustes</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}><Upload size={14} /> Exportar</button><button className="ghost" onClick={async()=>{await window.ferro.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> Carpeta</button><button className="ghost" onClick={async()=>{await window.ferro.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> Duplicar</button><button className="ghost" onClick={async()=>{const n=window.prompt('Nuevo nombre:', i.name); if(n && n!==i.name){await window.ferro.renameInstance({instanceName:i.name, newName:n}); refresh();}}}><Pencil size={14} /> Renombrar</button><button className="ghost danger" onClick={async()=>{if(window.confirm(`¿Eliminar ${i.name}? Se borran sus archivos.`)){await window.ferro.deleteInstance({instanceName:i.name}); refresh();}}}><Trash2 size={14} /> Eliminar</button></div></div>)}
             </div>
             <div className="row" style={{marginTop:12}}>
-              <button className="primary" onClick={async()=>{const n=await window.ferro.importInstance(); if(n){setLog((l)=>l+`[ferro] importada ${n}\n`); refresh();}}}>Importar .ferro</button>
+              <button className="primary" onClick={async()=>{const n=await window.ferro.importInstance(); if(n){setLog((l)=>l+`[ferro] importada ${n}\n`); refresh();}}}><Upload size={14} /> Importar .ferro</button>
             </div>
             <h3>Copias de {bkFor || '…'}</h3>
             <div className="row">
@@ -465,7 +529,7 @@ export default function App() {
             <div className="grid" style={{marginTop:10}}>
               {bkList.map((b)=><div key={b.file} className="card"><div className="card-title" title={b.file}>{b.file}</div><div className="meta"><span className="pill">{(b.size/1048576).toFixed(1)} MB</span></div><div className="actions">
                 <button className="ghost" onClick={async()=>{await window.ferro.backupRestore({instanceName:bkFor, file:b.file});}}>Restaurar</button>
-                <button className="ghost danger" onClick={async()=>{await window.ferro.backupDelete({instanceName:bkFor, file:b.file}); loadBackups(bkFor);}}>Eliminar</button>
+                <button className="ghost danger" onClick={async()=>{await window.ferro.backupDelete({instanceName:bkFor, file:b.file}); loadBackups(bkFor);}}><Trash2 size={14} /> Eliminar</button>
               </div></div>)}
             </div>
             {settingsFor && (
@@ -517,10 +581,10 @@ export default function App() {
                 <option value="newest">Novedades</option>
                 <option value="updated">Actualizados</option>
               </select>
-              <button className="primary" onClick={doSearch} disabled={searching || !modsFor}>{searching ? 'Buscando…' : 'Buscar'}</button>
+              <button className="primary" onClick={doSearch} disabled={searching || !modsFor}>{searching ? 'Buscando…' : <><Search size={14} /> Buscar</>}</button>
               <button className="ghost" onClick={()=>loadMods(modsFor)} disabled={!modsFor}>Ver instalados</button>
             </div>
-            {!modsFor && <p>Crea primero una instancia con loader (Fabric, Quilt, Forge o NeoForge) en 📦 Instancias.</p>}
+            {!modsFor && <p>Crea primero una instancia con loader (Fabric, Quilt, Forge o NeoForge) en Instancias.</p>}
             <h3>Resultados{modTotal>0 && ` (${modTotal.toLocaleString()})`} · {fVersion} · {fLoader}</h3>
             {modHits.length===0 && <p style={{opacity:.6}}>Sin resultados todavía — busca algo arriba.</p>}
             <div className="grid">
@@ -531,10 +595,10 @@ export default function App() {
                 <div key={m.id} className="card">
                   <div className="mod-head">{m.icon && <img className="mod-icon" src={m.icon} alt="" />}<b>{m.title}</b></div>
                   <div className="desc">{m.description?.slice(0,120)}</div>
-                  <div className="meta"><span className="pill">⬇ {m.downloads?.toLocaleString?.() || m.downloads}</span>{m.updated && <span className="pill">↻ {new Date(m.updated).toLocaleDateString()}</span>}{m.client==='required' && <span className="pill green">cliente</span>}</div>
+                  <div className="meta"><span className="pill"><Download size={12} /> {m.downloads?.toLocaleString?.() || m.downloads}</span>{m.updated && <span className="pill">↻ {new Date(m.updated).toLocaleDateString()}</span>}{m.client==='required' && <span className="pill green">cliente</span>}</div>
                   <div className="actions">
                     <button className={done ? 'ghost ok' : 'ghost'} disabled={busy || done || !modsFor} onClick={()=>doInstall(m.id, m.title)}>
-                      {busy ? <><span className="spinner" />Instalando…</> : done ? '✓ Instalado' : 'Instalar'}
+                      {busy ? <><span className="spinner" />Instalando…</> : done ? <><Check size={14} /> Instalado</> : <><Download size={14} /> Instalar</>}
                     </button>
                   </div>
                 </div>);
@@ -544,7 +608,7 @@ export default function App() {
             <div className="grid">
               {mods.map((m)=><div key={m.file} className="card"><div className="card-title" title={m.file}>{m.file}</div><div className="meta"><span className="pill">{(m.size/1048576).toFixed(1)} MB{m.disabled?' · desactivado':''}</span></div><div className="actions">
                 <button className="ghost" onClick={async()=>{await window.ferro.modToggle({instanceName:modsFor, file:m.file, disable:!m.disabled, kind}); loadMods(modsFor);}}>{m.disabled?'Activar':'Desactivar'}</button>
-                <button className="ghost danger" onClick={async()=>{await window.ferro.modRemove({instanceName:modsFor, file:m.file, kind}); loadMods(modsFor);}}>Quitar</button>
+                <button className="ghost danger" onClick={async()=>{await window.ferro.modRemove({instanceName:modsFor, file:m.file, kind}); loadMods(modsFor);}}><X size={14} /> Quitar</button>
               </div></div>)}
             </div>
           </div>
@@ -571,7 +635,7 @@ export default function App() {
                 <option value="newest">Novedades</option>
                 <option value="updated">Actualizados</option>
               </select>
-              <button className="primary" onClick={doPackSearch}>Buscar</button>
+              <button className="primary" onClick={doPackSearch}><Search size={14} /> Buscar</button>
             </div>
             <p style={{opacity:.65}}>{packTotal>0 ? `${packTotal.toLocaleString()} resultados · ` : ''}{packMc}{packLoader ? ` · ${packLoader}` : ''}. Crea una instancia nueva con el MC + loader que pida el pack. El progreso sale en ▶ Jugar.</p>
             <div className="grid">
@@ -579,7 +643,7 @@ export default function App() {
                 <div key={p.id} className="card">
                   <div className="mod-head">{p.icon && <img className="mod-icon" src={p.icon} alt="" />}<b>{p.title}</b></div>
                   <div className="desc">{p.description?.slice(0,120)}</div>
-                  <div className="meta"><span className="pill">⬇ {p.downloads?.toLocaleString?.() || p.downloads}</span>{p.updated && <span className="pill">↻ {new Date(p.updated).toLocaleDateString()}</span>}</div>
+                  <div className="meta"><span className="pill"><Download size={12} /> {p.downloads?.toLocaleString?.() || p.downloads}</span>{p.updated && <span className="pill">↻ {new Date(p.updated).toLocaleDateString()}</span>}</div>
                   <div className="actions"><button className="ghost" onClick={()=>doPackVers(p.id)}>Versiones</button></div>
                   {(packVers[p.id]||[]).map((v)=>(
                     <div className="meta" key={v.id}>
@@ -609,7 +673,7 @@ export default function App() {
             <div className="grid">
               {accts.map((a)=><div key={a.uuid} className="card"><div className="card-title">{a.name}</div><div className="meta">{a.active && <span className="pill green">✓ activa</span>}</div><div className="actions">
                 {!a.active && <button className="ghost" onClick={async()=>{await window.ferro.authSelect({uuid:a.uuid}); loadAuth();}}>Usar</button>}
-                <button className="ghost danger" onClick={async()=>{await window.ferro.authRemove({uuid:a.uuid}); loadAuth();}}>Quitar</button>
+                <button className="ghost danger" onClick={async()=>{await window.ferro.authRemove({uuid:a.uuid}); loadAuth();}}><X size={14} /> Quitar</button>
               </div></div>)}
             </div>
             <h3>Estado</h3>
@@ -685,6 +749,24 @@ export default function App() {
             </div>
           </div>
           <div className="card">
+            <h2>Sonido</h2>
+            <div className="row">
+              <button className="ghost" onClick={()=>{sfx.cfg.enabled=!sfx.cfg.enabled; sfx.save(); setSfxOn(sfx.cfg.enabled); if(sfx.cfg.enabled) sfx.play('success');}}>{sfxOn ? '✓ Activado' : 'Desactivado'}</button>
+              <button className="ghost" onClick={()=>{sfx.cfg.hover=!sfx.cfg.hover; sfx.save(); setSfxHover(sfx.cfg.hover);}}>Hover: {sfxHover ? 'sí' : 'no'}</button>
+              <label>Volumen <input type="range" min={0} max={1} step={0.05} value={sfxVol} onChange={(e)=>{sfx.cfg.volume=Number(e.target.value); sfx.save(); setSfxVol(sfx.cfg.volume);}} style={{width:130}} /></label>
+              <button className="ghost" onClick={()=>sfx.play('launch')}>Probar</button>
+            </div>
+          </div>
+          <div className="card">
+            <h2>Discord Rich Presence</h2>
+            <p style={{opacity:.65}}>Muestra "Jugando Minecraft" con instancia y versión. Crea la app gratis en discord.com/developers → copia el Application ID. Para el logo, súbelo en Rich Presence → Art Assets con nombre <b>logo</b>.</p>
+            <div className="row">
+              <input value={dcId} onChange={(e)=>setDcId(e.target.value)} placeholder="Application ID de Discord" style={{minWidth:240}} />
+              <button className="ghost" onClick={async()=>{await window.ferro.setDiscord({clientId:dcId, enabled:dcOn}); setLog((l)=>l+'[ferro] discord guardado\n');}}><Check size={14} /> Guardar</button>
+              <button className="ghost" onClick={async()=>{const v=!dcOn; setDcOn(v); await window.ferro.setDiscord({enabled:v});}}>{dcOn ? '✓ Activado' : 'Desactivado'}</button>
+            </div>
+          </div>
+          <div className="card">
             <h2>Java</h2>
             <pre>{JSON.stringify(java, null, 2) || 'no encontrado'}</pre>
             <p style={{opacity:.7}}>Se usa el Java del sistema si cumple el requisito de la versión; si no, se descarga Temurin auto a runtimes/.</p>
@@ -697,6 +779,16 @@ export default function App() {
           <img ref={introImgRef} className="intro-logo" src={brand} alt="" />
         </div>
       )}
+      {flashKey > 0 && <div key={flashKey} className="vignette" />}
+      <div className="toasts">
+        {toasts.map((t)=>(
+          <div key={t.id} className={`toast ${t.type}`}>
+            {t.type === 'error' ? <AlertTriangle size={16} /> : t.type === 'success' ? <Check size={16} /> : <Info size={16} />}
+            <span>{t.msg}</span>
+            <div className="t-bar" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

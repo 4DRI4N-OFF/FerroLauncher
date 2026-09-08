@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('ferro', {
   packVersions: (data) => ipcRenderer.invoke('ferro:packVersions', data),
   packInstall: (data) => ipcRenderer.invoke('ferro:packInstall', data),
   clientId: () => ipcRenderer.invoke('ferro:clientId'),
+  discord: () => ipcRenderer.invoke('ferro:discord'),
+  setDiscord: (data) => ipcRenderer.invoke('ferro:setDiscord', data),
   setClientId: (data) => ipcRenderer.invoke('ferro:setClientId', data),
   authStatus: () => ipcRenderer.invoke('ferro:authStatus'),
   authStart: () => ipcRenderer.invoke('ferro:authStart'),
@@ -51,5 +53,9 @@ contextBridge.exposeInMainWorld('ferro', {
   stop: () => ipcRenderer.invoke('ferro:stop'),
   status: () => ipcRenderer.invoke('ferro:status'),
   updateSettings: (data) => ipcRenderer.invoke('ferro:updateSettings', data),
+  openFolder: (data) => ipcRenderer.invoke('ferro:openFolder', data),
+  duplicateInstance: (data) => ipcRenderer.invoke('ferro:duplicateInstance', data),
+  deleteInstance: (data) => ipcRenderer.invoke('ferro:deleteInstance', data),
+  renameInstance: (data) => ipcRenderer.invoke('ferro:renameInstance', data),
   onLog: (cb) => ipcRenderer.on('ferro:log', (_, t) => cb(t)),
 });

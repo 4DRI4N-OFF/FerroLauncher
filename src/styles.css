@@ -110,6 +110,7 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
   backdrop-filter: blur(12px);
   transform: translateX(2px);
 }
+.side button svg, button.primary svg, button.ghost svg, .pill svg { vertical-align: -3px; flex-shrink: 0; }
 .side button.active {
   color: #1a0d06;
   background: linear-gradient(135deg, var(--gold), var(--amber) 50%, var(--ember));
@@ -275,3 +276,42 @@ pre {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.28); background-clip: content-box; }
+
+/* ——— Toasts ——— */
+.toasts { position: fixed; top: 16px; right: 16px; z-index: 200; display: flex; flex-direction: column; gap: 10px; max-width: 340px; }
+.toast {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: rgba(20, 13, 10, 0.82);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid var(--stroke);
+  border-radius: 16px; padding: 12px 14px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  font-size: 13px; line-height: 1.45;
+  animation: toast-in 0.35s cubic-bezier(.2, .9, .3, 1.2) both;
+  overflow: hidden; position: relative;
+}
+.toast.out { animation: toast-out 0.25s ease both; }
+.toast.success { border-color: rgba(52, 211, 153, 0.5); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(52, 211, 153, 0.25); }
+.toast.error { border-color: rgba(248, 113, 113, 0.55); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5), 0 0 28px rgba(248, 113, 113, 0.3); animation: toast-in 0.35s cubic-bezier(.2, .9, .3, 1.2) both, shake 0.45s ease 0.1s; }
+.toast svg { flex-shrink: 0; margin-top: 1px; }
+.toast.success svg { color: #6ee7b7; }
+.toast.error svg { color: #fca5a5; }
+.toast .t-bar { position: absolute; bottom: 0; left: 0; height: 3px; width: 100%;
+  background: linear-gradient(90deg, var(--gold), var(--amber), var(--ember));
+  animation: t-shrink 4.5s linear forwards; }
+.toast.error .t-bar { animation-duration: 6s; }
+@keyframes toast-in { from { opacity: 0; transform: translateX(60px) scale(0.95); } to { opacity: 1; transform: none; } }
+@keyframes toast-out { to { opacity: 0; transform: translateX(60px) scale(0.95); } }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
+@keyframes t-shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@keyframes flash-red { 0%, 100% { box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1); } 30% { box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4), 0 0 34px rgba(248, 113, 113, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1); } }
+.flash-red { animation: flash-red 0.6s ease; }
+
+/* ——— Viñeta roja al fallar ——— */
+.vignette {
+  position: fixed; inset: 0; z-index: 150; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(220, 38, 38, 0.4) 100%);
+  animation: vig 0.9s ease both;
+}
+@keyframes vig { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }

@@ -47,6 +47,12 @@ npm run dist:full        # NSIS installer + portable .exe in release/
 
 Project layout: `core/` launcher engine (Mojang/Fabric/Modrinth/Xbox APIs) · `electron/` main + preload (IPC) · `src/` React UI.
 
+![Architecture](docs/architecture.svg)
+
+## 🖼️ Screenshots
+
+> Coming soon — in-game captures from the community. PRs with fresh screenshots are welcome!
+
 ## 🗺️ Roadmap
 
 - [x] Offline launch (all 5 loaders) · [x] Modrinth content · [x] Skins, backups, multi-account

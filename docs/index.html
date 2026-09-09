@@ -31,6 +31,19 @@
   <p class="ver" id="ver">v0.4.0 · Windows 10/11 64-bit</p>
 </section>
 
+<section class="mockwrap reveal">
+  <div class="mock">
+    <div class="mock-bar"><i></i><i></i><i></i></div>
+    <div class="mock-body">
+      <div class="mock-side"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+      <div class="mock-main">
+        <div class="mock-hero"><b>Mi instancia</b><span class="mock-pills"><i></i><i></i><i></i></span><em class="mock-play">▶ JUGAR</em></div>
+        <div class="mock-cards"><i></i><i></i><i></i></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <div class="ticker"><span>VANILLA · FABRIC · QUILT · FORGE · NEOFORGE · MODS · SHADERS · MODPACKS · BACKUPS · SKINS ·&nbsp;</span><span>VANILLA · FABRIC · QUILT · FORGE · NEOFORGE · MODS · SHADERS · MODPACKS · BACKUPS · SKINS ·&nbsp;</span></div>
 
 <section id="features" class="grid">
@@ -62,6 +75,15 @@
   </div>
   <h3 style="margin-top:22px" data-es="Cambios recientes" data-en="Recent changes">Cambios recientes</h3>
   <div id="changelog"><p style="opacity:.6">…</p></div>
+</section>
+
+<section class="panel reveal" id="roadmap">
+  <h2 data-es="Hoja de ruta" data-en="Roadmap">Hoja de ruta</h2>
+  <div class="timeline">
+    <div class="tl done"><b>v0.1 – v0.4</b><p data-es="Núcleo completo: loaders, mods, cuentas, backups, updater." data-en="Full core: loaders, mods, accounts, backups, updater.">Núcleo completo: loaders, mods, cuentas, backups, updater.</p></div>
+    <div class="tl now"><b data-es="Ahora" data-en="Now">Ahora</b><p data-es="Pulido, temas, sonidos y web. Probando con la comunidad." data-en="Polish, themes, sounds and website. Testing with the community.">Pulido, temas, sonidos y web. Probando con la comunidad.</p></div>
+    <div class="tl next"><b data-es="Siguiente" data-en="Next">Siguiente</b><p data-es="CurseForge total, firma del instalador y login online tras la aprobación." data-en="Full CurseForge, installer signing and online login after approval.">CurseForge total, firma del instalador y login online tras la aprobación.</p></div>
+  </div>
 </section>
 
 <section class="panel" id="community">
@@ -111,7 +133,7 @@ const top = document.getElementById('top');
 addEventListener('scroll', () => top.classList.toggle('scrolled', scrollY > 24), { passive: true });
 // Reveal on scroll
 const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
-document.querySelectorAll('.grid .card, .panel, .ticker').forEach((el) => { el.classList.add('reveal'); io.observe(el); });
+document.querySelectorAll('.grid .card, .panel, .ticker, .mockwrap').forEach((el) => { el.classList.add('reveal'); io.observe(el); });
 // Spotlight que sigue el ratón en tarjetas
 document.querySelectorAll('.grid .card').forEach((card) => {
   card.addEventListener('pointermove', (e) => {

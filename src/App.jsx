@@ -3,6 +3,7 @@ import brand from './assets/brand.png';
 import { sfx } from './sfx.js';
 import { STR, getLang } from './i18n.js';
 import { GithubIcon, DiscordIcon, YoutubeIcon, XIcon } from './brands.jsx';
+import Embers from './embers.jsx';
 import {
   Play, Square, Layers, Package, LayoutGrid, Gift, User, Palette,
   Settings, Search, Plus, RefreshCw, FolderOpen, Copy, Pencil, Trash2,
@@ -552,6 +553,27 @@ export default function App() {
     window.ferro.status?.().then((s) => setRunning(!!s?.running)).catch(()=>{});
   }, []);
 
+  // Tilt 3D en tarjetas al pasar el ratón
+  useEffect(() => {
+    const clear = (except) => document.querySelectorAll('.grid .card.tilting').forEach((c) => {
+      if (c !== except) { c.classList.remove('tilting'); c.style.transform = ''; }
+    });
+    const move = (e) => {
+      const card = e.target.closest?.('.grid .card');
+      clear(card);
+      if (!card) return;
+      const r = card.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - 0.5;
+      const py = (e.clientY - r.top) / r.height - 0.5;
+      card.classList.add('tilting');
+      card.style.transform = `perspective(900px) rotateX(${(-py * 7).toFixed(2)}deg) rotateY(${(px * 7).toFixed(2)}deg) translateY(-3px)`;
+    };
+    const out = (e) => { if (!e.relatedTarget) clear(null); };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseout', out);
+    return () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseout', out); };
+  }, [tab]);
+
   // Clics y hover globales en botones
   useEffect(() => {
     let lastHover = 0;
@@ -661,6 +683,7 @@ export default function App() {
 
   return (
     <div className="layout">
+      <Embers />
       <div className="side">
         <img ref={sideLogoRef} className="brand-logo" src={brand} alt="FerroLauncher" />
         <button className={tab==='jugar'?'active':''} onClick={()=>setTab('jugar')}><Play size={16} /> {t('tab.play')}</button>
@@ -1029,18 +1052,10 @@ export default function App() {
           </div>
           <div className="card">
             <h2>{t('set.discord')}</h2>
-            <p style={{opacity:.65}}>{t('set.discordDesc')}</p>
             <div className="row">
-              <input value={dcId} onChange={(e)=>setDcId(e.target.value)} placeholder={t('set.dcPh')} style={{minWidth:240}} />
-              <button className="ghost" onClick={async()=>{await window.ferro.setDiscord({clientId:dcId, enabled:dcOn}); setLog((l)=>l+'[ferro] discord guardado\n');}}><Check size={14} /> {t('acct.save')}</button>
               <button className="ghost" onClick={async()=>{const v=!dcOn; setDcOn(v); await window.ferro.setDiscord({enabled:v});}}>{dcOn ? `✓ ${t('set.sfxOn')}` : t('set.sfxOff')}</button>
-            </div>
-            <div className="row" style={{marginTop:10}}>
-              <input value={dcHook} onChange={(e)=>setDcHook(e.target.value)} placeholder="Webhook: https://discord.com/api/webhooks/…" style={{minWidth:280}} />
-              <button className="ghost" onClick={async()=>{await window.ferro.setDiscord({webhook:dcHook}); setLog((l)=>l+'[ferro] webhook guardado\n');}}><Check size={14} /> {t('acct.save')}</button>
               <button className="ghost" onClick={async()=>{try{await window.ferro.testWebhook(); setLog((l)=>l+'[ferro] webhook OK\n');}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>Probar envío</button>
             </div>
-            <p style={{opacity:.65}}>Canal de Discord → ajustes → Integraciones → Webhooks → Nuevo. Avisos de partidas, crashes e instalaciones.</p>
           </div>
           <div className="card">
             <h2>{t('set.share')}</h2>

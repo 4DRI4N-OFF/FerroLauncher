@@ -137,6 +137,9 @@ body::after {
 @keyframes drift { to { transform: translate(3%, -2.5%) scale(1.05); } }
 .layout { position: relative; z-index: 1; }
 
+/* ——— Brasas ——— */
+.embers { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+
 .layout { display: grid; grid-template-columns: 248px 1fr; height: 100vh; }
 
 /* ——— Sidebar cristal ——— */
@@ -307,10 +310,13 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
 .hero-title {
   font-size: clamp(26px, 4vw, 38px); font-weight: 900; letter-spacing: 0.5px; line-height: 1.05;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  background: linear-gradient(92deg, #fff3d6, var(--amber) 60%, var(--ember));
+  background: linear-gradient(92deg, #fff3d6, var(--amber) 30%, var(--ember) 50%, var(--amber) 70%, #fff3d6);
+  background-size: 200% auto;
   -webkit-background-clip: text; background-clip: text; color: transparent;
   filter: drop-shadow(0 4px 18px rgba(255, 130, 30, 0.3));
+  animation: shine 7s linear infinite;
 }
+@keyframes shine { to { background-position: 200% center; } }
 .hero-id .meta { margin-top: 10px; }
 .hero-play { flex-shrink: 0; }
 .hero h2 { font-size: 26px; }
@@ -481,7 +487,7 @@ button.ghost.danger:hover:not(:disabled) { border-color: rgba(248, 113, 113, 0.6
 .mini.danger:hover:not(:disabled) { border-color: rgba(248, 113, 113, 0.6); color: #fecaca; }
 
 /* ——— Tarjetas internas / resultados ——— */
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; perspective: 1000px; }
 .grid .card {
   margin: 0;
   border-radius: var(--r-card);

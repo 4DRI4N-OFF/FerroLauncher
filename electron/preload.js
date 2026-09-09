@@ -80,6 +80,8 @@ contextBridge.exposeInMainWorld('ferro', {
   importScan: () => ipcRenderer.invoke('ferro:importScan'),
   importVanilla: (data) => ipcRenderer.invoke('ferro:importVanilla', data),
   importPrism: (data) => ipcRenderer.invoke('ferro:importPrism', data),
+  importDrop: (data) => ipcRenderer.invoke('ferro:importDrop', data),
+  onProgress: (cb) => ipcRenderer.on('ferro:progress', (_, d) => cb(d)),
   servers: () => ipcRenderer.invoke('ferro:servers'),
   serverAdd: (data) => ipcRenderer.invoke('ferro:serverAdd', data),
   serverRemove: (data) => ipcRenderer.invoke('ferro:serverRemove', data),

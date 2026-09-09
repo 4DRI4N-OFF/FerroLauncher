@@ -20,7 +20,7 @@ function loaderApi(type) {
   return { list: listLoaders, meta: getLoaderMeta, resolve: resolveFabricLibraries, label: 'fabric' };
 }
 const { searchMods, listMods, installMod, removeMod, toggleMod, checkModUpdates, updateMod } = require('../core/modrinthService');
-const { searchModpacks, packVersions, getPackVersion, installMrpack } = require('../core/modpackService');
+const { searchModpacks, packVersions, getPackVersion, installMrpack, readMrpackManifest } = require('../core/modpackService');
 const auth = require('../core/authService');
 const skins = require('../core/skinService');
 const backups = require('../core/backupService');
@@ -95,6 +95,10 @@ function getDirs() {
   return D;
 }
 
+function boundsPath() { return path.join(getDirs().base, 'win-bounds.json'); }
+function loadBounds() { try { return JSON.parse(fs.readFileSync(boundsPath(), 'utf8')); } catch { return null; } }
+function saveBounds() { try { if (win && !win.isDestroyed()) fs.writeFileSync(boundsPath(), JSON.stringify(win.getBounds())); } catch {} }
+
 function createSplash() {
   splash = new BrowserWindow({
     width: 380, height: 430,
@@ -144,6 +148,7 @@ function createWindow() {
     },
   });
   const dev = !app.isPackaged;
+  win.on('close', () => saveBounds());
   if (dev) win.loadURL('http://localhost:5173');
   else win.loadFile(path.join(__dirname, '../dist/index.html'));
   win.once('ready-to-show', () => {
@@ -154,7 +159,12 @@ function createWindow() {
         if (win && !win.isDestroyed()) {
           // La ventana nace con el tamaño del splash y crece hasta la app (morph)
           let from = null;
+          const saved = loadBounds();
           const target = { width: 1100, height: 700, x: undefined, y: undefined };
+          if (saved && saved.width >= 800 && saved.height >= 550) {
+            target.width = Math.min(2560, saved.width);
+            target.height = Math.min(1440, saved.height);
+          }
           try {
             if (splash && !splash.isDestroyed()) {
               from = splash.getBounds();
@@ -629,6 +639,43 @@ ipcMain.handle('ferro:doctorFix', async (_, { instanceName, fix }) => {
 });
 
 // Importar de otros launchers
+ipcMain.handle('ferro:importDrop', async (_, { paths, instanceName }) => {
+  const d = getDirs();
+  const send = (t) => win && win.webContents.send('ferro:log', t);
+  const out = [];
+  for (const p of paths || []) {
+    const low = String(p || '').toLowerCase();
+    try {
+      if (low.endsWith('.ferro')) {
+        out.push({ kind: 'ferro', name: backups.importPack(p, d.instances, send) });
+      } else if (low.endsWith('.mrpack')) {
+        const man = readMrpackManifest(p);
+        const inst = createInstance(d.instances, man.name || path.basename(p, '.mrpack'), man.mcVersion, {
+          type: ['fabric', 'quilt', 'forge', 'neoforge'].includes(man.loaderType) ? man.loaderType : 'fabric',
+          loaderVersion: man.loaderVersion || undefined,
+        });
+        const info = await installMrpack(inst.path, p, send);
+        const cfgPath = path.join(inst.path, 'ferro.json');
+        const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+        if (info.mcVersion) cfg.versionId = info.mcVersion;
+        if (info.loaderVersion) cfg.loaderVersion = info.loaderVersion;
+        fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+        out.push({ kind: 'mrpack', name: inst.name });
+      } else if (low.endsWith('.jar') && instanceName) {
+        const inst = findInstance(d, instanceName);
+        const safe = path.basename(p).replace(/[^\w\-.+() \[\]]+/g, '_');
+        fs.mkdirSync(path.join(inst.path, 'mods'), { recursive: true });
+        fs.copyFileSync(p, path.join(inst.path, 'mods', safe));
+        out.push({ kind: 'jar', file: safe });
+      } else {
+        out.push({ kind: 'skip', file: path.basename(p) });
+      }
+    } catch (e) {
+      out.push({ kind: 'error', file: path.basename(p), error: e.message });
+    }
+  }
+  return out;
+});
 ipcMain.handle('ferro:importScan', async () => {
   const found = imp.detectLaunchers();
   const out = { found: Object.keys(found) };
@@ -692,6 +739,7 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
   const inst = instances.find((i) => i.name === instanceName);
   if (!inst) throw new Error('Instancia no encontrada');
   const send = (t) => win && win.webContents.send('ferro:log', t);
+  const prog = (phase, s) => { try { win && win.webContents.send('ferro:progress', { phase, done: s?.done ?? null, total: s?.total ?? null, extra: s?.lib || null }); } catch {} };
 
   send(`[ferro] resolviendo ${inst.versionId}...\n`);
   const vanilla = await getVersionDetails(inst.versionId);
@@ -743,7 +791,7 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
     if (!pick) throw new Error(`${api.label} sin loader para ${inst.versionId}`);
     send(`[ferro] ${api.label} loader ${pick}...\n`);
     const meta = await api.meta(inst.versionId, pick);
-    const fab = await api.resolve(meta, d.libraries, (s) => send(`[ferro] ${api.label} ${s.done}/${s.total} ${s.lib}\n`));
+    const fab = await api.resolve(meta, d.libraries, (s) => { send(`[ferro] ${api.label} ${s.done}/${s.total} ${s.lib}\n`); prog('loader', s); });
     mainClassOverride = fab.mainClass;
     extraClasspath = fab.classpathExtra;
     send(`[ferro] ${api.label}: ${fab.count} libs, main ${fab.mainClass}\n`);
@@ -751,11 +799,11 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
   const requiredJava = details.javaVersion?.majorVersion || requiredJavaVanilla;
 
   const forClient = details.downloads?.client?.url ? details : vanilla;
-  const clientJar = await downloadClientJar(forClient, d.versions, (p) => send(`[ferro] client ${(p*100).toFixed(0)}%\n`));
-  const cp = await resolveLibraries(details, d.libraries, (s) => send(`[ferro] lib ${s.done}/${s.total} ${s.lib}\n`));
+  const clientJar = await downloadClientJar(forClient, d.versions, (p) => { send(`[ferro] client ${(p*100).toFixed(0)}%\n`); prog('client', { done: p, total: 1 }); });
+  const cp = await resolveLibraries(details, d.libraries, (s) => { send(`[ferro] lib ${s.done}/${s.total} ${s.lib}\n`); prog('libs', s); });
   const nativesDir = path.join(profileDir, 'natives-windows');
-  await resolveNatives(details, d.libraries, nativesDir, (s) => send(`[ferro] natives ${s.done}/${s.total}\n`));
-  await downloadAssets(details, d.assets, (s) => send(`[ferro] assets ${s.done}/${s.total}\n`));
+  await resolveNatives(details, d.libraries, nativesDir, (s) => { send(`[ferro] natives ${s.done}/${s.total}\n`); prog('natives', s); });
+  await downloadAssets(details, d.assets, (s) => { send(`[ferro] assets ${s.done}/${s.total}\n`); prog('assets', s); });
   const loggingPath = await downloadLoggingConfig(details, d.base || d.versions);
   send('[ferro] lanzando...\n');
   const effRam = ramMb || inst.settings?.ramMb || 2048;

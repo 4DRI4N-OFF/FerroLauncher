@@ -304,6 +304,9 @@ export default function App() {
   const askRename = (current, onOk) => { setConfirmInput(current); setConfirmDlg({ message: t('inst.renamePrompt'), input: true, onOk: (v) => { if (v && v !== current) onOk(v); } }); };
   const [saving, setSaving] = useState(false);
   const [instFilter, setInstFilter] = useState('');
+  const [launchProg, setLaunchProg] = useState(null);
+  const [dragOn, setDragOn] = useState(false);
+  const dragCount = useRef(0);
   const logRef = useRef(null);
 
   const refresh = async () => {
@@ -768,12 +771,16 @@ export default function App() {
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
-  const play = async () => {
+  const play = async (nm, srv) => {
+    const target = nm || launchInstance;
+    if (!target) return;
     try {
       setTab('jugar');
-      setLog((l) => l + `[ferro] lanzando ${launchInstance} como ${username}...\n`);
+      setLaunchInstance(target);
+      setLog((l) => l + `[ferro] lanzando ${target} como ${username}...\n`);
       setRunning(true);
-      await window.ferro.launch({ instanceName: launchInstance, username });
+      setLaunchProg(null);
+      await window.ferro.launch({ instanceName: target, username, ...(srv ? { serverHost: srv.host, serverPort: srv.port } : {}) });
       const s = await window.ferro.status().catch(() => null);
       setRunning(!!s?.running);
       if (!s?.running) setLog((l) => l + `[error] ${t('play.diedFast')}\n`);
@@ -812,15 +819,8 @@ export default function App() {
 
   const playOn = async (s) => {
     if (!launchInstance) { setLog((l) => l + `[error] ${t('srv.noInst')}\n`); return; }
-    try {
-      setTab('jugar');
-      setLog((l) => l + `[ferro] lanzando ${launchInstance} en ${s.host}...\n`);
-      setRunning(true);
-      await window.ferro.launch({ instanceName: launchInstance, username, serverHost: s.host, serverPort: s.port });
-      const st = await window.ferro.status().catch(() => null);
-      setRunning(!!st?.running);
-      if (!st?.running) setLog((l) => l + `[error] ${t('play.diedFast')}\n`);
-    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); setRunning(false); }
+    setLog((l) => l + `[ferro] directo a ${s.host}...\n`);
+    play(launchInstance, s);
   };
 
   const filteredLog = useMemo(() => {
@@ -837,6 +837,32 @@ export default function App() {
   useEffect(() => {
     if (autoScroll && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [filteredLog, autoScroll]);
+
+  useEffect(() => { if (!running) setLaunchProg(null); }, [running]);
+
+  useEffect(() => {
+    window.ferro.onProgress?.((d) => setLaunchProg(d));
+  }, []);
+
+  useEffect(() => {
+    const lv = (e) => { e.preventDefault(); dragCount.current = Math.max(0, dragCount.current - 1); if (!dragCount.current) setDragOn(false); };
+    const dr = (e) => { e.preventDefault(); };
+    const dp = async (e) => {
+      e.preventDefault(); dragCount.current = 0; setDragOn(false);
+      const files = [...(e.dataTransfer?.files || [])].map((f) => f.path).filter(Boolean);
+      if (!files.length) return;
+      try {
+        const r = await window.ferro.importDrop({ paths: files, instanceName: modsFor });
+        for (const x of r || []) setLog((l) => l + `[ferro] drop ${x.kind}: ${x.name || x.file || ''}${x.error ? ` (${x.error})` : ''}\n`);
+        refresh();
+      } catch (err) { setLog((l) => l + `[error] ${err.message}\n`); }
+    };
+    window.addEventListener('dragenter', en);
+    window.addEventListener('dragleave', lv);
+    window.addEventListener('dragover', dr);
+    window.addEventListener('drop', dp);
+    return () => { window.removeEventListener('dragenter', en); window.removeEventListener('dragleave', lv); window.removeEventListener('dragover', dr); window.removeEventListener('drop', dp); };
+  }, [modsFor]);
 
   const editSettings = (name, e) => {
     if (settingsFor === name) { setSettingsFor(''); setModalOrigin(null); return; }
@@ -923,8 +949,8 @@ export default function App() {
                 </div>
               </div>
               <div className="hero-play" data-tour="play">
-                {!running
-                  ? <button className="primary" onClick={play} disabled={!launchInstance}><Play size={18} /> {t('play.play')}</button>
+                  {!running
+                    ? <button className="primary" onClick={()=>play()} disabled={!launchInstance}><Play size={18} /> {t('play.play')}</button>
                   : <button className="primary" onClick={stop} style={{filter:'hue-rotate(140deg)'}}><Square size={18} /> {t('play.stop')}</button>}
               </div>
             </div>
@@ -946,6 +972,14 @@ export default function App() {
             )}
             {instances.length===0 && <p>{t('play.noInst')}</p>}
           </div>
+          {launchProg && launchProg.done != null && launchProg.total > 0 && (
+            <div className="card" style={{marginTop:8}}>
+              <div className="row"><span>{t('play.ph.' + launchProg.phase) || launchProg.phase}</span><span>{launchProg.done}/{launchProg.total}{launchProg.extra ? ` · ${launchProg.extra}` : ''}</span></div>
+              <div style={{height:8, borderRadius:6, background:'rgba(255,255,255,.08)', overflow:'hidden', marginTop:6}}>
+                <div style={{height:'100%', width:`${Math.min(100, Math.round(100 * launchProg.done / Math.max(1, launchProg.total)))}%`, background:'linear-gradient(90deg,#ffb62e,#f97316)', transition:'width .3s'}} />
+              </div>
+            </div>
+          )}
           <div className="card">
             <h3>{t('play.console')}</h3>
             <div className="row" style={{marginBottom:8}}>
@@ -1000,7 +1034,7 @@ export default function App() {
               <input value={instFilter} onChange={(e)=>setInstFilter(e.target.value)} placeholder={t('inst.filterPh')} />
             </div>
             <div className="grid">
-              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className="card"><div className="card-title" title={i.name}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}</span><span className={`pill l-${i.type}`}>{i.type==='vanilla' ? 'vanilla' : `${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}{fmtPlay(i.playSecs) ? ` · ${fmtPlay(i.playSecs)}` : ''}</span> : <span className="pill">{t('inst.neverPlayed')}</span>}</div><div className="actions"><button className="ghost" onClick={(e)=>editSettings(i.name, e)}><Settings size={14} /> {t('inst.settings')}</button><button className="ghost" onClick={(e)=>openGallery(i.name, e)}><Camera size={14} /> {t('inst.shots')}</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}><Upload size={14} /> {t('inst.export')}</button><button className="ghost" onClick={async()=>{await window.ferro.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> {t('inst.folder')}</button><button className="ghost" onClick={async()=>{await window.ferro.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> {t('inst.duplicate')}</button><button className="ghost" onClick={()=>askRename(i.name, async (n)=>{await window.ferro.renameInstance({instanceName:i.name, newName:n}); refresh();})}><Pencil size={14} /> {t('inst.rename')}</button><button className="ghost danger" onClick={()=>askConfirm(t('inst.delConfirm', {n:i.name}), async()=>{await window.ferro.deleteInstance({instanceName:i.name}); refresh();})}><Trash2 size={14} /> {t('inst.delete')}</button></div>
+              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className="card"><div className="card-title" title={i.name} onDoubleClick={()=>play(i.name)} style={{cursor:'pointer'}}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}</span><span className={`pill l-${i.type}`}>{i.type==='vanilla' ? 'vanilla' : `${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}{fmtPlay(i.playSecs) ? ` · ${fmtPlay(i.playSecs)}` : ''}</span> : <span className="pill">{t('inst.neverPlayed')}</span>}</div><div className="actions"><button className="ghost" onClick={(e)=>editSettings(i.name, e)}><Settings size={14} /> {t('inst.settings')}</button><button className="ghost" onClick={(e)=>openGallery(i.name, e)}><Camera size={14} /> {t('inst.shots')}</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}><Upload size={14} /> {t('inst.export')}</button><button className="ghost" onClick={async()=>{await window.ferro.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> {t('inst.folder')}</button><button className="ghost" onClick={async()=>{await window.ferro.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> {t('inst.duplicate')}</button><button className="ghost" onClick={()=>askRename(i.name, async (n)=>{await window.ferro.renameInstance({instanceName:i.name, newName:n}); refresh();})}><Pencil size={14} /> {t('inst.rename')}</button><button className="ghost danger" onClick={()=>askConfirm(t('inst.delConfirm', {n:i.name}), async()=>{await window.ferro.deleteInstance({instanceName:i.name}); refresh();})}><Trash2 size={14} /> {t('inst.delete')}</button></div>
 </div>)}
             </div>
             <div className="row" style={{marginTop:12}}>
@@ -1416,6 +1450,14 @@ export default function App() {
           </div>
         ))}
       </div>
+      {dragOn && (
+        <div className="confirm-overlay">
+          <div className="card" style={{textAlign:'center'}}>
+            <div className="card-title">{t('inst.dropTitle')}</div>
+            <p style={{opacity:.75}}>{t('inst.dropHint')}</p>
+          </div>
+        </div>
+      )}
       {confirmDlg && (
         <div className="confirm-overlay" onClick={()=>setConfirmDlg(null)}>
           <div className="card" onClick={(e)=>e.stopPropagation()} style={{minWidth:320, maxWidth:440}}>

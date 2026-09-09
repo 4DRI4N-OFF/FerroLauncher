@@ -40,12 +40,33 @@ async function getPackVersion(packVersionId) {
 
 // Descarga el .mrpack y vuelca su contenido en instanceDir.
 // Devuelve { mcVersion, loaderVersion, files } para configurar la instancia.
+function loaderFromDeps(deps) {
+  const depEntries = [['fabric-loader', 'fabric'], ['quilt-loader', 'quilt'], ['forge', 'forge'], ['neoforge', 'neoforge']];
+  let loaderType = 'fabric', loaderVersion = null;
+  for (const [key, type] of depEntries) {
+    if (deps[key]) { loaderType = type; loaderVersion = deps[key]; break; }
+  }
+  return { loaderType, loaderVersion };
+}
+
+function readMrpackManifest(mrpackPath) {
+  const zip = new AdmZip(mrpackPath);
+  const indexEntry = zip.getEntry('modrinth.index.json');
+  if (!indexEntry) throw new Error('.mrpack sin modrinth.index.json');
+  const index = JSON.parse(zip.readAsText(indexEntry));
+  const deps = index.dependencies || {};
+  return { name: index.name, mcVersion: deps.minecraft, ...loaderFromDeps(deps) };
+}
+
 async function installMrpack(instanceDir, mrpackUrl, onLog) {
   fs.mkdirSync(instanceDir, { recursive: true });
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ferro-pack-'));
-  const packPath = path.join(tmp, 'pack.mrpack');
-  onLog && onLog('[ferro] descargando modpack...\n');
-  await downloadFile(mrpackUrl, packPath);
+  const isLocal = fs.existsSync(mrpackUrl);
+  const tmp = isLocal ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'ferro-pack-'));
+  const packPath = isLocal ? mrpackUrl : path.join(tmp, 'pack.mrpack');
+  if (!isLocal) {
+    onLog && onLog('[ferro] descargando modpack...\n');
+    await downloadFile(mrpackUrl, packPath);
+  }
   const zip = new AdmZip(packPath);
   const indexEntry = zip.getEntry('modrinth.index.json');
   if (!indexEntry) throw new Error('.mrpack sin modrinth.index.json');
@@ -79,13 +100,9 @@ async function installMrpack(instanceDir, mrpackUrl, onLog) {
     if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) continue; // zip-slip
     zip.extractEntryTo(e, instanceDir, false, true);
   }
-  try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
-  const depEntries = [['fabric-loader', 'fabric'], ['quilt-loader', 'quilt'], ['forge', 'forge'], ['neoforge', 'neoforge']];
-  let loaderType = 'fabric', loaderVersion = null;
-  for (const [key, type] of depEntries) {
-    if (deps[key]) { loaderType = type; loaderVersion = deps[key]; break; }
-  }
+  try { if (!isLocal) fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
+  const { loaderType, loaderVersion } = loaderFromDeps(deps);
   return { name: index.name, mcVersion: deps.minecraft, loaderType, loaderVersion, files: files.length };
 }
 
-module.exports = { searchModpacks, packVersions, getPackVersion, installMrpack };
+module.exports = { searchModpacks, packVersions, getPackVersion, installMrpack, readMrpackManifest, loaderFromDeps };

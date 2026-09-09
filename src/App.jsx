@@ -88,6 +88,13 @@ export default function App() {
   const [searching, setSearching] = useState(false);
   const [installingId, setInstallingId] = useState(null);
   const [installedIds, setInstalledIds] = useState([]);
+  const [source, setSource] = useState('mr');
+  const [cfKeyInput, setCfKeyInput] = useState('');
+  const [cfKeySet, setCfKeySet] = useState('');
+  const [cfHits, setCfHits] = useState([]);
+  const [cfTotal, setCfTotal] = useState(0);
+  const [cfFiles, setCfFiles] = useState({});
+  const [cfBusy, setCfBusy] = useState(null);
   const [updMap, setUpdMap] = useState({});
   const [checkingUpd, setCheckingUpd] = useState(false);
   const [updMsg, setUpdMsg] = useState('');
@@ -195,6 +202,46 @@ export default function App() {
   const [log, setLogRaw] = useState('[ferro] listo\n');
   const [playFace, setPlayFace] = useState(null);
   const [nameState, setNameState] = useState({ status: 'idle', suggestions: [] });
+  const [tourIdx, setTourIdx] = useState(null);
+  const [tourRect, setTourRect] = useState(null);
+
+  const tourSteps = () => ([
+    { tab: 'jugar', sel: '[data-tour="play"]', title: t('tour.s1t'), body: t('tour.s1x') },
+    { tab: 'instancias', sel: '[data-tour="create"]', title: t('tour.s2t'), body: t('tour.s2x') },
+    { tab: 'mods', sel: '[data-tour="mods-search"]', title: t('tour.s3t'), body: t('tour.s3x') },
+    { tab: 'cuenta', sel: '[data-tour="account-login"]', title: t('tour.s4t'), body: t('tour.s4x') },
+    { tab: 'ajustes', sel: '[data-tour="settings"]', title: t('tour.s5t'), body: t('tour.s5x') },
+  ]);
+  const startTour = () => setTourIdx(0);
+  const endTour = () => { setTourIdx(null); setTourRect(null); try { localStorage.setItem('ferro-tour-done', '1'); } catch {} };
+
+  useEffect(() => {
+    if (tourIdx === null) return;
+    const steps = tourSteps();
+    const st = steps[tourIdx];
+    if (!st) { endTour(); return; }
+    if (tab !== st.tab) setTab(st.tab);
+    const t1 = setTimeout(() => {
+      const el = document.querySelector(st.sel);
+      if (!el) { setTourRect(null); return; }
+      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      setTimeout(() => {
+        const r = el.getBoundingClientRect();
+        setTourRect({ x: r.left - 8, y: r.top - 8, w: r.width + 16, h: r.height + 16 });
+      }, 250);
+    }, 300);
+    return () => clearTimeout(t1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tourIdx, tab, lang]);
+
+  // Auto-arranque solo la primera vez (tras la intro)
+  useEffect(() => {
+    let ok = false;
+    try { ok = !localStorage.getItem('ferro-tour-done'); } catch {}
+    if (!ok) return;
+    const t1 = setTimeout(() => setTourIdx(0), 4500);
+    return () => clearTimeout(t1);
+  }, []);
 
   useEffect(() => {
     const name = (account?.name || username || '').trim();
@@ -349,6 +396,47 @@ export default function App() {
       await loadMods(modsFor);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
     finally { setInstallingId(null); }
+  };
+
+  const loadCfKey = async () => {
+    try { setCfKeySet(await window.ferro.cfKey()); } catch {}
+  };
+
+  const doCfSearch = async () => {
+    setSearching(true);
+    try {
+      const ck = kind === 'shader' ? 'mod' : kind;
+      const r = await window.ferro.cfSearch({ query: modQuery, mcVersion: fVersion, kind: ck, sort: fSort });
+      setCfHits(r.hits || []);
+      setCfTotal(r.total || 0);
+      setInstalledIds([]);
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+    finally { setSearching(false); }
+  };
+
+  const doCfFiles = async (modId) => {
+    if (cfFiles[modId]) {
+      setCfFiles((p) => { const n = { ...p }; delete n[modId]; return n; });
+      return;
+    }
+    try {
+      const inst = instances.find((i) => i.name === modsFor);
+      const vers = await window.ferro.cfFiles({ modId, mcVersion: fVersion, loader: inst?.type === 'vanilla' ? undefined : inst?.type });
+      setCfFiles((p) => ({ ...p, [modId]: vers }));
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const doCfInstall = async (m, f) => {
+    if (cfBusy) return;
+    setCfBusy(f.id);
+    try {
+      setLog((l) => l + `[ferro] instalando ${f.name} en ${modsFor}...\n`);
+      const r = await window.ferro.cfInstall({ instanceName: modsFor, modId: m.id, fileId: f.id, kind: kind === 'resourcepack' ? 'resourcepack' : 'mod' });
+      setLog((l) => l + `[ferro] instalado ${r.file}\n`);
+      pushToast('success', `${m.title} ${t('toast.installed')}`);
+      await loadMods(modsFor);
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+    finally { setCfBusy(null); }
   };
 
   const doPackSearch = async () => {
@@ -718,7 +806,7 @@ export default function App() {
                   {running && <span className="pill green"><span className="spinner" />{t('play.running')}</span>}
                 </div>
               </div>
-              <div className="hero-play">
+              <div className="hero-play" data-tour="play">
                 {!running
                   ? <button className="primary" onClick={play} disabled={!launchInstance}><Play size={18} /> {t('play.play')}</button>
                   : <button className="primary" onClick={stop} style={{filter:'hue-rotate(140deg)'}}><Square size={18} /> {t('play.stop')}</button>}
@@ -769,7 +857,7 @@ export default function App() {
         {tab==='instancias' && (
           <div className="card">
             <h2>{t('inst.createTitle')}</h2>
-            <div className="row">
+            <div className="row" data-tour="create">
               <input value={instanceName} onChange={(e)=>setInstanceName(e.target.value)} placeholder={t('inst.namePh')} />
               <select value={versionId} onChange={(e)=>{touchedVer.current.create=true; setVersionId(e.target.value);}}>
                 {versions.map((v)=><option key={v.id} value={v.id}>{v.id}</option>)}
@@ -804,7 +892,11 @@ export default function App() {
         {tab==='mods' && (
           <div className="card">
             <h2>{t('mods.title')}</h2>
-            <div className="row">
+            <div className="row" data-tour="mods-search">
+              <select value={source} onChange={(e)=>{setSource(e.target.value); setModHits([]); setCfHits([]); setInstalledIds([]); if(e.target.value==='cf') loadCfKey();}} title="Fuente">
+                <option value="mr">Modrinth</option>
+                <option value="cf">CurseForge</option>
+              </select>
               <select value={modsFor} onChange={(e)=>{setModsFor(e.target.value); setUpdMap({}); setUpdMsg(''); setRpOn(null); setShaderCur(null); loadMods(e.target.value);}}>
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' '+i.type})</option>)}
               </select>
@@ -832,9 +924,16 @@ export default function App() {
                 <option value="newest">{t('mods.sNewest')}</option>
                 <option value="updated">{t('mods.sUpdated')}</option>
               </select>
-              <button className="primary" onClick={doSearch} disabled={searching || !modsFor}>{searching ? t('mods.searching') : <><Search size={14} /> {t('mods.search')}</>}</button>
+              <button className="primary" onClick={()=>{source==='cf' ? doCfSearch() : doSearch();}} disabled={searching || !modsFor}>{searching ? t('mods.searching') : <><Search size={14} /> {t('mods.search')}</>}</button>
               <button className="mini" onClick={()=>loadMods(modsFor)} disabled={!modsFor}>{t('mods.viewInstalled')}</button>
             </div>
+            {source==='cf' && (
+            <div className="row" style={{marginTop:8}}>
+              <input value={cfKeyInput} onChange={(e)=>setCfKeyInput(e.target.value)} type="password" placeholder="CurseForge API key…" style={{minWidth:260}} />
+              <button className="mini" onClick={async()=>{await window.ferro.cfSetKey({key:cfKeyInput}); setCfKeyInput(''); loadCfKey(); setLog((l)=>l+'[ferro] CurseForge key guardada\n');}}>{t('acct.save')}</button>
+              {cfKeySet ? <span className="pill green">key {cfKeySet}</span> : <span className="pill">console.curseforge.com → API Keys</span>}
+            </div>
+            )}
             {!modsFor && <p>{t('mods.needLoader')}</p>}
             <h3>{t('mods.results')}{modTotal>0 && ` (${modTotal.toLocaleString()})`} · {fVersion} · {fLoader}</h3>
             {modHits.length===0 && <p style={{opacity:.6}}>{t('mods.noResults')}</p>}
@@ -855,6 +954,30 @@ export default function App() {
                 </div>);
               })}
             </div>
+            {source==='cf' && kind==='shader' && <p style={{opacity:.65}}>CurseForge no lista shaders: cambia a Modrinth para esta pestaña.</p>}
+            {source==='cf' && (<>
+            <h3>CurseForge{cfTotal>0 && ` (${cfTotal.toLocaleString()})`} · {fVersion}</h3>
+            {cfHits.length===0 && <p style={{opacity:.6}}>{t('mods.noResults')}</p>}
+            <div className="grid">
+              {cfHits.map((m)=>(
+                <div key={m.id} className="card">
+                  <div className="mod-head">{m.icon && <img className="mod-icon" src={m.icon} alt="" />}<b>{m.title}</b></div>
+                  <div className="desc">{m.description?.slice(0,120)}</div>
+                  <div className="meta"><span className="pill"><Download size={12} /> {m.downloads?.toLocaleString?.() || m.downloads}</span>{m.updated && <span className="pill">↻ {new Date(m.updated).toLocaleDateString()}</span>}</div>
+                  <div className="actions"><button className="mini" onClick={()=>doCfFiles(m.id)}>{t('packs.versions')}</button></div>
+                  {(cfFiles[m.id]||[]).map((f)=>(
+                    <div className="meta" key={f.id}>
+                      <span className="pill">{f.name.length > 26 ? f.name.slice(0,25)+'…' : f.name}</span>
+                      <button className="mini hot" disabled={cfBusy===f.id || !modsFor} onClick={()=>doCfInstall(m, f)}>
+                        {cfBusy===f.id ? <><span className="spinner" />{t('mods.installing')}</> : t('mods.install')}
+                      </button>
+                    </div>
+                  ))}
+                  {cfFiles[m.id] && cfFiles[m.id].length===0 && <p style={{opacity:.6}}>Sin archivos para {fVersion}.</p>}
+                </div>
+              ))}
+            </div>
+            </>)}
             <h3>{t('mods.installed')} ({mods.length})</h3>
             {kind==='shader' && (
             <div className="row" style={{marginBottom:10}}>
@@ -960,7 +1083,7 @@ export default function App() {
                     <button className="ghost" onClick={cancelBrowserAuth}>{t('acct.cancel')}</button>
                   </div>
                 : !authStep
-                  ? <div className="row">
+                  ? <div className="row" data-tour="account-login">
                       <button className="primary" onClick={doBrowserAuth}>{t('acct.login')}</button>
                     </div>
                   : null}
@@ -1010,7 +1133,7 @@ export default function App() {
         )}
         {tab==='ajustes' && (
           <>
-          <div className="card">
+          <div className="card" data-tour="settings">
             <h2>{t('set.updates')} {appVer && <span className="pill">v{appVer}</span>}</h2>
             <div className="row">
               <button className="ghost" onClick={async()=>{setUpd({state:'checking'}); try{await window.ferro.checkUpdate();}catch(e){setUpd({state:'error',error:e.message});}}}>{t('set.checkUpd')}</button>
@@ -1035,6 +1158,7 @@ export default function App() {
                 <option value="forest">Bosque</option>
                 <option value="sakura">Sakura</option>
               </select>
+              <button className="ghost" onClick={startTour}>{t('tour.replay')}</button>
             </div>
           </div>
           <div className="card">
@@ -1093,6 +1217,32 @@ export default function App() {
         </div>
       )}
       {flashKey > 0 && <div key={flashKey} className="vignette" />}
+      {tourIdx !== null && (() => {
+        const steps = tourSteps();
+        const st = steps[tourIdx];
+        if (!st) return null;
+        const last = tourIdx === steps.length - 1;
+        const tipStyle = tourRect
+          ? (tourRect.y + tourRect.h + 220 < window.innerHeight
+            ? { left: Math.min(Math.max(12, tourRect.x), window.innerWidth - 332), top: tourRect.y + tourRect.h + 12 }
+            : { left: Math.min(Math.max(12, tourRect.x), window.innerWidth - 332), top: Math.max(12, tourRect.y - 232) })
+          : { left: '50%', top: '50%', transform: 'translate(-50%,-50%)' };
+        return (<>
+          <div className="tour-dim" onClick={endTour} />
+          {tourRect && <div className="tour-ring" style={{ left: tourRect.x, top: tourRect.y, width: tourRect.w, height: tourRect.h }} />}
+          <div className="tour-tip" style={tipStyle}>
+            <b>{st.title}</b>
+            <p>{st.body}</p>
+            <div className="tour-dots">{steps.map((_, i) => <span key={i} className={i === tourIdx ? 'on' : ''} />)}</div>
+            <div className="row">
+              <button className="mini" onClick={endTour}>{t('tour.skip')}</button>
+              <span style={{ flex: 1 }} />
+              {tourIdx > 0 && <button className="mini" onClick={() => setTourIdx(tourIdx - 1)}>{t('tour.back')}</button>}
+              <button className="mini hot" onClick={() => (last ? endTour() : setTourIdx(tourIdx + 1))}>{last ? t('tour.finish') : t('tour.next')}</button>
+            </div>
+          </div>
+        </>);
+      })()}
       {scare && (
         <div className="scare" onClick={() => setScare(null)}>
           <div className="scare-title">{t('scare.title')}</div>

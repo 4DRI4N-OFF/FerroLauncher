@@ -28,6 +28,7 @@ const discord = require('../core/discordService');
 const crashes = require('../core/crashService');
 const gallery = require('../core/galleryService');
 const notify = require('../core/notifyService');
+const cf = require('../core/curseforgeService');
 const res = require('../core/resourceService');
 
 function findInstance(d, name) {
@@ -258,6 +259,15 @@ ipcMain.handle('ferro:modUpdate', async (_, { instanceName, file, projectId }) =
   const inst = findInstance(d, instanceName);
   const send = (t) => win && win.webContents.send('ferro:log', t);
   return updateMod(inst.path, projectId, inst.versionId, inst.type === 'vanilla' ? 'fabric' : inst.type, file, send);
+});
+ipcMain.handle('ferro:cfKey', async () => (cf.getKey(getDirs().base) ? '••••' + cf.getKey(getDirs().base).slice(-4) : ''));
+ipcMain.handle('ferro:cfSetKey', async (_, { key }) => cf.setKey(getDirs().base, key));
+ipcMain.handle('ferro:cfSearch', async (_, { query, mcVersion, kind, sort }) => cf.search(getDirs().base, query || '', mcVersion, kind, sort));
+ipcMain.handle('ferro:cfFiles', async (_, { modId, mcVersion, loader }) => cf.files(getDirs().base, modId, mcVersion, loader));
+ipcMain.handle('ferro:cfInstall', async (_, { instanceName, modId, fileId, kind }) => {
+  const inst = findInstance(getDirs(), instanceName);
+  const send = (t) => win && win.webContents.send('ferro:log', t);
+  return cf.installFile(getDirs().base, inst.path, modId, fileId, kind, send);
 });
 ipcMain.handle('ferro:rp', async (_, { instanceName }) => {
   const inst = findInstance(getDirs(), instanceName);

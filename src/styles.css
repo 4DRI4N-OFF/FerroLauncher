@@ -593,7 +593,29 @@ pre {
 @keyframes shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
 @keyframes t-shrink { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
-/* ——— Viñeta roja al fallar ——— */
+/* ——— Tour guiado ——— */
+.tour-dim { position: fixed; inset: 0; z-index: 250; background: rgba(3, 2, 1, 0.62); animation: fade-in 0.25s ease both; }
+.tour-ring {
+  position: fixed; z-index: 251; border-radius: 18px; pointer-events: none;
+  border: 2px solid var(--amber);
+  box-shadow: 0 0 0 4000px rgba(3, 2, 1, 0.0), 0 0 28px rgba(255, 160, 40, 0.55), inset 0 0 18px rgba(255, 160, 40, 0.12);
+  transition: all 0.35s cubic-bezier(.22, .9, .3, 1.1);
+}
+.tour-tip {
+  position: fixed; z-index: 252; width: 320px;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid var(--stroke);
+  border-radius: 18px; padding: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  animation: rise 0.3s ease both;
+}
+.tour-tip b { font-size: 15px; }
+.tour-tip p { font-size: 13px; color: var(--muted); margin: 6px 0 10px; line-height: 1.5; }
+.tour-dots { display: flex; gap: 6px; margin-bottom: 10px; }
+.tour-dots span { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.2); }
+.tour-dots span.on { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
 .vignette {
   position: fixed; inset: 0; z-index: 150; pointer-events: none;
   background: radial-gradient(ellipse at center, transparent 55%, rgba(220, 38, 38, 0.4) 100%);

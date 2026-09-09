@@ -20,6 +20,7 @@ function listShots(instanceDir) {
 
 function deleteShot(instanceDir, file) {
   const p = path.join(shotsDir(instanceDir), path.basename(file));
+  if (!fs.existsSync(p)) throw new Error('Captura no encontrada');
   fs.unlinkSync(p);
   return true;
 }

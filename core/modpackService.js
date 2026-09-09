@@ -5,7 +5,7 @@ const AdmZip = require('adm-zip');
 const { downloadFile } = require('./downloader');
 
 const API = 'https://api.modrinth.com/v2';
-const UA = { 'User-Agent': 'FerroLauncher/0.1.0 (github.com/ferro)' };
+const UA = { 'User-Agent': `FerroLauncher/${require('../package.json').version} (github.com/4DRI4N-OFF/FerroLauncher)` };
 
 async function apiJson(url) {
   const res = await fetch(url, { headers: UA });
@@ -60,12 +60,14 @@ async function installMrpack(instanceDir, mrpackUrl, onLog) {
     await Promise.all(files.slice(i, i + CONC).map(async (f) => {
       const url = f.downloads?.[0];
       if (!url) return;
-      const dest = path.join(instanceDir, ...f.path.split('/'));
+      const rel = path.normalize(f.path).replace(/\\/g, '/');
+      if (rel.startsWith('..') || path.isAbsolute(rel)) { onLog && onLog(`[ferro] salto ruta fuera de la instancia: ${f.path}\n`); return; }
+      const dest = path.join(instanceDir, rel);
       try {
         const st = fs.statSync(dest);
         if (st.size === f.fileSize) return;
       } catch {}
-      await downloadFile(url, dest);
+      await downloadFile(url, dest, undefined, f.fileSize, f.hashes?.sha1);
     }));
     done += Math.min(CONC, files.length - done);
     onLog && onLog(`[ferro] modpack ${done}/${files.length}\n`);
@@ -74,7 +76,7 @@ async function installMrpack(instanceDir, mrpackUrl, onLog) {
   for (const e of zip.getEntries()) {
     if (e.isDirectory || !e.entryName.startsWith('overrides/')) continue;
     const rel = e.entryName.slice('overrides/'.length);
-    if (!rel) continue;
+    if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) continue; // zip-slip
     zip.extractEntryTo(e, instanceDir, false, true);
   }
   try { fs.rmSync(tmp, { recursive: true, force: true }); } catch {}

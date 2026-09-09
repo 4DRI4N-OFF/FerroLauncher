@@ -37,11 +37,13 @@ function findInstance(d, name) {
   return inst;
 }
 
-// Caché de nombres premium (sesión): name.lower -> uuid | null | 'unknown' (sin red)
+// Caché de nombres premium (sesión, TTL 10 min): name.lower -> uuid | null | 'unknown'
 const premiumCache = new Map();
+const PREMIUM_TTL = 10 * 60 * 1000;
 async function premiumUuidOf(name) {
   const key = String(name || '').toLowerCase();
-  if (premiumCache.has(key)) return premiumCache.get(key);
+  const hit = premiumCache.get(key);
+  if (hit && Date.now() - hit.t < PREMIUM_TTL) return hit.v;
   let out = null;
   try {
     const res = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
@@ -51,7 +53,7 @@ async function premiumUuidOf(name) {
   } catch {
     out = 'unknown';
   }
-  premiumCache.set(key, out);
+  premiumCache.set(key, { v: out, t: Date.now() });
   return out;
 }
 
@@ -425,6 +427,7 @@ ipcMain.handle('ferro:authWindow', async () => {
   authWin.loadURL(url);
 
   const done = (err, acc) => {
+    authDone = true;
     try { if (authWin && !authWin.isDestroyed()) authWin.close(); } catch {}
     authWin = null;
     if (err) win && win.webContents.send('ferro:auth-error', { error: err.message || String(err) });
@@ -432,6 +435,7 @@ ipcMain.handle('ferro:authWindow', async () => {
   };
 
   let handled = false;
+  let authDone = false;
   const intercept = async (navUrl) => {
     if (!navUrl.startsWith(auth.NATIVE_REDIRECT)) return false;
     if (handled) return true; // la redirección ya se está procesando: ignora el duplicado
@@ -460,7 +464,10 @@ ipcMain.handle('ferro:authWindow', async () => {
     if (navUrl.startsWith(auth.NATIVE_REDIRECT)) return; // esperado: esa URL no es una página real
     win && win.webContents.send('ferro:log', `[ferro] la ventana de login falló al cargar (${code} ${desc})\n`);
   });
-  authWin.on('closed', () => { authWin = null; });
+  authWin.on('closed', () => {
+    authWin = null;
+    if (!authDone) win && win.webContents.send('ferro:auth-error', { error: 'Ventana cerrada antes de completar' });
+  });
   return true;
 });
 
@@ -580,7 +587,6 @@ ipcMain.handle('ferro:nameSuggest', async (_, { base }) => {
 ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, width, height }) => {
   if (activeChild && activeChild.exitCode === null && !activeChild.killed) throw new Error('Ya hay una instancia en ejecución. Deténla primero.');
   const d = getDirs();
-  const path = require('path');
   const instances = listInstances(d.instances);
   const inst = instances.find((i) => i.name === instanceName);
   if (!inst) throw new Error('Instancia no encontrada');

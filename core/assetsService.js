@@ -30,7 +30,7 @@ async function downloadAssets(versionDetails, assetsDir, onProgress) {
       const h = obj.hash;
       const sub = `${h.slice(0, 2)}/${h}`;
       const dest = path.join(objectsDir, h.slice(0, 2), h);
-      await downloadFile(`${RESOURCE_BASE}/${sub}`, dest, undefined, obj.size);
+      await downloadFile(`${RESOURCE_BASE}/${sub}`, dest, undefined, obj.size, h);
     }));
     done += batch.length;
     onProgress && onProgress({ done, total: entries.length });

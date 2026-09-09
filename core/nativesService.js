@@ -26,7 +26,9 @@ function pickNativeClassifier(lib) {
   const candidates =
     arch === 'arm64'
       ? ['natives-windows-arm64', 'natives-windows']
-      : ['natives-windows-x86', 'natives-windows', 'natives-windows-64'];
+      : arch === 'ia32'
+        ? ['natives-windows-x86', 'natives-windows']
+        : ['natives-windows-64', 'natives-windows', 'natives-windows-x86'];
   // también soporta claves con guion distinto en versiones viejas
   for (const k of candidates) if (cls[k]) return k;
   // fallback: cualquier natives-windows*
@@ -80,8 +82,9 @@ function nativesTarget(versionDetails, nativesDir) {
 
 async function resolveNatives(versionDetails, librariesDir, nativesDir, onProgress) {
   const target = nativesTarget(versionDetails, nativesDir);
+  // Limpia extracciones previas: evita mezclar DLLs de otras versiones
+  fs.rmSync(target, { recursive: true, force: true });
   fs.mkdirSync(target, { recursive: true });
-  // Limpia extracciones previas de esta versión para evitar DLLs viejas
   let done = 0;
   const libs = (versionDetails.libraries || []).filter((l) => ruleAllows(l.rules));
   const jobs = [];
@@ -96,7 +99,7 @@ async function resolveNatives(versionDetails, librariesDir, nativesDir, onProgre
   }
   for (const { lib, art } of jobs) {
     const dest = path.join(librariesDir, art.path);
-    await downloadFile(art.url, dest);
+    await downloadFile(art.url, dest, undefined, art.size, art.sha1);
     try {
       extractJar(dest, target, lib);
     } catch (err) {

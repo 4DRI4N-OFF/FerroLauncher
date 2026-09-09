@@ -70,10 +70,20 @@ function createBackup(baseDir, instanceDir, instanceName, onLog) {
 function restoreBackup(baseDir, instancesDir, instanceName, file, onLog) {
   const src = path.join(backupsDir(baseDir, instanceName), path.basename(file));
   if (!src.startsWith(backupsDir(baseDir, instanceName))) throw new Error('Ruta no válida');
+  // Valida ANTES de tocar nada: un zip corrupto no debe destruir la instancia
+  try {
+    const test = new AdmZip(src);
+    if (!test.getEntry('ferro.json')) throw new Error('sin ferro.json');
+  } catch (e) {
+    throw new Error(`Copia no válida: ${e.message}`);
+  }
   const dest = path.join(instancesDir, instanceName);
+  const tmp = dest + '.restore-tmp';
+  fs.rmSync(tmp, { recursive: true, force: true });
+  fs.mkdirSync(tmp, { recursive: true });
+  new AdmZip(src).extractAllTo(tmp, true);
   fs.rmSync(dest, { recursive: true, force: true });
-  fs.mkdirSync(dest, { recursive: true });
-  new AdmZip(src).extractAllTo(dest, true);
+  fs.renameSync(tmp, dest);
   onLog && onLog(`[ferro] ${instanceName} restaurada desde ${file}\n`);
   return true;
 }
@@ -102,6 +112,12 @@ function profileBackup(baseDir, destZip, onLog) {
 }
 
 function profileRestore(zipPath, baseDir, onLog) {
+  try {
+    const test = new AdmZip(zipPath);
+    if (test.getEntries().length === 0) throw new Error('vacío');
+  } catch (e) {
+    throw new Error(`Perfil no válido: ${e.message}`);
+  }
   new AdmZip(zipPath).extractAllTo(baseDir, true);
   onLog && onLog('[ferro] perfil restaurado (reinicia el launcher)\n');
   return true;

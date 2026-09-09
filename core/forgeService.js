@@ -25,8 +25,9 @@ function forgeInstallerUrl(mcVersion, forgeVersion) {
 }
 
 function mcToNeoPrefix(mcVersion) {
-  const [, a, b] = mcVersion.split('.').map(Number);
-  return `${a}.${b}`;
+  const parts = String(mcVersion).split('.').map(Number);
+  if (parts.length <= 2) return String(parts[1]); // "1.21" -> "21"
+  return `${parts[1]}.${parts[2]}`;
 }
 
 async function listNeoForge(mcVersion) {
@@ -62,7 +63,7 @@ function runInstaller(javaPath, installerJar, targetDir, versionsDir, onLog) {
   return new Promise((resolve, reject) => {
     fs.mkdirSync(targetDir, { recursive: true });
     onLog && onLog(`[ferro] instalador: ${path.basename(installerJar)} (puede tardar varios minutos)…\n`);
-    const child = spawn(javaPath, ['-jar', installerJar, '--installClient', targetDir], { cwd: targetDir });
+    const child = spawn(javaPath, ['-jar', installerJar, '--installClient', targetDir], { cwd: targetDir, timeout: 15 * 60 * 1000 });
     let tail = '';
     const feed = (d) => {
       const t = d.toString();

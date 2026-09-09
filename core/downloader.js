@@ -7,6 +7,10 @@ async function fetchRetry(url, opts = {}, tries = 3) {
   for (let i = 0; i < tries; i++) {
     try {
       const res = await fetch(url, { ...opts, signal: AbortSignal.timeout(20000) });
+      if ((res.status >= 500 || res.status === 429) && i < tries - 1) {
+        await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+        continue;
+      }
       return res;
     } catch (e) {
       last = e;
@@ -22,13 +26,17 @@ async function fetchJson(url) {
   return res.json();
 }
 
-async function downloadFile(url, dest, onProgress, expectedSize) {
+async function downloadFile(url, dest, onProgress, expectedSize, expectedSha1) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
-  // Caché: si existe y coincide el tamaño esperado (o no lo conocemos y no está vacío), se reutiliza
+  // Caché: reutiliza si coincide sha1 (o tamaño si no hay sha1)
   try {
     const st = fs.statSync(dest);
-    if (expectedSize ? st.size === expectedSize : st.size > 0) return dest;
-    if (expectedSize) fs.unlinkSync(dest); // corrupto o parcial: re-descargar
+    if (expectedSha1) {
+      if (sha1Of(dest) === expectedSha1.toLowerCase()) return dest;
+    } else if (expectedSize ? st.size === expectedSize : st.size > 0) {
+      return dest;
+    }
+    fs.unlinkSync(dest); // corrupto o parcial: re-descargar
   } catch {}
 
   const res = await fetchRetry(url);
@@ -51,7 +59,19 @@ async function downloadFile(url, dest, onProgress, expectedSize) {
       throw new Error(`Descarga incompleta (${got}/${expectedSize} bytes): ${url}`);
     }
   }
+  if (expectedSha1 && sha1Of(dest) !== expectedSha1.toLowerCase()) {
+    try { fs.unlinkSync(dest); } catch {}
+    throw new Error(`Descarga corrupta (sha1 no coincide): ${url}`);
+  }
   return dest;
+}
+
+function sha1Of(p) {
+  try {
+    const h = require('crypto').createHash('sha1');
+    h.update(fs.readFileSync(p));
+    return h.digest('hex');
+  } catch { return null; }
 }
 
 module.exports = { fetchJson, downloadFile };

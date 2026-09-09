@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const { downloadFile } = require('./downloader');
 
 const API = 'https://api.modrinth.com/v2';
-const UA = { 'User-Agent': 'FerroLauncher/0.1.0 (github.com/ferro)' };
+const UA = { 'User-Agent': `FerroLauncher/${require('../package.json').version} (github.com/4DRI4N-OFF/FerroLauncher)` };
 
 async function apiJson(url) {
   const res = await fetch(url, { headers: UA });
@@ -70,9 +70,9 @@ function listMods(instanceDir, kind = 'mod') {
     );
 }
 
-async function installModFile(instanceDir, fileUrl, fileName, onProgress, kind = 'mod', expectedSize) {
+async function installModFile(instanceDir, fileUrl, fileName, onProgress, kind = 'mod', expectedSize, expectedSha1) {
   const safe = String(fileName).replace(/[^\w\-.+() \[\]]+/g, '_');
-  return downloadFile(fileUrl, path.join(contentDir(instanceDir, kind), safe), onProgress, expectedSize);
+  return downloadFile(fileUrl, path.join(contentDir(instanceDir, kind), safe), onProgress, expectedSize, expectedSha1);
 }
 
 async function installMod(instanceDir, projectId, mcVersion, loader = 'fabric', onLog, kind = 'mod') {
@@ -82,7 +82,7 @@ async function installMod(instanceDir, projectId, mcVersion, loader = 'fabric', 
   const file = (v.files || []).find((f) => f.primary) || v.files?.[0];
   if (!file?.url) throw new Error('Versión sin archivo');
   onLog && onLog(`[ferro] ${kind} ${v.name} (${file.filename})\n`);
-  await installModFile(instanceDir, file.url, file.filename, undefined, kind, file.size);
+  await installModFile(instanceDir, file.url, file.filename, undefined, kind, file.size, file.hashes?.sha1);
   return { version: v.version_number, file: file.filename };
 }
 
@@ -153,8 +153,8 @@ async function updateMod(instanceDir, projectId, mcVersion, loader, oldFile, onL
   if (!v) throw new Error('Sin versión compatible');
   const file = (v.files || []).find((f) => f.primary) || v.files?.[0];
   if (!file?.url) throw new Error('Versión sin archivo');
-  await installModFile(instanceDir, file.url, file.filename);
-  try { fs.unlinkSync(path.join(contentDir(instanceDir, 'mod'), oldFile)); } catch {}
+  await installModFile(instanceDir, file.url, file.filename, undefined, 'mod', file.size, file.hashes?.sha1);
+  if (file.filename !== oldFile) { try { fs.unlinkSync(path.join(contentDir(instanceDir, 'mod'), oldFile)); } catch {} }
   onLog && onLog(`[ferro] actualizado a ${file.filename}\n`);
   return { version: v.version_number, file: file.filename };
 }

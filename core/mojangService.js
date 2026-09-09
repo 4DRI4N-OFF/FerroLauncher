@@ -23,7 +23,7 @@ async function downloadClientJar(versionDetails, versionsDir, onProgress) {
   const dl = versionDetails.downloads?.client;
   if (!dl?.url) throw new Error('Sin client jar en version details');
   const dest = path.join(versionsDir, id, `${id}.jar`);
-  return downloadFile(dl.url, dest, onProgress, dl.size);
+  return downloadFile(dl.url, dest, onProgress, dl.size, dl.sha1);
 }
 
 module.exports = { listVersions, getVersionDetails, downloadClientJar };

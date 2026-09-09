@@ -28,6 +28,7 @@ function peekDescription(p) {
 
 function readCrash(instanceDir, file, maxBytes = 60000) {
   const p = path.join(crashDir(instanceDir), path.basename(file));
+  if (!fs.existsSync(p)) throw new Error('Informe no encontrado');
   const st = fs.statSync(p);
   const buf = Buffer.alloc(Math.min(st.size, maxBytes));
   const fd = fs.openSync(p, 'r');

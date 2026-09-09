@@ -39,18 +39,27 @@ function systemCandidates(runtimesDir) {
   const list = [];
   if (process.env.JAVA_HOME) list.push(path.join(process.env.JAVA_HOME, 'bin', 'java.exe'));
   list.push('java'); // PATH
-  list.push('C:\\Program Files\\Java\\jdk-25\\bin\\java.exe');
-  list.push('C:\\Program Files\\Eclipse Adoptium\\jdk-21.0.3.9-hotspot\\bin\\java.exe');
-  list.push('C:\\Program Files\\Microsoft\\jdk-21.0.4.7-hotspot\\bin\\java.exe');
+  for (const base of ['C:\\Program Files\\Java', 'C:\\Program Files\\Eclipse Adoptium', 'C:\\Program Files\\Microsoft']) {
+    try {
+      const found = fs.readdirSync(base, { withFileTypes: true })
+        .filter((e) => e.isDirectory())
+        .map((e) => path.join(base, e.name, 'bin', 'java.exe'))
+        .filter((jp) => { try { return fs.existsSync(jp); } catch { return false; } })
+        .sort()
+        .reverse();
+      list.push(...found);
+    } catch {}
+  }
   return list;
 }
 
 async function findJava() {
+  let best = null;
   for (const c of systemCandidates()) {
     const found = await checkJava(c);
-    if (found) return found;
+    if (found && (!best || (found.major || 0) > (best.major || 0))) best = found;
   }
-  return null;
+  return best;
 }
 
 // Busca un Java compatible con el major requerido: primero runtimes gestionados, luego sistema.

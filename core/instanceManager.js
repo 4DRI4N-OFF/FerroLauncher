@@ -13,6 +13,13 @@ function withSettings(cfg) {
   return { ...cfg, settings: { ...defaultSettings(), ...(cfg.settings || {}) } };
 }
 
+// Los nombres vienen de la UI, pero nunca deben escapar del dir de instancias
+function safeName(n) {
+  const s = path.basename(String(n || ''));
+  if (!s || s === '.' || s === '..') throw new Error('Nombre no válido');
+  return s;
+}
+
 function listInstances(instancesDir) {
   fs.mkdirSync(instancesDir, { recursive: true });
   return fs.readdirSync(instancesDir, { withFileTypes: true })
@@ -42,7 +49,7 @@ function createInstance(instancesDir, name, versionId, opts = {}) {
 }
 
 function updateInstanceSettings(instancesDir, name, patch) {
-  const dir = path.join(instancesDir, name);
+  const dir = path.join(instancesDir, safeName(name));
   const cfgPath = path.join(dir, 'ferro.json');
   const cfg = withSettings(JSON.parse(fs.readFileSync(cfgPath, 'utf8')));
   const s = { ...cfg.settings };
@@ -68,7 +75,7 @@ function copyDir(src, dest) {
 }
 
 function duplicateInstance(instancesDir, name) {
-  const src = path.join(instancesDir, name);
+  const src = path.join(instancesDir, safeName(name));
   const cfg = withSettings(JSON.parse(fs.readFileSync(path.join(src, 'ferro.json'), 'utf8')));
   const safe = `${cfg.name} copia`.replace(/[^\w\-. ]+/g, '_').trim();
   let dest = safe, i = 2;
@@ -83,7 +90,7 @@ function duplicateInstance(instancesDir, name) {
 }
 
 function deleteInstance(instancesDir, name) {
-  fs.rmSync(path.join(instancesDir, name), { recursive: true, force: true });
+  fs.rmSync(path.join(instancesDir, safeName(name)), { recursive: true, force: true });
   return true;
 }
 
@@ -91,7 +98,7 @@ function renameInstance(instancesDir, oldName, newName) {
   const safe = String(newName).replace(/[^\w\-. ]+/g, '_').trim();
   if (!safe) throw new Error('Nombre vacío');
   if (fs.existsSync(path.join(instancesDir, safe))) throw new Error('Ya existe ese nombre');
-  fs.renameSync(path.join(instancesDir, oldName), path.join(instancesDir, safe));
+  fs.renameSync(path.join(instancesDir, safeName(oldName)), path.join(instancesDir, safe));
   const cfgPath = path.join(instancesDir, safe, 'ferro.json');
   const cfg = withSettings(JSON.parse(fs.readFileSync(cfgPath, 'utf8')));
   cfg.name = safe;
@@ -101,7 +108,7 @@ function renameInstance(instancesDir, oldName, newName) {
 
 function touchPlayed(instancesDir, name) {
   try {
-    const cfgPath = path.join(instancesDir, name, 'ferro.json');
+    const cfgPath = path.join(instancesDir, safeName(name), 'ferro.json');
     const cfg = withSettings(JSON.parse(fs.readFileSync(cfgPath, 'utf8')));
     cfg.lastPlayed = Date.now();
     cfg.plays = (cfg.plays || 0) + 1;
@@ -112,7 +119,7 @@ function touchPlayed(instancesDir, name) {
 function addPlayTime(instancesDir, name, secs) {
   try {
     if (!secs || secs < 5) return null;
-    const cfgPath = path.join(instancesDir, name, 'ferro.json');
+    const cfgPath = path.join(instancesDir, safeName(name), 'ferro.json');
     const cfg = withSettings(JSON.parse(fs.readFileSync(cfgPath, 'utf8')));
     cfg.playSecs = Math.round((cfg.playSecs || 0) + secs);
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
@@ -121,7 +128,7 @@ function addPlayTime(instancesDir, name, secs) {
 }
 
 function setForgeProfile(instancesDir, name, patch) {
-  const dir = path.join(instancesDir, name);
+  const dir = path.join(instancesDir, safeName(name));
   const cfgPath = path.join(dir, 'ferro.json');
   const cfg = withSettings(JSON.parse(fs.readFileSync(cfgPath, 'utf8')));
   Object.assign(cfg, patch);

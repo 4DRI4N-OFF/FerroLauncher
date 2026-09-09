@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { downloadFile } = require('./downloader');
+const PKG_VER = require('../package.json').version;
 
 function ruleAllows(rules) {
   if (!rules || rules.length === 0) return true;
@@ -19,8 +20,20 @@ function ruleAllows(rules) {
   return allowed;
 }
 
-function flattenArgs(list) {
+// Parte por flags (--x): los valores con espacios (rutas) quedan intactos
+function splitArgs(str) {
   const out = [];
+  for (const chunk of String(str || '').split(/\s+(?=--)/)) {
+    const t = chunk.trim();
+    if (!t) continue;
+    const sp = t.indexOf(' ');
+    if (sp < 0) out.push(t);
+    else { out.push(t.slice(0, sp)); out.push(t.slice(sp + 1)); }
+  }
+  return out;
+}
+
+function flattenArgs(list) {  const out = [];
   for (const a of list || []) {
     if (typeof a === 'string') { out.push(a); continue; }
     if (a && typeof a === 'object' && ruleAllows(a.rules)) {
@@ -45,7 +58,7 @@ async function resolveLibraries(versionDetails, librariesDir, onProgress) {
     const art = libArtifact(lib);
     if (!art) continue;
     const dest = path.join(librariesDir, art.path);
-    await downloadFile(art.url, dest, (p) => onProgress && onProgress({ lib: lib.name, done: ++done, total: libs.length, p }), art.size);
+    await downloadFile(art.url, dest, (p) => onProgress && onProgress({ lib: lib.name, done: ++done, total: libs.length, p }), art.size, art.sha1);
     cp.push(dest);
   }
   return cp;
@@ -64,7 +77,10 @@ async function launch({ javaPath, versionDetails, clientJar, librariesCp, native
   const plan = buildLaunchPlan({ versionDetails, clientJar, librariesCp, nativesDir, loggingPath, instanceDir, dataDirs, username, ramMb, mainClassOverride, extraClasspath, width, height, auth });
   onLog && onLog(`[ferro] java: ${javaPath}\n[ferro] mainClass: ${plan.mainClass}\n[ferro] libs: ${librariesCp.length} natives: ${nativesDir}\n`);
   const full = [...plan.jvmArgs, plan.mainClass, ...plan.gameArgs];
-  onLog && onLog(`[ferro] cmd: "${javaPath}" ${full.join(' ')}\n`);
+  const shown = [...full];
+  const ti = shown.indexOf('--accessToken');
+  if (ti >= 0 && shown[ti + 1]) shown[ti + 1] = String(shown[ti + 1]).slice(0, 4) + '…';
+  onLog && onLog(`[ferro] cmd: "${javaPath}" ${shown.join(' ')}\n`);
   const child = spawn(javaPath, full, { cwd: instanceDir });
 
   child.stdout.on('data', (d) => onLog && onLog(d.toString()));
@@ -102,7 +118,7 @@ function buildLaunchPlan({ versionDetails, clientJar, librariesCp, nativesDir, l
     natives_directory: nativesDir,
     natives_directory_raw: nativesDir,
     launcher_name: 'FerroLauncher',
-    launcher_version: '0.1.0',
+    launcher_version: PKG_VER,
     classpath,
     library_directory: dataDirs.libraries,
     classpath_separator: ';',
@@ -124,7 +140,7 @@ function buildLaunchPlan({ versionDetails, clientJar, librariesCp, nativesDir, l
   if (versionDetails.arguments?.game) {
     gameArgs = flattenArgs(versionDetails.arguments.game).map(sub);
   } else if (versionDetails.minecraftArguments) {
-    gameArgs = versionDetails.minecraftArguments.split(' ').map(sub);
+    gameArgs = splitArgs(versionDetails.minecraftArguments).map(sub);
   } else {
     gameArgs = ['--username', '${auth_player_name}', '--version', '${version_name}', '--gameDir', '${game_directory}', '--assetsDir', '${assets_root}', '--assetIndex', '${assets_index_name}', '--uuid', '${auth_uuid}', '--accessToken', '${auth_access_token}', '--userType', '${user_type}', '--versionType', '${version_type}'].map(sub);
   }

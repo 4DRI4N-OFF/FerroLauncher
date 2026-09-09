@@ -915,8 +915,9 @@ export default function App() {
   return (
     <div className="layout">
       <Embers />
-      <div className="side">
+      <div className="topbar">
         <img ref={sideLogoRef} className="brand-logo" src={brand} alt="FerroLauncher" />
+        <nav className="topnav">
         <button className={tab==='jugar'?'active':''} onClick={()=>setTab('jugar')}><Play size={16} /> {t('tab.play')}</button>
         <button className={tab==='versiones'?'active':''} onClick={()=>setTab('versiones')}><Layers size={16} /> {t('tab.versions')}</button>
         <button className={tab==='instancias'?'active':''} onClick={()=>setTab('instancias')}><Package size={16} /> {t('tab.instances')}</button>
@@ -926,12 +927,15 @@ export default function App() {
         <button className={tab==='skin'?'active':''} onClick={()=>{setTab('skin'); loadSkin();}}><Palette size={16} /> {t('tab.skin')}</button>
         <button className={tab==='ajustes'?'active':''} onClick={()=>setTab('ajustes')}><Settings size={16} /> {t('tab.settings')}</button>
         <button className={tab==='servers'?'active':''} onClick={()=>{setTab('servers'); loadServers();}}><Server size={16} /> {t('tab.servers')}</button>
+        </nav>
+        <div className="topside">
         <div className="player-chip" onClick={()=>setTab('cuenta')} title={t('tab.account')}>
           {playFace ? <img className="face" src={playFace} alt="" onError={()=>setPlayFace(null)} /> : <User size={18} />}
           <div className="pc-id"><b>{account?.name || username || '—'}</b><span>{account ? t('play.online') : t('play.offline')}</span></div>
           <span className={`dot ${account ? 'on' : ''}`} />
         </div>
-        <div className="ver">v0.3.0 · {t('footerTag')}</div>
+        <div className="ver">v{appVer || '?'} · {t('footerTag')}</div>
+        </div>
       </div>
       <div className="main" key={tab}>
         {tab==='jugar' && (<>

@@ -569,7 +569,14 @@ ipcMain.handle('ferro:openCrashes', async (_, { instanceName }) => {
   return true;
 });
 ipcMain.handle('ferro:shots', async (_, { instanceName }) => gallery.listShots(findInstance(getDirs(), instanceName).path));
-ipcMain.handle('ferro:shotThumb', async (_, { instanceName, file }) => {
+ipcMain.handle('ferro:heroBg', async () => {
+  const hit = gallery.heroShot(getDirs().instances);
+  if (!hit || hit.size > 8 * 1048576) return null;
+  return {
+    instanceName: hit.instance, file: hit.file,
+    dataUrl: 'data:image/png;base64,' + require('fs').readFileSync(hit.path).toString('base64'),
+  };
+});ipcMain.handle('ferro:shotThumb', async (_, { instanceName, file }) => {
   const list = gallery.listShots(findInstance(getDirs(), instanceName).path);
   const hit = list.find((s) => s.file === path.basename(file));
   if (!hit) throw new Error('Captura no encontrada');

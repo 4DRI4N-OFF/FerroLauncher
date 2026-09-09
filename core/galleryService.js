@@ -25,4 +25,19 @@ function deleteShot(instanceDir, file) {
   return true;
 }
 
-module.exports = { listShots, deleteShot, shotsDir };
+// La captura más reciente de todas las instancias (fondo del hero)
+function heroShot(instancesDir) {
+  let best = null;
+  try {
+    for (const e of fs.readdirSync(instancesDir, { withFileTypes: true })) {
+      if (!e.isDirectory()) continue;
+      for (const s of listShots(path.join(instancesDir, e.name))) {
+        if (s.size > 8 * 1048576) continue;
+        if (!best || s.mtime > best.mtime) best = { ...s, instance: e.name };
+      }
+    }
+  } catch {}
+  return best;
+}
+
+module.exports = { listShots, deleteShot, shotsDir, heroShot };

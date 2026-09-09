@@ -298,6 +298,7 @@ export default function App() {
   const [srvHost, setSrvHost] = useState('');
   const [srvPort, setSrvPort] = useState('');
   const [srvPing, setSrvPing] = useState({});
+  const [heroBg, setHeroBg] = useState(null);
   const [confirmDlg, setConfirmDlg] = useState(null);
   const [confirmInput, setConfirmInput] = useState('');
   const askConfirm = (message, onOk) => setConfirmDlg({ message, onOk, input: false });
@@ -842,6 +843,7 @@ export default function App() {
 
   useEffect(() => {
     window.ferro.onProgress?.((d) => setLaunchProg(d));
+    window.ferro.heroBg?.().then((r) => { if (r?.dataUrl) setHeroBg(r.dataUrl); }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -934,6 +936,7 @@ export default function App() {
       <div className="main" key={tab}>
         {tab==='jugar' && (<>
           <div className={`card hero hero-${(() => { const s = instances.find((i)=>i.name===launchInstance); return s ? s.type : 'vanilla'; })()}`}>
+            {heroBg && <img className="hero-bg" src={heroBg} alt="" />}
             <div className="hero-top">
               {playFace && <img className="face xl" src={playFace} alt="" onError={()=>setPlayFace(null)} />}
               <div className="hero-id">

@@ -63,6 +63,7 @@ contextBridge.exposeInMainWorld('ferro', {
   crashRead: (data) => ipcRenderer.invoke('ferro:crashRead', data),
   openCrashes: (data) => ipcRenderer.invoke('ferro:openCrashes', data),
   shots: (data) => ipcRenderer.invoke('ferro:shots', data),
+  heroBg: () => ipcRenderer.invoke('ferro:heroBg'),
   shotThumb: (data) => ipcRenderer.invoke('ferro:shotThumb', data),
   shotView: (data) => ipcRenderer.invoke('ferro:shotView', data),
   shotDelete: (data) => ipcRenderer.invoke('ferro:shotDelete', data),

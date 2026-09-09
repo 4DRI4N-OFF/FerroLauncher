@@ -46,15 +46,46 @@ async function search(baseDir, query, mcVersion, kind = 'mod', sort = 'downloads
     sortOrder: 'desc',
     pageSize: '24',
   });
-  const data = await api(baseDir, `${API}/mods/search?${qs}`);
+  let data;
+  try {
+    data = await api(baseDir, `${API}/mods/search?${qs}`);
+  } catch (e) {
+    if (/403/.test(e.message)) {
+      throw new Error('CurseForge denegó la búsqueda con esta key: las keys nuevas a veces requieren aprobación para /search (escribe a support@curseforge.com). Mientras, usa Tendencias.');
+    }
+    throw e;
+  }
   return {
     total: data.pagination?.totalCount || 0,
-    hits: (data.data || []).map((m) => ({
-      id: m.id, title: m.name, description: m.summary,
-      icon: m.logo?.url || null, downloads: m.downloadCount || 0,
-      updated: m.dateModified || null, loaders: [],
-    })),
+    hits: (data.data || []).map(hit),
   };
+}
+
+function hit(m) {
+  return {
+    id: m.id, title: m.name, description: m.summary,
+    icon: m.logo?.url || null, downloads: m.downloadCount || 0,
+    updated: m.dateModified || null, loaders: [],
+  };
+}
+
+// Plan B sin /search: populares + recién actualizados (funciona con keys nuevas)
+async function trending(baseDir) {
+  const key = getKey(baseDir);
+  if (!key) throw new Error('Falta la API key de CurseForge (Contenido → Configurar)');
+  const res = await fetch(`${API}/mods/featured`, {
+    method: 'POST',
+    headers: { 'x-api-key': key, Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ gameId: MC_GAME_ID, excludedModIds: [] }),
+  });
+  if (!res.ok) throw new Error(`CurseForge HTTP ${res.status}`);
+  const data = await res.json();
+  const seen = new Map();
+  for (const m of [...(data.data?.popular || []), ...(data.data?.recentlyUpdated || [])]) {
+    if (!seen.has(m.id)) seen.set(m.id, hit(m));
+  }
+  const hits = [...seen.values()];
+  return { total: hits.length, hits };
 }
 
 async function files(baseDir, modId, mcVersion, loader) {
@@ -84,4 +115,4 @@ async function installFile(baseDir, instanceDir, modId, fileId, kind, onLog) {
   return { file: safe };
 }
 
-module.exports = { getKey, setKey, search, files, installFile };
+module.exports = { getKey, setKey, search, trending, files, installFile };

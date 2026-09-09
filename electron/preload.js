@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('ferro', {
   cfKey: () => ipcRenderer.invoke('ferro:cfKey'),
   cfSetKey: (data) => ipcRenderer.invoke('ferro:cfSetKey', data),
   cfSearch: (data) => ipcRenderer.invoke('ferro:cfSearch', data),
+  cfTrending: () => ipcRenderer.invoke('ferro:cfTrending'),
   cfFiles: (data) => ipcRenderer.invoke('ferro:cfFiles', data),
   cfInstall: (data) => ipcRenderer.invoke('ferro:cfInstall', data),
   rp: (data) => ipcRenderer.invoke('ferro:rp', data),

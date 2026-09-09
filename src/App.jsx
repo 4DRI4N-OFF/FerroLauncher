@@ -414,6 +414,18 @@ export default function App() {
     finally { setSearching(false); }
   };
 
+  const doCfTrending = async () => {
+    setSearching(true);
+    try {
+      const r = await window.ferro.cfTrending();
+      setCfHits(r.hits || []);
+      setCfTotal(r.total || 0);
+      setInstalledIds([]);
+      setLog((l) => l + `[ferro] tendencias CF: ${r.hits?.length || 0}\n`);
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+    finally { setSearching(false); }
+  };
+
   const doCfFiles = async (modId) => {
     if (cfFiles[modId]) {
       setCfFiles((p) => { const n = { ...p }; delete n[modId]; return n; });
@@ -925,6 +937,7 @@ export default function App() {
                 <option value="updated">{t('mods.sUpdated')}</option>
               </select>
               <button className="primary" onClick={()=>{source==='cf' ? doCfSearch() : doSearch();}} disabled={searching || !modsFor}>{searching ? t('mods.searching') : <><Search size={14} /> {t('mods.search')}</>}</button>
+              {source==='cf' && <button className="ghost" onClick={doCfTrending} disabled={searching}>Tendencias</button>}
               <button className="mini" onClick={()=>loadMods(modsFor)} disabled={!modsFor}>{t('mods.viewInstalled')}</button>
             </div>
             {source==='cf' && (

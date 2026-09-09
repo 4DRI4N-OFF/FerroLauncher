@@ -263,6 +263,7 @@ ipcMain.handle('ferro:modUpdate', async (_, { instanceName, file, projectId }) =
 ipcMain.handle('ferro:cfKey', async () => (cf.getKey(getDirs().base) ? '••••' + cf.getKey(getDirs().base).slice(-4) : ''));
 ipcMain.handle('ferro:cfSetKey', async (_, { key }) => cf.setKey(getDirs().base, key));
 ipcMain.handle('ferro:cfSearch', async (_, { query, mcVersion, kind, sort }) => cf.search(getDirs().base, query || '', mcVersion, kind, sort));
+ipcMain.handle('ferro:cfTrending', async () => cf.trending(getDirs().base));
 ipcMain.handle('ferro:cfFiles', async (_, { modId, mcVersion, loader }) => cf.files(getDirs().base, modId, mcVersion, loader));
 ipcMain.handle('ferro:cfInstall', async (_, { instanceName, modId, fileId, kind }) => {
   const inst = findInstance(getDirs(), instanceName);

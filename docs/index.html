@@ -8,8 +8,11 @@
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+<div id="loader"><span>⛏</span></div>
+<div class="progress" id="progress"></div>
 <div class="bg"><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
 <div class="grid-bg"></div>
+<div class="cursor" id="cursor"></div>
 <header class="top" id="top">
   <span class="logo-mini">⛏ FerroLauncher</span>
   <nav>
@@ -23,7 +26,11 @@
 
 <section class="hero">
   <img src="assets/brand.png" alt="FerroLauncher" class="brand" />
+  <h1 class="display" data-es="Juega Minecraft a tu manera" data-en="Play Minecraft your way">Juega Minecraft a tu manera</h1>
   <p class="tag" data-es="Launcher gratis y open-source de Minecraft: Java Edition para Windows." data-en="Free, open-source Minecraft: Java Edition launcher for Windows.">Launcher gratis y open-source de Minecraft: Java Edition para Windows.</p>
+  <div class="chips">
+    <span>MIT</span><span>ES/EN</span><span>5 loaders</span><span>Auto-updater</span>
+  </div>
   <div class="cta">
     <a class="btn primary" id="dl-setup" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest" data-es="Descargar instalador" data-en="Download installer">Descargar instalador</a>
     <a class="btn ghost" id="dl-portable" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest/download/FerroLauncher-portable.exe" data-es="Versión portable" data-en="Portable version">Versión portable</a>
@@ -31,8 +38,8 @@
   <p class="ver" id="ver">v0.4.0 · Windows 10/11 64-bit</p>
 </section>
 
-<section class="mockwrap reveal">
-  <div class="mock">
+<section class="mockwrap reveal" id="mockwrap">
+  <div class="mock" id="mock">
     <div class="mock-bar"><i></i><i></i><i></i></div>
     <div class="mock-body">
       <div class="mock-side"><i class="on"></i><i></i><i></i><i></i><i></i></div>
@@ -96,14 +103,22 @@
   </div>
 </section>
 
-<section id="download" class="panel">
+<section id="download" class="panel reveal">
   <h2 data-es="Descargar" data-en="Download">Descargar</h2>
   <p data-es="Gratis y open-source (MIT). Elige instalador o portable, ambos de la última release de GitHub." data-en="Free and open-source (MIT). Pick the installer or the portable build, both from the latest GitHub release.">Gratis y open-source (MIT). Elige instalador o portable, ambos de la última release de GitHub.</p>
-  <div class="cta">
-    <a class="btn primary" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest" data-es="Ver releases" data-en="View releases">Ver releases</a>
-    <a class="btn ghost" href="https://github.com/4DRI4N-OFF/FerroLauncher">GitHub</a>
-    <a class="btn ghost" href="https://discord.gg/vTujTm3hE">Discord</a>
+  <div class="dl-grid">
+    <div class="dl-card">
+      <b data-es="Instalador" data-en="Installer">Instalador</b>
+      <p data-es="Asistente con accesos directos y auto-updater integrado." data-en="Wizard with shortcuts and built-in auto-updater.">Asistente con accesos directos y auto-updater integrado.</p>
+      <a class="btn primary" id="dl-setup" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest" data-es="Descargar instalador" data-en="Download installer">Descargar instalador</a>
+    </div>
+    <div class="dl-card">
+      <b data-es="Portable" data-en="Portable">Portable</b>
+      <p data-es="Sin instalación: descomprime y juega donde quieras." data-en="No install: unzip and play anywhere.">Sin instalación: descomprime y juega donde quieras.</p>
+      <a class="btn ghost" id="dl-portable" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest/download/FerroLauncher-portable.exe" data-es="Versión portable" data-en="Portable version">Versión portable</a>
+    </div>
   </div>
+  <p class="req" data-es="Windows 10/11 64-bit · ~200 MB · Java incluido automáticamente" data-en="Windows 10/11 64-bit · ~200 MB · Java included automatically">Windows 10/11 64-bit · ~200 MB · Java incluido automáticamente</p>
 </section>
 
 <section id="faq" class="panel">
@@ -117,6 +132,7 @@
 <footer>
   <p>NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT. · MIT · <a href="https://github.com/4DRI4N-OFF/FerroLauncher/issues">Issues</a></p>
 </footer>
+<button id="toTop" title="Top">↑</button>
 
 <script>
 const btn = document.getElementById('lang');
@@ -128,9 +144,50 @@ function setLang(l) {
 }
 btn.onclick = () => setLang(document.documentElement.lang === 'en' ? 'es' : 'en');
 setLang((() => { try { return localStorage.getItem('ferro-site-lang') || 'es'; } catch { return 'es'; } })());
-// Navbar compacta al bajar
+// Navbar + progreso + arriba
 const top = document.getElementById('top');
-addEventListener('scroll', () => top.classList.toggle('scrolled', scrollY > 24), { passive: true });
+const prog = document.getElementById('progress');
+const toTop = document.getElementById('toTop');
+addEventListener('scroll', () => {
+  top.classList.toggle('scrolled', scrollY > 24);
+  const h = document.documentElement.scrollHeight - innerHeight;
+  prog.style.width = (h > 0 ? (scrollY / h) * 100 : 0) + '%';
+  toTop.classList.toggle('show', scrollY > 600);
+}, { passive: true });
+toTop.onclick = () => scrollTo({ top: 0, behavior: 'smooth' });
+// Loader fuera
+addEventListener('load', () => setTimeout(() => document.getElementById('loader').classList.add('done'), 350));
+setTimeout(() => document.getElementById('loader').classList.add('done'), 2500);
+// Cursor glow
+(function () {
+  const c = document.getElementById('cursor');
+  if (matchMedia('(pointer: coarse)').matches) return;
+  let x = -400, y = -400, tx = x, ty = y;
+  addEventListener('pointermove', (e) => { tx = e.clientX; ty = e.clientY; }, { passive: true });
+  (function follow() { x += (tx - x) * 0.12; y += (ty - y) * 0.12; c.style.transform = `translate(${x - 170}px, ${y - 170}px)`; requestAnimationFrame(follow); })();
+})();
+// Tilt del mockup
+(function () {
+  const wrap = document.getElementById('mockwrap');
+  const mock = document.getElementById('mock');
+  if (!wrap || !mock) return;
+  wrap.addEventListener('pointermove', (e) => {
+    const r = wrap.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - 0.5;
+    const py = (e.clientY - r.top) / r.height - 0.5;
+    mock.style.transform = `perspective(1200px) rotateX(${(-py * 5).toFixed(2)}deg) rotateY(${(px * 5).toFixed(2)}deg)`;
+  });
+  wrap.addEventListener('pointerleave', () => { mock.style.transform = ''; });
+})();
+// Contadores animados en stats
+function countUp(el, target) {
+  const t0 = performance.now(), dur = 1400;
+  (function tick(t) {
+    const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(target * e).toLocaleString();
+    if (p < 1) requestAnimationFrame(tick);
+  })(t0);
+}
 // Reveal on scroll
 const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
 document.querySelectorAll('.grid .card, .panel, .ticker, .mockwrap').forEach((el) => { el.classList.add('reveal'); io.observe(el); });
@@ -153,7 +210,7 @@ fetch('https://api.github.com/repos/4DRI4N-OFF/FerroLauncher/releases/latest')
 // Stats + changelog en vivo
 fetch('https://api.github.com/repos/4DRI4N-OFF/FerroLauncher')
   .then((r) => r.json())
-  .then((j) => { if (j.stargazers_count !== undefined) document.getElementById('st-stars').textContent = j.stargazers_count; })
+  .then((j) => { if (j.stargazers_count !== undefined) countUp(document.getElementById('st-stars'), j.stargazers_count); })
   .catch(() => {});
 fetch('https://api.github.com/repos/4DRI4N-OFF/FerroLauncher/releases?per_page=3')
   .then((r) => r.json())
@@ -172,7 +229,7 @@ fetch('https://api.github.com/repos/4DRI4N-OFF/FerroLauncher/releases?per_page=3
       d.querySelector('p').textContent = (r.body || '').slice(0, 400);
       box.appendChild(d);
     }
-    document.getElementById('st-dl').textContent = dl.toLocaleString();
+    countUp(document.getElementById('st-dl'), dl);
   }).catch(() => {});
 // Lightbox
 (function () {

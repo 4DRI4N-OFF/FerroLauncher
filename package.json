@@ -66,7 +66,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "FerroLauncher"
+      "shortcutName": "FerroLauncher",
+      "artifactName": "FerroLauncher-Setup.exe"
     },
     "portable": {
       "artifactName": "FerroLauncher-portable.exe"

@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-electron/
 release/
+build/secrets.json
 .ferro/
 .ferro-test/
 *.log

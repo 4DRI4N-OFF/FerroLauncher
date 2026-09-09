@@ -28,8 +28,16 @@ function readJson(p, fallback = null) {
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; }
 }
 
+// IDs de distribución: build/secrets.json local (gitignored) para tus builds.
+// Nunca commitees IDs: rota en Azure/Discord si alguno se filtró al historial.
+function localSecrets() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'build', 'secrets.json'), 'utf8'));
+  } catch { return {}; }
+}
+
 function getClientId(baseDir) {
-  return readJson(authPaths(baseDir).config, {}).clientId || process.env.FERRO_CLIENT_ID || DEFAULT_CLIENT_ID;
+  return readJson(authPaths(baseDir).config, {}).clientId || process.env.FERRO_CLIENT_ID || localSecrets().clientId || DEFAULT_CLIENT_ID;
 }
 
 function setClientId(baseDir, clientId) {
@@ -43,7 +51,7 @@ function setClientId(baseDir, clientId) {
 
 function getDiscord(baseDir) {
   const cfg = readJson(authPaths(baseDir).config, {});
-  return { clientId: cfg.discordClientId || process.env.FERRO_DISCORD_ID || DEFAULT_DISCORD_ID, enabled: cfg.discordEnabled !== false };
+  return { clientId: cfg.discordClientId || process.env.FERRO_DISCORD_ID || localSecrets().discordId || DEFAULT_DISCORD_ID, enabled: cfg.discordEnabled !== false };
 }
 
 function setDiscord(baseDir, patch) {

@@ -75,7 +75,8 @@
     "publish": {
       "provider": "github",
       "owner": "4DRI4N-OFF",
-      "repo": "FerroLauncher"
+      "repo": "FerroLauncher",
+      "releaseType": "release"
     }
   }
 }

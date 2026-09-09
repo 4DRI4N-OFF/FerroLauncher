@@ -1,5 +1,7 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const AdmZip = require('adm-zip');
 const { downloadFile } = require('./downloader');
 
 const API = 'https://api.curseforge.com/v1';
@@ -129,4 +131,75 @@ async function installFile(baseDir, instanceDir, modId, fileId, kind, onLog) {
   return { file: safe };
 }
 
-module.exports = { getKey, setKey, search, trending, files, installFile };
+function parseLoaderId(id) {
+  const m = String(id || '').match(/^(forge|fabric|quilt|neoforge)[-_]?(.+)$/i);
+  if (!m) return { type: 'forge', version: null };
+  return { type: m[1].toLowerCase(), version: m[2] || null };
+}
+
+function safeName(n) {
+  return String(n || 'file').replace(/[^\w\-.+() \[\]]+/g, '_');
+}
+
+// Fase 1: descarga el zip y lee el manifest (sin tocar instancias)
+async function inspectPack(baseDir, modId, fileId) {
+  const info = await api(baseDir, `${API}/mods/${modId}/files/${fileId}`);
+  const f = info.data;
+  if (!f?.downloadUrl) throw new Error('Ese archivo no tiene descarga directa');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ferro-cfpack-'));
+  const zipPath = path.join(tmp, 'pack.zip');
+  await downloadFile(f.downloadUrl, zipPath);
+  const zip = new AdmZip(zipPath);
+  const manEntry = zip.getEntry('manifest.json');
+  if (!manEntry) throw new Error('No es un modpack de CurseForge (sin manifest.json)');
+  const man = JSON.parse(zip.readAsText(manEntry));
+  const mc = man.minecraft?.version;
+  if (!mc) throw new Error('Manifest sin versión de Minecraft');
+  const loaders = man.minecraft?.modLoaders || [];
+  const prim = loaders.find((l) => l.primary) || loaders[0] || {};
+  const { type: loaderType, version: loaderVersion } = parseLoaderId(prim.id || prim);
+  return {
+    name: man.name || 'Modpack', mcVersion: mc, loaderType, loaderVersion,
+    files: (man.files || []).length, tmpDir: tmp, zipPath,
+  };
+}
+
+// Fase 2: vuelca mods + overrides en la instancia ya creada
+async function finishPack(baseDir, tmpDir, zipPath, instanceDir, onLog) {
+  const zip = new AdmZip(zipPath);
+  const manEntry = zip.getEntry('manifest.json');
+  const man = JSON.parse(zip.readAsText(manEntry));
+  const allFiles = man.files || [];
+  onLog && onLog(`[ferro] pack ${man.name}: ${allFiles.length} archivos\n`);
+  const CONC = 8;
+  let done = 0;
+  for (let i = 0; i < allFiles.length; i += CONC) {
+    await Promise.all(allFiles.slice(i, i + CONC).map(async (x) => {
+      try {
+        const fi = await api(baseDir, `${API}/mods/${x.projectID}/files/${x.fileID}`);
+        const u = fi.data?.downloadUrl;
+        if (!u) return;
+        const dest = path.join(instanceDir, 'mods', safeName(fi.data.fileName));
+        try {
+          const st = fs.statSync(dest);
+          if (st.size === fi.data.fileLength) return;
+        } catch {}
+        await downloadFile(u, dest, undefined, fi.data.fileLength || undefined);
+      } catch (e) {
+        onLog && onLog(`[ferro] salto archivo ${x.projectID}/${x.fileID} (${e.message?.slice(0, 60)})\n`);
+      }
+    }));
+    done += Math.min(CONC, allFiles.length - done);
+    onLog && onLog(`[ferro] modpack ${done}/${allFiles.length}\n`);
+  }
+  for (const e of zip.getEntries()) {
+    if (e.isDirectory || !e.entryName.startsWith('overrides/')) continue;
+    const sub = e.entryName.slice('overrides/'.length);
+    if (!sub || sub.startsWith('..') || path.isAbsolute(sub)) continue;
+    zip.extractEntryTo(e, instanceDir, false, true);
+  }
+  try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+  return { files: allFiles.length };
+}
+
+module.exports = { getKey, setKey, search, trending, files, installFile, inspectPack, finishPack, parseLoaderId };

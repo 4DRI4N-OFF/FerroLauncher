@@ -30,6 +30,10 @@ const gallery = require('../core/galleryService');
 const notify = require('../core/notifyService');
 const cf = require('../core/curseforgeService');
 const res = require('../core/resourceService');
+const perf = require('../core/perfService');
+const doctor = require('../core/crashDoctor');
+const imp = require('../core/importService');
+const srv = require('../core/serverService');
 
 function findInstance(d, name) {
   const inst = listInstances(d.instances).find((i) => i.name === name);
@@ -74,6 +78,7 @@ let D = null;
 let activeChild = null;
 let activeInstance = null;
 let activeT0 = null;
+let lastExit = null;
 
 function fmtPlay(totalSecs) {
   const m = Math.floor((totalSecs || 0) / 60);
@@ -222,8 +227,10 @@ ipcMain.handle('ferro:quitAndInstall', async () => {
   return true;
 });
 
-ipcMain.handle('ferro:versions', async () => {
+ipcMain.handle('ferro:versions', async (_, { kind } = {}) => {
   const all = await listVersions();
+  if (kind === 'snapshot') return all.filter((v) => v.type === 'snapshot').slice(0, 30);
+  if (kind === 'all') return all.slice(0, 60);
   return all.filter((v) => v.type === 'release').slice(0, 30);
 });
 
@@ -271,6 +278,26 @@ ipcMain.handle('ferro:cfInstall', async (_, { instanceName, modId, fileId, kind 
   const inst = findInstance(getDirs(), instanceName);
   const send = (t) => win && win.webContents.send('ferro:log', t);
   return cf.installFile(getDirs().base, inst.path, modId, fileId, kind, send);
+});
+ipcMain.handle('ferro:cfPackInstall', async (_, { name, modId, fileId }) => {
+  const d = getDirs();
+  const send = (t) => win && win.webContents.send('ferro:log', t);
+  const meta = await cf.inspectPack(d.base, modId, fileId);
+  const inst = createInstance(d.instances, name || meta.name, meta.mcVersion, {
+    type: ['fabric', 'quilt', 'forge', 'neoforge'].includes(meta.loaderType) ? meta.loaderType : 'forge',
+    loaderVersion: meta.loaderVersion || undefined,
+  });
+  send(`[ferro] instalando modpack CF en ${inst.name} (MC ${meta.mcVersion} + ${inst.type})...\n`);
+  const info = await cf.finishPack(d.base, meta.tmpDir, meta.zipPath, inst.path, send);
+  const cfgPath = require('path').join(inst.path, 'ferro.json');
+  const cfg = JSON.parse(require('fs').readFileSync(cfgPath, 'utf8'));
+  if (meta.mcVersion) cfg.versionId = meta.mcVersion;
+  if (meta.loaderVersion) cfg.loaderVersion = meta.loaderVersion;
+  cfg.type = inst.type;
+  cfg.modpack = { projectId: modId, packVersionId: fileId, packName: meta.name, source: 'curseforge' };
+  require('fs').writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+  send(`[ferro] modpack listo: ${info.files} archivos\n`);
+  return { name: inst.name, ...cfg };
 });
 ipcMain.handle('ferro:rp', async (_, { instanceName }) => {
   const inst = findInstance(getDirs(), instanceName);
@@ -563,6 +590,80 @@ ipcMain.handle('ferro:stop', async () => {
 });
 ipcMain.handle('ferro:status', async () => ({ running: !!activeChild && activeChild.exitCode === null && !activeChild.killed, instance: activeInstance }));
 
+// Rendimiento: presets JVM + RAM sugerida
+ipcMain.handle('ferro:jvmPresets', async () => ({ labels: perf.LABELS, suggested: perf.suggestRam() }));
+ipcMain.handle('ferro:ramSuggest', async () => perf.suggestRam());
+
+// Doctor de crashes: diagnostica + aplica arreglos seguros
+function nativesDirFor(inst, d) {
+  let profileDir = path.join(d.versions, inst.versionId);
+  if ((inst.type === 'forge' || inst.type === 'neoforge') && inst.forgeProfileId) {
+    profileDir = path.join(d.versions, inst.forgeProfileId);
+  }
+  return path.join(profileDir, 'natives-windows');
+}
+ipcMain.handle('ferro:diagnose', async (_, { instanceName }) => {
+  const d = getDirs();
+  const inst = findInstance(d, instanceName);
+  const exitCode = (lastExit && lastExit.instance === instanceName) ? lastExit.code : null;
+  return {
+    exitCode,
+    list: doctor.diagnose({
+      logTail: doctor.latestLogTail(inst.path),
+      exitCode,
+      crashDesc: doctor.lastCrashDesc(inst.path),
+    }),
+  };
+});
+ipcMain.handle('ferro:doctorFix', async (_, { instanceName, fix }) => {
+  const d = getDirs();
+  const inst = findInstance(d, instanceName);
+  if (fix?.type === 'ram' && fix.mb) {
+    return updateInstanceSettings(d.instances, instanceName, { ramMb: fix.mb });
+  }
+  if (fix?.type === 'wipeNatives') {
+    fs.rmSync(nativesDirFor(inst, d), { recursive: true, force: true });
+    return true;
+  }
+  throw new Error('Arreglo no soportado');
+});
+
+// Importar de otros launchers
+ipcMain.handle('ferro:importScan', async () => {
+  const found = imp.detectLaunchers();
+  const out = { found: Object.keys(found) };
+  if (found.vanilla) {
+    try { out.vanilla = { path: found.vanilla, versions: imp.listVanilla(found.vanilla).slice(0, 60) }; } catch (e) { out.vanilla = { path: found.vanilla, error: e.message }; }
+  }
+  for (const k of ['prism', 'multimc']) {
+    if (found[k]) {
+      try { out[k] = { path: found[k], instances: imp.listPrism(found[k]) }; } catch (e) { out[k] = { path: found[k], error: e.message }; }
+    }
+  }
+  return out;
+});
+ipcMain.handle('ferro:importVanilla', async (_, { versionId, asName }) => {
+  const d = getDirs();
+  const found = imp.detectLaunchers();
+  if (!found.vanilla) throw new Error('No se encontró launcher oficial');
+  return imp.importVanillaInstance(d.instances, found.vanilla, versionId, asName);
+});
+ipcMain.handle('ferro:importPrism', async (_, { from, instPath, asName }) => {
+  const d = getDirs();
+  const found = imp.detectLaunchers();
+  const base = found[from];
+  if (!base) throw new Error('Launcher no encontrado');
+  const full = path.join(base, 'instances', path.basename(instPath || ''));
+  if (!full.startsWith(path.join(base, 'instances'))) throw new Error('Ruta no válida');
+  return imp.importPrismInstance(d.instances, full, asName);
+});
+
+// Servidores favoritos + ping
+ipcMain.handle('ferro:servers', async () => srv.listServers(getDirs().base));
+ipcMain.handle('ferro:serverAdd', async (_, data) => srv.addServer(getDirs().base, data || {}));
+ipcMain.handle('ferro:serverRemove', async (_, { host, port }) => srv.removeServer(getDirs().base, host, port));
+ipcMain.handle('ferro:serverPing', async (_, { host, port }) => srv.ping(String(host || '').trim(), Number(port) || 25565));
+
 const NAME_RE = /^[a-zA-Z0-9_]{3,16}$/;
 ipcMain.handle('ferro:nameCheck', async (_, { name }) => {
   const clean = String(name || '').trim();
@@ -584,7 +685,7 @@ ipcMain.handle('ferro:nameSuggest', async (_, { base }) => {
   return out.slice(0, 4);
 });
 
-ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, width, height }) => {
+ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, width, height, serverHost, serverPort }) => {
   if (activeChild && activeChild.exitCode === null && !activeChild.killed) throw new Error('Ya hay una instancia en ejecución. Deténla primero.');
   const d = getDirs();
   const instances = listInstances(d.instances);
@@ -694,7 +795,7 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
       throw new Error(`"${uname}" es premium (${caseId}). Ni lo intentes.`);
     }
   }
-  activeChild = await launch({ javaPath: javaBin, versionDetails: details, clientJar, librariesCp: cp, nativesDir, loggingPath, instanceDir: inst.path, dataDirs: d, username: username || 'Ferro', ramMb: effRam, width: effW, height: effH, onLog: send, mainClassOverride, extraClasspath, auth: authArg });
+  activeChild = await launch({ javaPath: javaBin, versionDetails: details, clientJar, librariesCp: cp, nativesDir, loggingPath, instanceDir: inst.path, dataDirs: d, username: username || 'Ferro', ramMb: effRam, width: effW, height: effH, onLog: send, mainClassOverride, extraClasspath, auth: authArg, jvmPreset: inst.settings?.jvmPreset, javaMajor: java.major, serverHost, serverPort });
   activeInstance = inst.name;
   activeT0 = Date.now();
   touchPlayed(d.instances, inst.name);
@@ -716,6 +817,7 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
     try { discord.clear(); } catch {}
   });
   activeChild.on('close', (code) => {
+    lastExit = { instance: inst.name, code };
     if (code !== 0 && code !== null) {
       send(`[ferro] crash detectado en ${inst.name} (código ${code})\n`);
       notify(d.base, 'error', `Crash en ${inst.name}`, `Código ${code}. Informe disponible en Instancias.`);

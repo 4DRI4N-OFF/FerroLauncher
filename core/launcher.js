@@ -73,8 +73,8 @@ function offlineUuid(username) {
   return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 }
 
-async function launch({ javaPath, versionDetails, clientJar, librariesCp, nativesDir, loggingPath, instanceDir, dataDirs, username, ramMb = 2048, onLog, mainClassOverride = null, extraClasspath = [], width = null, height = null, auth = null }) {
-  const plan = buildLaunchPlan({ versionDetails, clientJar, librariesCp, nativesDir, loggingPath, instanceDir, dataDirs, username, ramMb, mainClassOverride, extraClasspath, width, height, auth });
+async function launch({ javaPath, versionDetails, clientJar, librariesCp, nativesDir, loggingPath, instanceDir, dataDirs, username, ramMb = 2048, onLog, mainClassOverride = null, extraClasspath = [], width = null, height = null, auth = null, jvmPreset = null, javaMajor = null, serverHost = null, serverPort = null }) {
+  const plan = buildLaunchPlan({ versionDetails, clientJar, librariesCp, nativesDir, loggingPath, instanceDir, dataDirs, username, ramMb, mainClassOverride, extraClasspath, width, height, auth, jvmPreset, javaMajor, serverHost, serverPort });
   onLog && onLog(`[ferro] java: ${javaPath}\n[ferro] mainClass: ${plan.mainClass}\n[ferro] libs: ${librariesCp.length} natives: ${nativesDir}\n`);
   const full = [...plan.jvmArgs, plan.mainClass, ...plan.gameArgs];
   const shown = [...full];
@@ -90,7 +90,7 @@ async function launch({ javaPath, versionDetails, clientJar, librariesCp, native
   return child;
 }
 
-function buildLaunchPlan({ versionDetails, clientJar, librariesCp, nativesDir, loggingPath, instanceDir, dataDirs, username, ramMb = 2048, mainClassOverride = null, extraClasspath = [], width = null, height = null, auth = null }) {
+function buildLaunchPlan({ versionDetails, clientJar, librariesCp, nativesDir, loggingPath, instanceDir, dataDirs, username, ramMb = 2048, mainClassOverride = null, extraClasspath = [], width = null, height = null, auth = null, jvmPreset = null, javaMajor = null, serverHost = null, serverPort = null }) {
   const online = !!(auth && auth.token && auth.uuid);
   const effName = online ? auth.username : username;
   const uuidDashed = online ? auth.uuid : offlineUuid(username);
@@ -134,6 +134,10 @@ function buildLaunchPlan({ versionDetails, clientJar, librariesCp, nativesDir, l
   }
   // RAM + logging + jar info (vanilla moderno lo espera)
   jvmArgs = [`-Xmx${ramMb}M`, `-Xms512M`, `-Dminecraft.client.jar=${clientJar}`, ...(loggingPath ? [`-Dlog4j.configurationFile=${loggingPath}`] : []), ...jvmArgs];
+  try {
+    const { flagsFor } = require('./perfService');
+    jvmArgs.push(...flagsFor(jvmPreset, javaMajor));
+  } catch {}
 
   // Game args
   let gameArgs;
@@ -145,6 +149,10 @@ function buildLaunchPlan({ versionDetails, clientJar, librariesCp, nativesDir, l
     gameArgs = ['--username', '${auth_player_name}', '--version', '${version_name}', '--gameDir', '${game_directory}', '--assetsDir', '${assets_root}', '--assetIndex', '${assets_index_name}', '--uuid', '${auth_uuid}', '--accessToken', '${auth_access_token}', '--userType', '${user_type}', '--versionType', '${version_type}'].map(sub);
   }
   if (width && height) gameArgs.push('--width', String(width), '--height', String(height));
+  if (serverHost) {
+    gameArgs.push('--server', String(serverHost));
+    if (serverPort) gameArgs.push('--port', String(serverPort));
+  }
 
   return { jvmArgs, gameArgs, mainClass, classpath, uuid };
 }

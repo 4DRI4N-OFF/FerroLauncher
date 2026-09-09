@@ -8,7 +8,7 @@ import {
   Play, Square, Layers, Package, LayoutGrid, Gift, User, Palette,
   Settings, Search, Plus, RefreshCw, FolderOpen, Copy, Pencil, Trash2,
   Download, Upload, Check, X, AlertTriangle, Info, Camera,
-  MessageCircle, ExternalLink,
+  MessageCircle, ExternalLink, Server,
 } from 'lucide-react';
 
 // El recuadro del botón crece hasta convertirse en la ventana (morph ida y vuelta)
@@ -108,6 +108,9 @@ export default function App() {
   const [packHits, setPackHits] = useState([]);
   const [packVers, setPackVers] = useState({});
   const [packBusy, setPackBusy] = useState(null);
+  const [packSrc, setPackSrc] = useState('mr');
+  const [cfPackVers, setCfPackVers] = useState({});
+  const [cfPackBusy, setCfPackBusy] = useState(null);
   const [clientId, setClientId] = useState('');
   const [account, setAccount] = useState(null);
   const [accts, setAccts] = useState([]);
@@ -284,6 +287,15 @@ export default function App() {
   const [sH, setSH] = useState('480');
   const [sJavaMode, setSJavaMode] = useState('auto');
   const [sJavaPath, setSJavaPath] = useState('');
+  const [sJvm, setSJvm] = useState('equilibrado');
+  const [verKind, setVerKind] = useState('release');
+  const [diag, setDiag] = useState(null);
+  const [impScan, setImpScan] = useState(null);
+  const [servers, setServers] = useState([]);
+  const [srvName, setSrvName] = useState('');
+  const [srvHost, setSrvHost] = useState('');
+  const [srvPort, setSrvPort] = useState('25565');
+  const [srvPing, setSrvPing] = useState({});
   const [saving, setSaving] = useState(false);
   const [instFilter, setInstFilter] = useState('');
   const logRef = useRef(null);
@@ -308,6 +320,13 @@ export default function App() {
     } catch (e) {
       setLog((l) => l + `[error] ${e.message}\n`);
     }
+  };
+
+  const loadVers = async (k) => {
+    try {
+      setVerKind(k);
+      setVersions(await window.ferro.versions({ kind: k }));
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
   const loadMods = async (name, k) => {
@@ -485,6 +504,40 @@ export default function App() {
       setLaunchInstance(r.name);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
     finally { setPackBusy(null); }
+  };
+
+  const doCfPackSearch = async () => {
+    try {
+      const r = await window.ferro.cfSearch({ query: packQuery, mcVersion: packMc, kind: 'modpack', sort: packSort });
+      setPackHits(r.hits || []);
+      setPackTotal(r.total || 0);
+      setPackVers({});
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const doCfPackVers = async (modId) => {
+    if (cfPackVers[modId]) {
+      setCfPackVers((p) => { const n = { ...p }; delete n[modId]; return n; });
+      return;
+    }
+    try {
+      const vers = await window.ferro.cfFiles({ modId, mcVersion: packMc });
+      setCfPackVers((p) => ({ ...p, [modId]: vers }));
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const doCfPackInstall = async (pack, f) => {
+    if (cfPackBusy) return;
+    setCfPackBusy(f.id);
+    try {
+      setTab('jugar');
+      const r = await window.ferro.cfPackInstall({ name: pack.title, modId: pack.id, fileId: f.id });
+      setLog((l) => l + `[ferro] instancia ${r.name} creada desde modpack\n`);
+      pushToast('success', `${t('toast.packDone')}: ${r.name}`);
+      await refresh();
+      setLaunchInstance(r.name);
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+    finally { setCfPackBusy(null); }
   };
 
   const loadAuth = async () => {
@@ -721,6 +774,41 @@ export default function App() {
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
+  const loadServers = async () => {
+    try {
+      const list = await window.ferro.servers();
+      setServers(list);
+      list.forEach((s) => pingServer(s));
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const pingServer = async (s) => {
+    const key = `${s.host}:${s.port}`;
+    try {
+      const r = await window.ferro.serverPing({ host: s.host, port: s.port });
+      setSrvPing((m) => ({ ...m, [key]: r }));
+    } catch { setSrvPing((m) => ({ ...m, [key]: { online: false } })); }
+  };
+
+  const addServer = async () => {
+    if (!srvHost.trim()) return;
+    try {
+      setServers(await window.ferro.serverAdd({ name: srvName.trim() || srvHost.trim(), host: srvHost.trim(), port: srvPort }));
+      setSrvName(''); setSrvHost(''); setSrvPort('25565');
+      setLog((l) => l + `[ferro] ${t('srv.added')}\n`);
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const playOn = async (s) => {
+    if (!launchInstance) { setLog((l) => l + `[error] ${t('srv.noInst')}\n`); return; }
+    try {
+      setTab('jugar');
+      setLog((l) => l + `[ferro] lanzando ${launchInstance} en ${s.host}...\n`);
+      setRunning(true);
+      await window.ferro.launch({ instanceName: launchInstance, username, serverHost: s.host, serverPort: s.port });
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); setRunning(false); }
+  };
+
   const filteredLog = useMemo(() => {
     const lines = log.split('\n');
     return lines.filter((ln) => {
@@ -744,6 +832,7 @@ export default function App() {
     const i = instances.find((x) => x.name === name);
     if (i?.settings) {
       setSRam(String(i.settings.ramMb)); setSW(String(i.settings.width)); setSH(String(i.settings.height));
+      setSJvm(i.settings.jvmPreset || 'equilibrado'); setDiag(null);
       setSJavaMode(i.settings.javaMode); setSJavaPath(i.settings.javaPath || '');
     }
     loadBackups(name);
@@ -774,7 +863,7 @@ export default function App() {
     if (!settingsFor || saving) return;
     setSaving(true);
     try {
-      await window.ferro.updateSettings({ instanceName: settingsFor, patch: { ramMb: sRam, width: sW, height: sH, javaMode: sJavaMode, javaPath: sJavaPath } });
+      await window.ferro.updateSettings({ instanceName: settingsFor, patch: { ramMb: sRam, width: sW, height: sH, javaMode: sJavaMode, javaPath: sJavaPath, jvmPreset: sJvm } });
       setLog((l) => l + `[ferro] ajustes guardados en ${settingsFor}\n`);
       refresh();
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -794,6 +883,7 @@ export default function App() {
         <button className={tab==='cuenta'?'active':''} onClick={()=>{setTab('cuenta'); loadAuth();}}><User size={16} /> {t('tab.account')}</button>
         <button className={tab==='skin'?'active':''} onClick={()=>{setTab('skin'); loadSkin();}}><Palette size={16} /> {t('tab.skin')}</button>
         <button className={tab==='ajustes'?'active':''} onClick={()=>setTab('ajustes')}><Settings size={16} /> {t('tab.settings')}</button>
+        <button className={tab==='servers'?'active':''} onClick={()=>{setTab('servers'); loadServers();}}><Server size={16} /> {t('tab.servers')}</button>
         <div className="player-chip" onClick={()=>setTab('cuenta')} title={t('tab.account')}>
           {playFace ? <img className="face" src={playFace} alt="" onError={()=>setPlayFace(null)} /> : <User size={18} />}
           <div className="pc-id"><b>{account?.name || username || '—'}</b><span>{account ? t('play.online') : t('play.offline')}</span></div>
@@ -861,6 +951,9 @@ export default function App() {
         {tab==='versiones' && (
           <div className="card">
             <h2>{t('ver.title')}</h2>
+            <div className="row" style={{marginBottom:10}}>
+              {['release','snapshot','all'].map((k)=><button key={k} className="mini" disabled={verKind===k} onClick={()=>loadVers(k)}>{t('ver.'+k)}</button>)}
+            </div>
             <div className="grid">
               {versions.map((v)=><div key={v.id} className="card"><div className="card-title">{v.id}</div><div className="meta"><span className="pill">{v.type}</span><span className="pill">{new Date(v.releaseTime).toLocaleDateString()}</span></div></div>)}
             </div>
@@ -898,7 +991,13 @@ export default function App() {
             </div>
             <div className="row" style={{marginTop:12}}>
               <button className="primary" onClick={async()=>{const n=await window.ferro.importInstance(); if(n){setLog((l)=>l+`[ferro] importada ${n}\n`); refresh();}}}><Upload size={14} /> {t('inst.import')}</button>
+              <button className="ghost" onClick={async()=>{try{setImpScan(await window.ferro.importScan());}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}><Download size={14} /> {t('inst.importOther')}</button>
             </div>
+            {impScan && (<div className="card" style={{marginTop:8}}>
+              {impScan.vanilla && (<><div className="subhead"><span>Vanilla ({impScan.vanilla.versions?.length||0})</span></div><div className="sublist">{(impScan.vanilla.versions||[]).slice(0,12).map((v)=><div key={v.id} className="subrow"><span className="grow">{v.id}</span><button className="mini" onClick={async()=>{try{const r=await window.ferro.importVanilla({versionId:v.id}); setLog((l)=>l+`[ferro] ${t('inst.imported')}: ${r.name}\n`); refresh();}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('inst.import')}</button></div>)}</div></>)}
+              {['prism','multimc'].map((k)=>(impScan[k] && <div key={k}><div className="subhead"><span style={{textTransform:'capitalize'}}>{k} ({impScan[k].instances?.length||0})</span></div><div className="sublist">{(impScan[k].instances||[]).map((i)=><div key={i.name} className="subrow"><span className="grow" title={i.path}>{i.name} · {i.mc||'?'} {i.loader?`+ ${i.loader.type}`:''}</span><button className="mini" onClick={async()=>{try{const r=await window.ferro.importPrism({from:k, instPath:i.name}); setLog((l)=>l+`[ferro] ${t('inst.imported')}: ${r.name}\n`); refresh();}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('inst.import')}</button></div>)}</div></div>))}
+              {!impScan.vanilla && !impScan.prism && !impScan.multimc && <p style={{opacity:.6}}>{t('inst.impNone')}</p>}
+            </div>)}
           </div>
         )}
         {tab==='mods' && (
@@ -1027,6 +1126,10 @@ export default function App() {
           <div className="card">
             <h2>{t('packs.title')}</h2>
             <div className="row">
+              <select value={packSrc} onChange={(e)=>{setPackSrc(e.target.value); setPackHits([]); setPackTotal(0); setPackVers({}); setCfPackVers({});}} title="Fuente">
+                <option value="mr">Modrinth</option>
+                <option value="cf">CurseForge</option>
+              </select>
               <select value={packMc} onChange={(e)=>{touchedVer.current.pack=true; setPackMc(e.target.value);}}>
                 {versions.map((v)=><option key={v.id} value={v.id}>{v.id}</option>)}
               </select>
@@ -1045,7 +1148,7 @@ export default function App() {
                 <option value="newest">{t('mods.sNewest')}</option>
                 <option value="updated">{t('mods.sUpdated')}</option>
               </select>
-              <button className="primary" onClick={doPackSearch}><Search size={14} /> {t('packs.search')}</button>
+              <button className="primary" onClick={()=>{packSrc==='cf' ? doCfPackSearch() : doPackSearch();}}><Search size={14} /> {t('packs.search')}</button>
             </div>
             <p style={{opacity:.65}}>{packTotal>0 ? `${packTotal.toLocaleString()} resultados · ` : ''}{packMc}{packLoader ? ` · ${packLoader}` : ''}. Crea una instancia nueva con el MC + loader que pida el pack. El progreso sale en ▶ Jugar.</p>
             <div className="grid">
@@ -1054,8 +1157,18 @@ export default function App() {
                   <div className="mod-head">{p.icon && <img className="mod-icon" src={p.icon} alt="" />}<b>{p.title}</b></div>
                   <div className="desc">{p.description?.slice(0,120)}</div>
                   <div className="meta"><span className="pill"><Download size={12} /> {p.downloads?.toLocaleString?.() || p.downloads}</span>{p.updated && <span className="pill">↻ {new Date(p.updated).toLocaleDateString()}</span>}</div>
-                    <div className="actions"><button className="ghost" onClick={()=>doPackVers(p.id)}>{packVers[p.id] ? t('mods.hide') : t('packs.versions')}</button></div>
-                  {(packVers[p.id]||[]).map((v)=>(
+                    <div className="actions"><button className="ghost" onClick={()=>{packSrc==='cf' ? doCfPackVers(p.id) : doPackVers(p.id)}}>{(packSrc==='cf' ? cfPackVers[p.id] : packVers[p.id]) ? t('mods.hide') : t('packs.versions')}</button></div>
+                  {(packSrc==='cf' ? (cfPackVers[p.id]||[]) : (packVers[p.id]||[])).map((v)=>(
+                    <div className="meta" key={v.id}>
+                      <span className="pill">{v.number || v.name}</span>
+                      {(v.loaders||[]).map((ld)=><span className="pill" key={ld}>{ld}</span>)}
+                      {(v.game||[]).slice(0,3).map((g)=><span className="pill" key={g}>{g}</span>)}
+                      {packSrc==='cf'
+                        ? <button className="mini hot" disabled={!!cfPackBusy} onClick={()=>doCfPackInstall(p, v)}>{cfPackBusy===v.id ? <><span className="spinner" />{t('mods.installing')}</> : t('mods.install')}</button>
+                        : null}
+                    </div>
+                  ))}
+                  {packSrc==='mr' && (packVers[p.id]||[]).map((v)=>(
                     <div className="meta" key={v.id}>
                       <span className="pill">{v.number}</span>
                       {(v.loaders||[]).map((ld)=><span className="pill" key={ld}>{ld}</span>)}
@@ -1142,6 +1255,21 @@ export default function App() {
               <button className="primary" onClick={applySkin} disabled={skinBusy || !skinUrl}>{skinBusy ? t('skin.applying') : t('skin.apply')}</button>
               <button className="mini danger" onClick={resetSkin}>{t('skin.reset')}</button>
             </div>
+          </div>
+        )}
+        {tab==='servers' && (
+          <div className="card">
+            <h2>{t('srv.title')}</h2>
+            <div className="row">
+              <input value={srvName} onChange={(e)=>setSrvName(e.target.value)} placeholder={t('srv.namePh')} style={{width:140}} />
+              <input value={srvHost} onChange={(e)=>setSrvHost(e.target.value)} placeholder={t('srv.hostPh')} style={{minWidth:200}} />
+              <input value={srvPort} onChange={(e)=>setSrvPort(e.target.value)} placeholder="25565" style={{width:90}} />
+              <button className="primary" onClick={addServer}><Plus size={14} /> {t('srv.add')}</button>
+            </div>
+            <div className="grid" style={{marginTop:10}}>
+              {servers.map((s)=>{const k=`${s.host}:${s.port}`; const p=srvPing[k]; return (<div key={k} className="card"><div className="card-title">{s.name}</div><div className="meta"><span className="pill">{s.host}:{s.port}</span>{p ? (p.online ? <><span className="pill green">● {p.latencyMs} ms</span><span className="pill">{p.players.online}/{p.players.max}</span><span className="pill">{p.version}</span></> : <span className="pill">{t('srv.offline')}</span>) : <span className="pill"><span className="spinner" /></span>}</div>{p?.motd && <p style={{opacity:.7}}>{p.motd}</p>}<div className="actions"><button className="mini" onClick={()=>pingServer(s)}><RefreshCw size={12} /></button><button className="ghost" onClick={()=>playOn(s)} disabled={!launchInstance}><Play size={14} /> {t('srv.play')}</button><button className="ghost danger" onClick={async()=>{setServers(await window.ferro.serverRemove({host:s.host, port:s.port}));}}><Trash2 size={12} /></button></div></div>);})}
+            </div>
+            {servers.length===0 && <p style={{opacity:.6}}>{t('srv.none')}</p>}
           </div>
         )}
         {tab==='ajustes' && (
@@ -1283,11 +1411,14 @@ export default function App() {
             <label>{t('inst.height')} <input type="number" value={sH} min={240} max={4320} onChange={(e)=>setSH(e.target.value)} style={{width:80}} /></label>
             <select value={sJavaMode} onChange={(e)=>setSJavaMode(e.target.value)}><option value="auto">{t('inst.javaAuto')}</option><option value="custom">{t('inst.javaCustom')}</option></select>
             {sJavaMode==='custom' && <input value={sJavaPath} onChange={(e)=>setSJavaPath(e.target.value)} placeholder="C:\...\bin\java.exe" style={{minWidth:200}} />}
+            <select value={sJvm} onChange={(e)=>setSJvm(e.target.value)} title={t('inst.jvm')}><option value="equilibrado">{t('inst.jvmEq')}</option><option value="rendimiento">{t('inst.jvmPerf')}</option><option value="patata">{t('inst.jvmPotato')}</option><option value="zgc">{t('inst.jvmZgc')}</option></select>
+            <button className="mini" onClick={async()=>{try{const r=await window.ferro.ramSuggest(); setSRam(String(r.suggestedMb)); setLog((l)=>l+`[ferro] RAM sugerida: ${r.suggestedMb} MB\n`);}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('inst.ramSug')}</button>
             <button className="primary" onClick={saveSettings} disabled={saving}>{saving ? t('inst.saving') : t('inst.save')}</button>
           </div>
           <div className="subhead"><span>{t('inst.backupsOf')} {settingsFor}</span><button className="mini" onClick={async()=>{await window.ferro.backupCreate({instanceName:settingsFor}); loadBackups(settingsFor);}}>{t('inst.createBk')}</button></div>
           {bkList.length===0 ? <p style={{opacity:.6}}>{t('inst.noBk')}</p> : (<div className="sublist">{bkList.map((b)=><div key={b.file} className="subrow"><span className="grow" title={b.file}>{b.file}</span><span className="pill">{(b.size/1048576).toFixed(1)} MB</span><button className="mini" onClick={async()=>{await window.ferro.backupRestore({instanceName:settingsFor, file:b.file});}}>{t('inst.restore')}</button><button className="mini danger" onClick={async()=>{await window.ferro.backupDelete({instanceName:settingsFor, file:b.file}); loadBackups(settingsFor);}}><Trash2 size={12} /></button></div>)}</div>)}
-          <div className="subhead"><span>{t('inst.crashesOf')} {settingsFor}</span><button className="mini" onClick={async()=>{await window.ferro.openCrashes({instanceName:settingsFor});}}><FolderOpen size={12} /> {t('inst.folder')}</button></div>
+            <div className="subhead"><span>{t('inst.crashesOf')} {settingsFor}</span><button className="mini" onClick={async()=>{await window.ferro.openCrashes({instanceName:settingsFor});}}><FolderOpen size={12} /> {t('inst.folder')}</button><button className="mini" onClick={async()=>{try{setDiag(await window.ferro.diagnose({instanceName:settingsFor}));}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}><AlertTriangle size={12} /> {t('inst.diagnose')}</button></div>
+            {diag && (diag.list.length===0 ? <p style={{opacity:.6}}>{t('inst.diagNone')}</p> : (<div className="sublist">{diag.list.map((d)=><div key={d.id} className="subrow"><span className="grow" title={d.desc}><b>{d.title}</b> — {d.desc}</span>{d.fix && <button className="mini" onClick={async()=>{try{await window.ferro.doctorFix({instanceName:settingsFor, fix:d.fix}); setLog((l)=>l+`[ferro] ${t('inst.fixed')}: ${d.title}\n`); setDiag(await window.ferro.diagnose({instanceName:settingsFor})); refresh();}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{d.fix.label || t('inst.applyFix')}</button>}</div>)}</div>))}
           {crList.length===0 ? <p style={{opacity:.6}}>{t('inst.noCrashes')}</p> : (<div className="sublist">{crList.map((c)=><div key={c.file} className="subrow"><span className="grow" title={c.description||c.file}>{c.description||c.file}</span><button className="mini" onClick={async()=>{const r = crOpen?.file===c.file ? null : await window.ferro.crashRead({instanceName:settingsFor, file:c.file}); setCrOpen(r);}}>{crOpen?.file===c.file ? t('mods.hide') : t('inst.view')}</button></div>)}</div>)}
           {crOpen && <pre style={{marginTop:4}}>{crOpen.content}{crOpen.truncated ? '\n…(truncado)' : ''}</pre>}
         </MorphModal>

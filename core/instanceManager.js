@@ -6,7 +6,7 @@ function ensureDirs(d) {
 }
 
 function defaultSettings() {
-  return { ramMb: 2048, javaMode: 'auto', javaPath: '', width: 854, height: 480 };
+  return { ramMb: 2048, javaMode: 'auto', javaPath: '', width: 854, height: 480, jvmPreset: 'equilibrado' };
 }
 
 function withSettings(cfg) {
@@ -58,6 +58,10 @@ function updateInstanceSettings(instancesDir, name, patch) {
   if (patch.javaPath !== undefined) s.javaPath = String(patch.javaPath || '');
   if (patch.width !== undefined) s.width = Math.min(7680, Math.max(320, Number(patch.width) || 854));
   if (patch.height !== undefined) s.height = Math.min(4320, Math.max(240, Number(patch.height) || 480));
+  if (patch.jvmPreset !== undefined) {
+    const ok = ['equilibrado', 'rendimiento', 'patata', 'zgc'];
+    s.jvmPreset = ok.includes(patch.jvmPreset) ? patch.jvmPreset : 'equilibrado';
+  }
   cfg.settings = s;
   fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
   return withSettings({ name, path: dir, ...cfg });

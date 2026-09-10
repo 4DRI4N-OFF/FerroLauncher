@@ -131,8 +131,8 @@ function MorphModal({ origin, closing, onClose, title, children }) {
 
 export default function App() {
   const [tab, setTab] = useState('jugar');
-  const [sideOpen, setSideOpen] = useState(true);
-  const [sidePinned, setSidePinned] = useState(false);
+  const [sideOpen, setSideOpen] = useState(false);
+  const [sidePinned, setSidePinned] = useState(() => { try { return localStorage.getItem('ferro-sidepin') === '1'; } catch { return false; } });
   const sideBig = sideOpen || sidePinned;
   const firstTab = useRef(true);
   useEffect(() => {
@@ -1157,7 +1157,7 @@ export default function App() {
           <span className={`dot ${account ? 'on' : ''}`} />
         </div>
         <div className="ver">v{appVer || '?'} · {t('footerTag')}</div>
-        <button className={`pin${sidePinned ? ' on' : ''}`} onClick={()=>{ if (!sidePinned) setSideOpen(true); setSidePinned(!sidePinned); }} title="Pin">{sidePinned ? <PinOff size={14} /> : <Pin size={14} />}</button>
+        <button className={`pin${sidePinned ? ' on' : ''}`} onClick={()=>{ const v = !sidePinned; setSidePinned(v); setSideOpen(v); try { localStorage.setItem('ferro-sidepin', v ? '1' : '0'); } catch {} }} title="Pin">{sidePinned ? <PinOff size={14} /> : <Pin size={14} />}</button>
       </div>
       <div className="main" key={tab}>
         <div className="bounce">

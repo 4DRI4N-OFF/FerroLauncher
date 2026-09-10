@@ -717,3 +717,16 @@ pre {
 .scare-warn { font-size: 13px; color: rgba(243, 232, 214, 0.6); max-width: 520px; line-height: 1.6; }
 .scare-case { font-family: Consolas, monospace; font-size: 13px; color: #fca5a5; border: 1px solid rgba(248,113,113,.4); padding: 6px 14px; border-radius: 10px; }
 .confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 90; }
+#login-confetti { position: fixed; inset: 0; pointer-events: none; z-index: 200; }
+.login-flash { position: fixed; inset: 0; pointer-events: none; z-index: 199; background: radial-gradient(circle at 50% 40%, rgba(255,209,102,.35), transparent 60%); animation: loginFlash .8s ease-out forwards; }
+@keyframes loginFlash { from { opacity: 1; } to { opacity: 0; } }
+.login-pop { display: inline-block; animation: loginPop .65s cubic-bezier(.2,1.4,.4,1); }
+@keyframes loginPop { 0% { transform: scale(.3); } 55% { transform: scale(1.15); } 78% { transform: scale(.94); } 100% { transform: scale(1); } }
+.premium-shine {
+  background: linear-gradient(100deg, #fff3d6 20%, var(--amber) 40%, #fff3d6 60%);
+  background-size: 200% auto;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: shine 2.8s linear infinite;
+}
+.player-chip .dot.on { animation: dotPing 1.8s ease-out infinite; }
+@keyframes dotPing { 0% { box-shadow: 0 0 0 0 rgba(52,211,153,.7); } 70% { box-shadow: 0 0 0 9px rgba(52,211,153,0); } 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); } }

@@ -310,6 +310,52 @@ export default function App() {
   const [heroBg, setHeroBg] = useState(null);
   const [confirmDlg, setConfirmDlg] = useState(null);
   const [confirmInput, setConfirmInput] = useState('');
+  const [loginFx, setLoginFx] = useState(0);
+  const [flashFx, setFlashFx] = useState(0);
+  const celebrateLogin = () => {
+    setLoginFx((k) => k + 1);
+    setFlashFx((k) => k + 1);
+    try {
+      const el = document.querySelector('.player-chip');
+      const r = el ? el.getBoundingClientRect() : { left: innerWidth / 2, top: 120, width: 0, height: 0 };
+      confettiBurst(r.left + r.width / 2, r.top + r.height / 2);
+    } catch {}
+  };
+  const confettiBurst = (x, y) => {
+    let cv = document.getElementById('login-confetti');
+    if (!cv) {
+      cv = document.createElement('canvas');
+      cv.id = 'login-confetti';
+      document.body.appendChild(cv);
+    }
+    cv.width = innerWidth; cv.height = innerHeight;
+    const ctx = cv.getContext('2d');
+    const cols = ['#ffd166', '#34d399', '#ffffff', '#ffb62e', '#7ef0c1'];
+    const ps = Array.from({ length: 90 }, () => ({
+      x, y,
+      vx: (Math.random() - 0.5) * 11, vy: Math.random() * -9 - 2,
+      s: 3 + Math.random() * 5, r: Math.random() * Math.PI,
+      vr: (Math.random() - 0.5) * 0.3, c: cols[(Math.random() * cols.length) | 0],
+      life: 1,
+    }));
+    let f = 0;
+    const tick = () => {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      let alive = false;
+      for (const p of ps) {
+        p.vy += 0.35; p.vx *= 0.99; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life -= 0.012;
+        if (p.life > 0 && p.y < cv.height + 20) {
+          alive = true;
+          ctx.save(); ctx.globalAlpha = Math.max(0, p.life); ctx.translate(p.x, p.y); ctx.rotate(p.r);
+          ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6);
+          ctx.restore();
+        }
+      }
+      if (alive && ++f < 300) requestAnimationFrame(tick);
+      else ctx.clearRect(0, 0, cv.width, cv.height);
+    };
+    tick();
+  };
   const askConfirm = (message, onOk) => setConfirmDlg({ message, onOk, input: false });
   const askRename = (current, onOk) => { setConfirmInput(current); setConfirmDlg({ message: t('inst.renamePrompt'), input: true, onOk: (v) => { if (v && v !== current) onOk(v); } }); };
   const [saving, setSaving] = useState(false);
@@ -664,6 +710,7 @@ export default function App() {
         setLog((l) => l + `[ferro] sesión iniciada: ${data.name}\n`);
         pushToast('success', `${t('toast.login')}: ${data.name}`);
         loadAuth();
+        celebrateLogin();
       }
     });
     window.ferro.onUpdate?.((d) => setUpd(d));
@@ -690,6 +737,7 @@ export default function App() {
       stopPoll(); setAuthStep(null);
       setLog((l) => l + `[ferro] sesión iniciada: ${r.name}\n`);
       loadAuth();
+      celebrateLogin();
     } else if (r.status === 'error') {
       stopPoll(); setAuthStep(null);
       setLog((l) => l + `[error] ${r.error}\n`);
@@ -941,7 +989,7 @@ export default function App() {
         <button className={tab==='servers'?'active':''} onClick={()=>{setTab('servers'); loadServers();}}><Server size={16} /><span className="nav-label">{t('tab.servers')}</span></button>
         <div className="player-chip" onClick={()=>setTab('cuenta')} title={t('tab.account')}>
           {playFace ? <img className="face" src={playFace} alt="" onError={()=>setPlayFace(null)} /> : <User size={18} />}
-          <div className="pc-id"><b>{account?.name || username || '—'}</b><span>{account ? t('play.online') : t('play.offline')}</span></div>
+          <div className="pc-id"><b className={account ? 'premium-shine' : ''}>{account?.name || username || '—'}</b><span>{account ? t('play.online') : t('play.offline')}</span></div>
           <span className={`dot ${account ? 'on' : ''}`} />
         </div>
         <div className="ver">v{appVer || '?'} · {t('footerTag')}</div>
@@ -1266,7 +1314,7 @@ export default function App() {
             </div>
             <h3>{t('acct.status')}</h3>
             {account
-              ? <><div className="row"><span className="pill green">✓ {account.name}</span><button className="ghost danger" onClick={doLogout}>{t('acct.logout')}</button></div>
+              ? <><div className="row"><span key={loginFx} className={`pill green${loginFx ? ' login-pop' : ''}`}>✓ {account.name}</span><button className="ghost danger" onClick={doLogout}>{t('acct.logout')}</button></div>
                 {!browserWaiting && !authStep && <p style={{marginTop:10}}><button className="ghost" onClick={doBrowserAuth}>{t('acct.addAnother')}</button></p>}</>
               : browserWaiting
                 ? <div className="card">
@@ -1475,6 +1523,7 @@ export default function App() {
           </div>
         </div>
       )}
+      {flashFx > 0 && <div key={flashFx} className="login-flash" />}
       {confirmDlg && (
         <div className="confirm-overlay" onClick={()=>setConfirmDlg(null)}>
           <div className="card" onClick={(e)=>e.stopPropagation()} style={{minWidth:320, maxWidth:440}}>

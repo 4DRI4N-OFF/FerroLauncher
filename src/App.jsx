@@ -578,8 +578,10 @@ export default function App() {
         ? await window.ferro.aiChat({ model: aiModel, system: aiSystem(), history: next.slice(-12) })
         : await geminiChat({ key: aiKey, model: aiModel, system: aiSystem(), history: next.slice(-12) });
       setAiMsgs((m) => [...m, { role: 'ai', text: reply }].slice(-60));
+      setIslandOpen(true);
     } catch (e) {
       setAiMsgs((m) => [...m, { role: 'ai', text: `⚠ ${t(aiErrorKey(e))}` }].slice(-60));
+      setIslandOpen(true);
     } finally { setAiBusy(false); }
   };
   const attachLog = () => {
@@ -605,7 +607,7 @@ export default function App() {
   // Clave integrada (proceso principal): si existe, no se pide ni se muestra ninguna clave.
   const [aiBuiltIn, setAiBuiltIn] = useState(false);
   useEffect(() => { try { window.ferro?.aiHasKey?.()?.then?.((v) => { if (v) setAiBuiltIn(true); })?.catch?.(() => {}); } catch {} }, []);
-  useEffect(() => { if (islandOpen && aiBuiltIn && aiModels.length === 0 && !aiBusy) loadAiModels(); }, [islandOpen, aiBuiltIn]);
+  useEffect(() => { if (aiBuiltIn && aiModels.length === 0 && !aiBusy) loadAiModels(); }, [aiBuiltIn]);
   useEffect(() => { try { aiEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch {} }, [aiMsgs, aiBusy, tab, islandOpen]);
   const [launchProg, setLaunchProg] = useState(null);
   const [dragOn, setDragOn] = useState(false);

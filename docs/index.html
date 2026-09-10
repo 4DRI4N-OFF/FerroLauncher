@@ -3,8 +3,124 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>FerroLauncher</title>
+<title>FerroLauncher — Minecraft Java Launcher para Windows</title>
+<meta name="description" content="FerroLauncher: launcher gratis y open-source de Minecraft Java para Windows. Vanilla, Fabric, Quilt, Forge y NeoForge, mods y modpacks en 1 clic." />
+<link rel="canonical" href="https://4dri4n-off.github.io/FerroLauncher/" />
+<meta name="author" content="4DRI4N-OFF" />
+<meta name="theme-color" content="#06222b" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="FerroLauncher" />
+<meta property="og:title" content="FerroLauncher — Minecraft Java Launcher para Windows" />
+<meta property="og:description" content="Launcher gratis y open-source de Minecraft Java: 5 loaders, mods en 1 clic, multicuenta Microsoft y auto-updater." />
+<meta property="og:url" content="https://4dri4n-off.github.io/FerroLauncher/" />
+<meta property="og:image" content="https://4dri4n-off.github.io/FerroLauncher/og.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="FerroLauncher — Minecraft Java Launcher" />
+<meta name="twitter:description" content="Gratis y open-source. Vanilla, Fabric, Quilt, Forge y NeoForge en 1 clic." />
+<meta name="twitter:image" content="https://4dri4n-off.github.io/FerroLauncher/og.png" />
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"FerroLauncher","applicationCategory":"GameApplication","operatingSystem":"Windows 10/11","offers":{"@type":"Offer","price":"0"},"downloadUrl":"https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest","softwareVersion":"0.7.0","inLanguage":["es","en"],"license":"https://opensource.org/licenses/MIT"}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,300..700&family=Inter+Tight:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="water" x="-20%" y="-20%" width="140%" height="140%">
+    <feTurbulence id="wt" type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="2" seed="7" result="n" />
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="30" xChannelSelector="R" yChannelSelector="G" />
+  </filter>
+</svg>
+
+<div class="sea"><div class="glow a"></div><div class="glow b"></div><div class="glow c"></div></div>
+<div class="dots"></div>
+<div class="ghost" aria-hidden="true">FERRO</div>
+<div class="bubbles" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+<div class="drop" id="drop" aria-hidden="true"><div class="drop-bg"></div></div>
+<div class="drop small d1" aria-hidden="true"><div class="drop-bg"></div></div>
+<div class="drop small d2" aria-hidden="true"><div class="drop-bg"></div></div>
+
+<header class="top">
+  <span class="brandmark"><img src="assets/brand.png" alt="FerroLauncher" />FerroLauncher</span>
+  <div class="top-right">
+    <button id="lang" class="mini">EN</button>
+    <a href="#download" class="dl-pill"><span data-es="Descargar" data-en="Download">Descargar</span></a>
+  </div>
+</header>
+
+<main class="hero">
+  <div class="badge reveal"><span class="pulse-dot"></span><span>MIT</span><span class="sep">·</span><span>ES/EN</span><span class="sep">·</span><span>Windows</span></div>
+  <img src="assets/brand.png" alt="FerroLauncher" class="brand reveal" />
+  <h1 class="reveal"><span data-es="Juega Minecraft" data-en="Play Minecraft">Juega Minecraft</span><br /><span class="serif" data-es="bajo el agua." data-en="underwater.">bajo el agua.</span></h1>
+  <p class="tag reveal" data-es="Launcher gratis y open-source de Minecraft: Java Edition. Mueve la gota con el ratón." data-en="Free, open-source Minecraft: Java Edition launcher. Move the droplet with your mouse.">Launcher gratis y open-source de Minecraft: Java Edition. Mueve la gota con el ratón.</p>
+  <div class="cta reveal">
+    <a class="btn-win" id="dl-setup" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest"><span><small data-es="Descargar para" data-en="Download for">Descargar para</small><b>Windows</b></span><span class="go">↓</span></a>
+    <a class="btn-dark" href="https://github.com/4DRI4N-OFF/FerroLauncher" target="_blank" rel="noopener"><span><small data-es="Ver en" data-en="View on">Ver en</small><b>GitHub</b></span></a>
+  </div>
+  <p class="ver reveal" id="ver">v0.7.0 · Windows 10/11 64-bit</p>
+</main>
+
+<section id="download">
+  <div class="dl-grid">
+    <a class="dl-card reveal" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest"><span class="dl-ico">↓</span><span><small data-es="Asistente con accesos directos" data-en="Wizard with shortcuts">Asistente con accesos directos</small><b data-es="Instalador" data-en="Installer">Instalador</b></span><span class="go">→</span></a>
+    <a class="dl-card reveal" id="dl-portable" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest/download/FerroLauncher-portable.exe"><span class="dl-ico">▣</span><span><small data-es="Sin instalación" data-en="No install">Sin instalación</small><b>Portable</b></span><span class="go">→</span></a>
+  </div>
+  <p class="req reveal" data-es="Windows 10/11 64-bit · ~200 MB · Java incluido automáticamente" data-en="Windows 10/11 64-bit · ~200 MB · Java included automatically">Windows 10/11 64-bit · ~200 MB · Java incluido automáticamente</p>
+</section>
+
+<footer>
+  <p><b>⛏ FerroLauncher</b> · MIT · <a href="https://github.com/4DRI4N-OFF/FerroLauncher/issues">Issues</a> · <a href="https://discord.gg/vTujTm3hE">Discord</a></p>
+  <p class="legal">NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.</p>
+</footer>
+<button id="toTop" title="Top">↑</button>
+
+<script>
+const btn = document.getElementById('lang');
+function setLang(l) {
+  document.documentElement.lang = l;
+  document.querySelectorAll('[data-es]').forEach((el) => { el.textContent = l === 'en' ? (el.dataset.en || el.dataset.es) : el.dataset.es; });
+  btn.textContent = l === 'en' ? 'ES' : 'EN';
+  try { localStorage.setItem('ferro-site-lang', l); } catch {}
+}
+btn.onclick = () => setLang(document.documentElement.lang === 'en' ? 'es' : 'en');
+setLang((() => { try { return localStorage.getItem('ferro-site-lang') || 'es'; } catch { return 'es'; } })());
+// Reveal + arriba
+const toTop = document.getElementById('toTop');
+addEventListener('scroll', () => { toTop.classList.toggle('show', scrollY > 600); }, { passive: true });
+toTop.onclick = () => scrollTo({ top: 0, behavior: 'smooth' });
+const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
+document.querySelectorAll('.reveal').forEach((el) => { io.observe(el); });
+// Versión y descargas en vivo
+fetch('https://api.github.com/repos/4DRI4N-OFF/FerroLauncher/releases/latest')
+  .then((r) => r.json())
+  .then((j) => {
+    if (!j.tag_name) return;
+    document.getElementById('ver').textContent = j.tag_name + ' · Windows 10/11 64-bit';
+    const setup = (j.assets || []).find((a) => /Setup.*\.exe$/i.test(a.name));
+    if (setup) document.getElementById('dl-setup').href = setup.browser_download_url;
+  }).catch(() => {});
+// Gota que sigue al ratón + agua viva
+(function () {
+  const drop = document.getElementById('drop');
+  const wt = document.getElementById('wt');
+  if (!drop || matchMedia('(pointer: coarse)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) { if (drop) drop.style.display = 'none'; return; }
+  const R = 110;
+  let x = innerWidth / 2, y = innerHeight * 0.42, tx = x, ty = y, t = 0;
+  addEventListener('pointermove', (e) => { tx = e.clientX; ty = e.clientY; }, { passive: true });
+  (function loop() {
+    t += 0.016;
+    x += (tx - x) * 0.08;
+    y += (ty - y) * 0.08;
+    drop.style.left = (x - R) + 'px';
+    drop.style.top = (y - R) + 'px';
+    if (wt) {
+      const w = 0.010 + 0.003 * Math.sin(t * 1.7);
+      wt.setAttribute('baseFrequency', w.toFixed(4) + ' ' + (w * 1.7).toFixed(4));
+    }
+    requestAnimationFrame(loop);
+  })();
+})();
+</script>
 </body>
 </html>

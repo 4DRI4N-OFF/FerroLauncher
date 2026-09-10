@@ -14,59 +14,11 @@ export const sfx = {
   cfg: loadCfg(),
   save() { try { localStorage.setItem(KEY, JSON.stringify(this.cfg)); } catch {} },
   play(name) {
-    if (!this.cfg.enabled) return;
+    if (!this.cfg.enabled || !PACK[this.cfg.pack]?.[name]) return;
     if (name === 'hover' && !this.cfg.hover) return;
-    try {
-      const arr = packSfx && packSfx[name];
-      if (arr && arr.length) {
-        playSample(arr[(Math.random() * arr.length) | 0], this.cfg.volume, name);
-        return;
-      }
-    } catch {}
-    if (!PACK[this.cfg.pack]?.[name]) return;
     try { PACK[this.cfg.pack][name](this.cfg.volume); } catch {}
   },
 };
-
-// Pack de samples real (JDSherbert en tu Musica): si existe, manda el; si no, sintesis.
-let packSfx = null;
-export async function loadSfxPack() {
-  try {
-    const r = await window.ferro?.sfxPack?.();
-    if (r && Object.keys(r).length) packSfx = r;
-  } catch {}
-}
-// Samples redondeados: pasa-bajos + ataque suave + reverb (anti-crispy).
-const sampleCache = new Map();
-async function playSample(url, volume, name) {
-  try {
-    const c = ac();
-    if (!c) return;
-    let audio = sampleCache.get(url);
-    if (!audio) {
-      const buf = await (await fetch(url)).arrayBuffer();
-      audio = await c.decodeAudioData(buf);
-      if (sampleCache.size > 24) sampleCache.clear();
-      sampleCache.set(url, audio);
-    }
-    const t0 = c.currentTime;
-    const src = c.createBufferSource();
-    src.buffer = audio;
-    const lp = c.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 2400; lp.Q.value = 0.5;
-    const g = c.createGain();
-    const dur = Math.min(0.7, audio.duration);
-    const v = Math.max(0.001, Math.min(1, volume) * 0.9);
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(v, t0 + 0.018);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    src.connect(lp); lp.connect(g); g.connect(out(0.5));
-    src.start(t0);
-    src.stop(t0 + dur + 0.05);
-  } catch {
-    try { PACK[sfx.cfg.pack]?.[name]?.(sfx.cfg.volume); } catch {}
-  }
-}
 
 let ctx = null;
 let master = null;

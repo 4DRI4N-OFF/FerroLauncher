@@ -429,41 +429,6 @@ ipcMain.handle('ferro:setDiscord', async (_, patch) => {
   return r;
 });
 let thxCache = null;
-let sfxPackCache = null;
-ipcMain.handle('ferro:sfxPack', async () => {
-  try {
-    if (sfxPackCache) return sfxPackCache;
-    const fs = require('fs');
-    const path = require('path');
-    const mus = app.getPath('music');
-    const dirs = fs.readdirSync(mus, { withFileTypes: true }).filter((d) => d.isDirectory() && /sherbert/i.test(d.name));
-    const files = [];
-    const walk = (dir) => {
-      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-        const p = path.join(dir, e.name);
-        if (e.isDirectory()) walk(p);
-        else if (/\.mp3$/i.test(e.name)) files.push(p);
-      }
-    };
-    for (const d of dirs) walk(path.join(mus, d.name));
-    if (!files.length) return {};
-    const stereo = files.filter((f) => /stereo/i.test(f));
-    const pool = stereo.length ? stereo : files;
-    const pick = (re) => pool.find((f) => re.test(path.basename(f, '.mp3')));
-    const toUrl = (f) => `data:audio/mpeg;base64,${fs.readFileSync(f).toString('base64')}`;
-    const arr = (...res) => res.map(pick).filter(Boolean).map(toUrl);
-    const one = (re) => { const f = pick(re); return f ? [toUrl(f)] : []; };
-    sfxPackCache = {
-      click: arr(/select[^0-9]*1/i, /select[^0-9]*2/i),
-      hover: arr(/cursor[^0-9]*1/i, /cursor[^0-9]*2/i, /cursor[^0-9]*3/i, /cursor[^0-9]*4/i, /cursor[^0-9]*5/i),
-      success: one(/popup open/i),
-      error: one(/error/i),
-      launch: one(/swipe[^0-9]*1/i),
-      alarm: one(/error/i),
-    };
-    return sfxPackCache;
-  } catch { return {}; }
-});
 ipcMain.handle('ferro:thx', async () => {
   try {
     if (thxCache) return { url: thxCache };

@@ -4,7 +4,7 @@ import flMark from './assets/fl.png';
 import intro1 from './assets/intro1.png';
 import intro2 from './assets/intro2.png';
 import intro3 from './assets/intro3.png';
-import { sfx, loadSfxPack } from './sfx.js';
+import { sfx } from './sfx.js';
 import { STR, getLang } from './i18n.js';
 import { GithubIcon, DiscordIcon, YoutubeIcon, XIcon } from './brands.jsx';
 import Embers from './embers.jsx';
@@ -241,7 +241,6 @@ export default function App() {
   const [dcHook, setDcHook] = useState('');
   const [social, setSocial] = useState({ github: '', discord: '', youtube: '' });
   useEffect(() => { window.ferro.social?.().then(setSocial).catch(()=>{}); }, []);
-  useEffect(() => { loadSfxPack(); }, []);
   const [toasts, setToasts] = useState([]);
   const [flashKey, setFlashKey] = useState(0);
   const [scare, setScare] = useState(null);

@@ -848,9 +848,9 @@ export default function App() {
 
   useEffect(() => {
     const onDragEnter = (e) => { e.preventDefault(); if (e.dataTransfer?.types?.includes('Files')) { dragCount.current++; setDragOn(true); } };
-    const onDragLeave = (e) => { e.preventDefault(); dragCount.current = Math.max(0, dragCount.current - 1); if (!dragCount.current) setDragOn(false); };
-    const onDragOver = (e) => { e.preventDefault(); };
-    const onDropFile = async (e) => {
+    const lv = (e) => { e.preventDefault(); dragCount.current = Math.max(0, dragCount.current - 1); if (!dragCount.current) setDragOn(false); };
+    const dr = (e) => { e.preventDefault(); };
+    const dp = async (e) => {
       e.preventDefault(); dragCount.current = 0; setDragOn(false);
       const files = [...(e.dataTransfer?.files || [])].map((f) => f.path).filter(Boolean);
       if (!files.length) return;
@@ -861,10 +861,10 @@ export default function App() {
       } catch (err) { setLog((l) => l + `[error] ${err.message}\n`); }
     };
     window.addEventListener('dragenter', onDragEnter);
-    window.addEventListener('dragleave', onDragLeave);
-    window.addEventListener('dragover', onDragOver);
-    window.addEventListener('drop', onDropFile);
-    return () => { window.removeEventListener('dragenter', onDragEnter); window.removeEventListener('dragleave', onDragLeave); window.removeEventListener('dragover', onDragOver); window.removeEventListener('drop', onDropFile); };
+    window.addEventListener('dragleave', lv);
+    window.addEventListener('dragover', dr);
+    window.addEventListener('drop', dp);
+    return () => { window.removeEventListener('dragenter', onDragEnter); window.removeEventListener('dragleave', lv); window.removeEventListener('dragover', dr); window.removeEventListener('drop', dp); };
   }, [modsFor]);
 
   const editSettings = (name, e) => {
@@ -916,9 +916,8 @@ export default function App() {
   return (
     <div className="layout">
       <Embers />
-      <div className="topbar">
+      <div className="side">
         <img ref={sideLogoRef} className="brand-logo" src={brand} alt="FerroLauncher" />
-        <nav className="topnav">
         <button className={tab==='jugar'?'active':''} onClick={()=>setTab('jugar')}><Play size={16} /> {t('tab.play')}</button>
         <button className={tab==='versiones'?'active':''} onClick={()=>setTab('versiones')}><Layers size={16} /> {t('tab.versions')}</button>
         <button className={tab==='instancias'?'active':''} onClick={()=>setTab('instancias')}><Package size={16} /> {t('tab.instances')}</button>
@@ -928,15 +927,12 @@ export default function App() {
         <button className={tab==='skin'?'active':''} onClick={()=>{setTab('skin'); loadSkin();}}><Palette size={16} /> {t('tab.skin')}</button>
         <button className={tab==='ajustes'?'active':''} onClick={()=>setTab('ajustes')}><Settings size={16} /> {t('tab.settings')}</button>
         <button className={tab==='servers'?'active':''} onClick={()=>{setTab('servers'); loadServers();}}><Server size={16} /> {t('tab.servers')}</button>
-        </nav>
-        <div className="topside">
         <div className="player-chip" onClick={()=>setTab('cuenta')} title={t('tab.account')}>
           {playFace ? <img className="face" src={playFace} alt="" onError={()=>setPlayFace(null)} /> : <User size={18} />}
           <div className="pc-id"><b>{account?.name || username || '—'}</b><span>{account ? t('play.online') : t('play.offline')}</span></div>
           <span className={`dot ${account ? 'on' : ''}`} />
         </div>
         <div className="ver">v{appVer || '?'} · {t('footerTag')}</div>
-        </div>
       </div>
       <div className="main" key={tab}>
         {tab==='jugar' && (<>

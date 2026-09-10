@@ -96,7 +96,7 @@
 
 /* ——— Identidad extra por tema ——— */
 [data-theme="midnight"] .card { border-width: 1px; border-color: rgba(148, 197, 255, 0.16); }
-[data-theme="midnight"] .topbar button.active { letter-spacing: 0.6px; }
+[data-theme="midnight"] .side button.active { letter-spacing: 0.6px; }
 [data-theme="forest"] .card { box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
 [data-theme="sakura"] button.primary { letter-spacing: 1px; }
 [data-theme="sakura"] .pill { border-radius: 999px; }
@@ -140,15 +140,15 @@ body::after {
 /* ——— Brasas ——— */
 .embers { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
 
-.layout { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
+.layout { display: grid; grid-template-columns: 248px 1fr; height: 100vh; }
 
-/* ——— Barra superior cristal ——— */
-.topbar {
-  margin: 14px 14px 0;
-  padding: 10px 16px;
+/* ——— Sidebar cristal ——— */
+.side {
+  margin: 14px 0 14px 14px;
+  padding: 20px 14px;
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  gap: 8px;
   background: var(--glass-strong);
   -webkit-backdrop-filter: blur(28px) saturate(1.7);
   backdrop-filter: blur(28px) saturate(1.7);
@@ -156,31 +156,23 @@ body::after {
   border-radius: var(--r-side);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
-.topnav {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.topnav::-webkit-scrollbar { display: none; }
-.topside {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-left: auto;
-  flex-shrink: 0;
+.side h1 {
+  font-size: 21px;
+  margin: 2px 6px 14px;
+  letter-spacing: 0.2px;
+  background: linear-gradient(92deg, var(--gold), var(--amber) 45%, var(--ember));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 800;
 }
 .brand-logo {
-  height: 46px;
-  width: auto;
+  width: 100%;
   aspect-ratio: 2030 / 701;
+  height: auto;
   display: block;
-  border-radius: 12px;
-  margin: 0;
-  flex-shrink: 0;
+  border-radius: 16px;
+  margin: 2px 0 12px;
   filter: drop-shadow(0 8px 22px var(--glow));
   transition: transform 0.25s ease, filter 0.25s ease;
 }
@@ -201,60 +193,61 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
   border-radius: 18px;
   filter: drop-shadow(0 12px 34px rgba(255, 120, 25, 0.5));
 }
-.topbar button {
+.side button {
   display: flex;
   align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-  font-size: 13px;
+  gap: 10px;
+  text-align: left;
+  font-size: 14px;
   font-weight: 600;
   background: transparent;
   border: 1px solid transparent;
   color: var(--muted);
-  padding: 9px 13px 11px;
-  border-radius: 14px;
+  padding: 11px 13px 11px 16px;
+  border-radius: 16px;
   cursor: pointer;
   transition: all 0.22s ease;
   position: relative;
 }
-.topbar button::before {
+.side button::before {
   content: "";
   position: absolute;
-  left: 50%; bottom: 4px; transform: translateX(-50%);
-  height: 3px; width: 0;
+  left: 5px; top: 24%; height: 52%; width: 3px;
   border-radius: 3px;
   background: transparent;
-  transition: all 0.22s ease;
+  transition: background 0.22s ease;
 }
-.topbar button:hover::before { width: 16px; background: rgba(255, 255, 255, 0.25); }
-.topbar button.active::before { width: 22px; background: rgba(26, 13, 6, 0.65); }
-.topbar button:hover {
+.side button:hover::before { background: rgba(255, 255, 255, 0.25); }
+.side button.active::before { background: rgba(26, 13, 6, 0.65); }
+.side button:hover {
   color: var(--ink);
   background: rgba(255, 255, 255, 0.07);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
-  transform: translateY(-1px);
+  transform: translateX(2px);
 }
-.topbar button svg, button.primary svg, button.ghost svg, .pill svg { vertical-align: -3px; flex-shrink: 0; }
-.topbar button.active {
+.side button svg, button.primary svg, button.ghost svg, .pill svg { vertical-align: -3px; flex-shrink: 0; }
+.side button.active {
   color: #1a0d06;
   background: linear-gradient(135deg, var(--gold), var(--amber) 50%, var(--ember));
   box-shadow: 0 8px 24px rgba(255, 110, 40, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
-.topbar .ver {
+.side .ver {
+  margin-top: auto;
   font-size: 12px;
   color: var(--muted);
-  padding: 8px 12px;
+  padding: 10px 12px;
   border: 1px solid var(--stroke-soft);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.04);
-  white-space: nowrap;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 /* ——— Chip de jugador ——— */
 .player-chip {
   display: flex; align-items: center; gap: 10px;
-  padding: 8px 12px; margin-top: 0;
+  padding: 10px 12px; margin-top: 4px;
   border: 1px solid var(--stroke-soft); border-radius: 16px;
   background: rgba(255, 255, 255, 0.05);
   cursor: pointer;
@@ -267,16 +260,9 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
 .player-chip .dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.25); flex-shrink: 0; }
 .player-chip .dot.on { background: #34d399; box-shadow: 0 0 10px rgba(52, 211, 153, 0.9); }
 
-@media (max-width: 1080px) {
-  .topnav button { font-size: 0; gap: 0; padding: 9px 11px 11px; }
-  .brand-logo { height: 38px; }
-  .player-chip .pc-id { display: none; }
-  .topbar .ver { display: none; }
-}
-
 /* ——— Contenido ——— */
 .main { padding: 14px 22px 22px 16px; overflow: auto; }
-.main > * { max-width: 1200px; margin-inline: auto; }
+.main > * { max-width: 1060px; margin-inline: auto; }
 .main > .card { margin-bottom: 14px; }
 .main > .card { animation: rise 0.35s ease both; }
 @keyframes rise {
@@ -426,7 +412,7 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
 .pill.l-neoforge { background: rgba(251, 146, 60, 0.16); border-color: rgba(251, 146, 60, 0.5); color: #fed7aa; }
 
 /* ——— Press físico ——— */
-button.primary:active, button.ghost:active, .topbar button:active { transform: scale(0.97); }
+button.primary:active, button.ghost:active, .side button:active { transform: scale(0.97); }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 
 input, select {

@@ -40,35 +40,44 @@ function initSpringScroll() {
     if (!box) return;
     e.preventDefault();
     let s = state.get(box);
-    if (!s) { s = { pull: 0, timer: 0, back: 0, dir: 1 }; state.set(box, s); }
+    if (!s) { s = { raw: 0, pull: 0, timer: 0, back: 0, dir: 1, rx: 0 }; state.set(box, s); }
     clearTimeout(s.timer); clearTimeout(s.back);
     try { box.getAnimations().forEach((a) => a.cancel()); } catch {}
     box.style.transition = 'none';
-    s.pull = Math.max(-MAX, Math.min(MAX, s.pull + e.deltaY * 0.42));
-    // Squash mientras tiras: se comprime en Y y se ensancha en X desde el borde.
+    box.style.willChange = 'transform';
+    // Resistencia exponencial: blando al empezar, duro al final (nada de bloque rigido).
+    s.raw = Math.max(-MAX * 3, Math.min(MAX * 3, s.raw + e.deltaY * 0.5));
+    s.pull = MAX * Math.tanh(s.raw / MAX);
+    // Squash vertical + inclinacion 3D anclados al borde: efecto gelatina.
     const k = Math.min(1, Math.abs(s.pull) / MAX);
     s.dir = s.pull < 0 ? -1 : 1;
+    s.rx = (s.dir < 0 ? -4.5 : 4.5) * k;
+    const y = (-s.pull).toFixed(1), sy = (1 - 0.16 * k).toFixed(3), rx = s.rx.toFixed(2);
     box.style.transformOrigin = s.dir < 0 ? '50% 0%' : '50% 100%';
-    box.style.transform = `translateY(${(-s.pull).toFixed(1)}px) scale(1,${(1 - 0.16 * k).toFixed(3)})`;
+    box.style.transform = `perspective(1100px) rotateX(${rx}deg) translateY(${y}px) scale(1,${sy})`;
     s.timer = setTimeout(() => {
-      const p = s.pull, d = s.dir || 1; s.pull = 0;
-      if (Math.abs(p) < 8) { box.style.transform = ''; box.style.transformOrigin = ''; return; }
-      // Al soltar: elastico que se estira, se aplasta y se asienta.
+      const p = s.pull, rx0 = s.rx, d = s.dir || 1; s.pull = 0; s.raw = 0; s.rx = 0;
+      const done = () => { try { box.style.transform = ''; box.style.transformOrigin = ''; box.style.willChange = ''; } catch {} };
+      if (Math.abs(p) < 8) { done(); return; }
+      // Al soltar: gelatina que oscila apagandose (estira, aplasta, asienta).
       const kk = Math.min(1, Math.abs(p) / MAX);
       const org = d < 0 ? '50% 0%' : '50% 100%';
-      const y0 = (-p).toFixed(1), sy0 = (1 - 0.16 * kk).toFixed(3);
+      const y0 = (-p).toFixed(1), sy0 = (1 - 0.16 * kk).toFixed(3), r0 = rx0.toFixed(2);
+      const r1 = (-rx0 * 0.5).toFixed(2), r2 = (rx0 * 0.3).toFixed(2), r3 = (-rx0 * 0.15).toFixed(2);
       box.style.transform = '';
       box.style.transformOrigin = org;
+      const P = 'perspective(1100px)';
       try {
         box.animate([
-          { transform: `translateY(${y0}px) scale(1,${sy0})`, transformOrigin: org },
-          { transform: 'translateY(0px) scale(1,1.10)', transformOrigin: org },
-          { transform: 'translateY(0px) scale(1,0.94)', transformOrigin: org },
-          { transform: 'translateY(0px) scale(1,1.02)', transformOrigin: org },
-          { transform: 'translateY(0px) scale(1,1)', transformOrigin: org },
-        ], { duration: 700, easing: 'ease-out' });
+          { transform: `${P} rotateX(${r0}deg) translateY(${y0}px) scale(1,${sy0})`, transformOrigin: org, offset: 0 },
+          { transform: `${P} rotateX(${r1}deg) translateY(0px) scale(1,1.12)`, transformOrigin: org, offset: 0.22 },
+          { transform: `${P} rotateX(${r2}deg) translateY(0px) scale(1,0.93)`, transformOrigin: org, offset: 0.42 },
+          { transform: `${P} rotateX(${r3}deg) translateY(0px) scale(1,1.05)`, transformOrigin: org, offset: 0.6 },
+          { transform: `${P} rotateX(0deg) translateY(0px) scale(1,0.98)`, transformOrigin: org, offset: 0.78 },
+          { transform: `${P} rotateX(0deg) translateY(0px) scale(1,1)`, transformOrigin: org, offset: 1 },
+        ], { duration: 900, easing: 'ease-out' });
       } catch {}
-      s.back = setTimeout(() => { try { box.style.transformOrigin = ''; } catch {} }, 750);
+      s.back = setTimeout(done, 950);
     }, 110);
   };
   document.addEventListener('wheel', onWheel, { passive: false, capture: true });

@@ -154,6 +154,13 @@ const cristal = {
       partial({ f: 155, t: 0.22, type: 'square', v: 0.2, delay: i * 0.28, master: m, wet: 0.2 });
     }
   },
+  // Explosion: trueno grave + chasquido + estruendo
+  boom: (m) => {
+    partial({ f: 95, f2: 32, t: 0.5, type: 'sine', v: 0.9, master: m, wet: 0.25 });
+    noise({ t: 0.35, lp: 900, v: 0.7, master: m, wet: 0.3 });
+    noise({ t: 0.08, hp: 2500, v: 0.5, master: m, wet: 0.4 });
+    partial({ f: 620, f2: 180, t: 0.18, type: 'sawtooth', v: 0.25, master: m, wet: 0.3 });
+  },
 };
 
 const asmr = {
@@ -182,6 +189,12 @@ const asmr = {
     for (let i = 0; i < 8; i++) {
       keyHit(m, { f: 150 + Math.random() * 120, bright: 0.55, delay: i * 0.16 });
     }
+  },
+  // Explosion grave: golpe hondo + estruendo de escombro
+  boom: (m) => {
+    keyHit(m, { f: 95, bright: 0.4, deep: true });
+    noise({ t: 0.4, lp: 700, v: 0.6, master: m, wet: 0.4 });
+    noise({ t: 0.09, bp: 1800, v: 0.4, q: 1, master: m, wet: 0.3 });
   },
 };
 

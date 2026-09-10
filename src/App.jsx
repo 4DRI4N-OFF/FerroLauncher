@@ -313,6 +313,7 @@ export default function App() {
   const [confirmInput, setConfirmInput] = useState('');
   const [loginFx, setLoginFx] = useState(0);
   const [flashFx, setFlashFx] = useState(0);
+  const [exploding, setExploding] = useState(null);
   const celebrateLogin = () => {
     setLoginFx((k) => k + 1);
     setFlashFx((k) => k + 1);
@@ -356,6 +357,59 @@ export default function App() {
       else ctx.clearRect(0, 0, cv.width, cv.height);
     };
     tick();
+  };
+  // Explosión de tarjeta: destello + metralla de brasas + humo sobre la tarjeta.
+  const boomBurst = (x, y) => {
+    let cv = document.getElementById('boom-fx');
+    if (!cv) { cv = document.createElement('canvas'); cv.id = 'boom-fx'; document.body.appendChild(cv); }
+    cv.width = innerWidth; cv.height = innerHeight;
+    const ctx = cv.getContext('2d');
+    const cols = ['#fff7d6', '#ffd166', '#ffb62e', '#ff6e1e', '#ff3d00'];
+    const shards = Array.from({ length: 70 }, () => {
+      const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 9;
+      return { x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 3, s: 2 + Math.random() * 5, r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.4, c: cols[(Math.random() * cols.length) | 0], life: 1, decay: 0.012 + Math.random() * 0.014 };
+    });
+    const smoke = Array.from({ length: 14 }, () => ({ x: x + (Math.random() - 0.5) * 60, y: y + (Math.random() - 0.5) * 30, vx: (Math.random() - 0.5), vy: -0.6 - Math.random(), r: 10 + Math.random() * 22, life: 1, decay: 0.008 + Math.random() * 0.006 }));
+    let flash = 1;
+    let f = 0;
+    const tick = () => {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      let alive = false;
+      if (flash > 0) {
+        alive = true;
+        const fr = 30 + (1 - flash) * 130;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, fr);
+        g.addColorStop(0, `rgba(255,240,200,${(flash * 0.9).toFixed(3)})`);
+        g.addColorStop(1, 'rgba(255,110,30,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, fr, 0, 7); ctx.fill();
+        flash -= 0.09;
+      }
+      for (const p of shards) {
+        p.vy += 0.3; p.vx *= 0.985; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life -= p.decay;
+        if (p.life > 0) { alive = true; ctx.save(); ctx.globalAlpha = Math.max(0, p.life); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s * 0.6); ctx.restore(); }
+      }
+      for (const p of smoke) {
+        p.x += p.vx; p.y += p.vy; p.r += 0.4; p.life -= p.decay;
+        if (p.life > 0) { alive = true; ctx.save(); ctx.globalAlpha = Math.max(0, p.life * 0.35); ctx.fillStyle = '#8a8a8a'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); ctx.restore(); }
+      }
+      if (alive && ++f < 240) requestAnimationFrame(tick);
+      else ctx.clearRect(0, 0, cv.width, cv.height);
+    };
+    tick();
+  };
+  // Borrar con explosión: la tarjeta tiembla, brilla y revienta; luego se borra de verdad.
+  const explodeInstance = (name, cardEl) => {
+    try {
+      const r = cardEl ? cardEl.getBoundingClientRect() : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
+      setExploding(name);
+      sfx.play('boom');
+      boomBurst(r.left + r.width / 2, r.top + r.height / 2);
+    } catch {}
+    setTimeout(async () => {
+      try { await window.ferro.deleteInstance({ instanceName: name }); } catch {}
+      setExploding(null);
+      refresh();
+    }, 760);
   };
   const askConfirm = (message, onOk) => setConfirmDlg({ message, onOk, input: false });
   const askRename = (current, onOk) => { setConfirmInput(current); setConfirmDlg({ message: t('inst.renamePrompt'), input: true, onOk: (v) => { if (v && v !== current) onOk(v); } }); };
@@ -1121,7 +1175,7 @@ export default function App() {
               <input value={instFilter} onChange={(e)=>setInstFilter(e.target.value)} placeholder={t('inst.filterPh')} />
             </div>
             <div className="grid">
-              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className="card"><div className="card-title" title={i.name} onDoubleClick={()=>play(i.name)} style={{cursor:'pointer'}}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}</span><span className={`pill l-${i.type}`}>{i.type==='vanilla' ? 'vanilla' : `${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}{fmtPlay(i.playSecs) ? ` · ${fmtPlay(i.playSecs)}` : ''}</span> : <span className="pill">{t('inst.neverPlayed')}</span>}</div><div className="actions"><button className="ghost" onClick={(e)=>editSettings(i.name, e)}><Settings size={14} /> {t('inst.settings')}</button><button className="ghost" onClick={(e)=>openGallery(i.name, e)}><Camera size={14} /> {t('inst.shots')}</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}><Upload size={14} /> {t('inst.export')}</button><button className="ghost" onClick={async()=>{await window.ferro.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> {t('inst.folder')}</button><button className="ghost" onClick={async()=>{await window.ferro.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> {t('inst.duplicate')}</button><button className="ghost" onClick={()=>askRename(i.name, async (n)=>{await window.ferro.renameInstance({instanceName:i.name, newName:n}); refresh();})}><Pencil size={14} /> {t('inst.rename')}</button><button className="ghost danger" onClick={()=>askConfirm(t('inst.delConfirm', {n:i.name}), async()=>{await window.ferro.deleteInstance({instanceName:i.name}); refresh();})}><Trash2 size={14} /> {t('inst.delete')}</button></div>
+              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className={"card" + (exploding === i.name ? " exploding" : "")}><div className="card-title" title={i.name} onDoubleClick={()=>play(i.name)} style={{cursor:'pointer'}}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}</span><span className={`pill l-${i.type}`}>{i.type==='vanilla' ? 'vanilla' : `${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}{fmtPlay(i.playSecs) ? ` · ${fmtPlay(i.playSecs)}` : ''}</span> : <span className="pill">{t('inst.neverPlayed')}</span>}</div><div className="actions"><button className="ghost" onClick={(e)=>editSettings(i.name, e)}><Settings size={14} /> {t('inst.settings')}</button><button className="ghost" onClick={(e)=>openGallery(i.name, e)}><Camera size={14} /> {t('inst.shots')}</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}><Upload size={14} /> {t('inst.export')}</button><button className="ghost" onClick={async()=>{await window.ferro.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> {t('inst.folder')}</button><button className="ghost" onClick={async()=>{await window.ferro.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> {t('inst.duplicate')}</button><button className="ghost" onClick={()=>askRename(i.name, async (n)=>{await window.ferro.renameInstance({instanceName:i.name, newName:n}); refresh();})}><Pencil size={14} /> {t('inst.rename')}</button><button className="ghost danger" onClick={(e)=>{ const card = e.currentTarget.closest('.card'); askConfirm(t('inst.delConfirm', {n:i.name}), ()=>explodeInstance(i.name, card)); }}><Trash2 size={14} /> {t('inst.delete')}</button></div>
 </div>)}
             </div>
             <div className="row" style={{marginTop:12}}>

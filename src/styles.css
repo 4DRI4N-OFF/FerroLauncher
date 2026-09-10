@@ -768,11 +768,6 @@ pre {
 .boom-shard { position: absolute; transform: translate(-50%,-50%); border-radius: 2px; box-shadow: 0 0 8px 2px rgba(255,140,30,.8); }
 .boom-smoke { position: absolute; transform: translate(-50%,-50%); border-radius: 50%; background: radial-gradient(circle, rgba(150,150,150,.5), rgba(150,150,150,0) 70%); }
 .card.exploding { animation: card-boom .76s ease-in forwards; pointer-events: none; }
-.ach-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; margin-top: 10px; }
-.ach { display: flex; gap: 8px; align-items: center; background: rgba(255,255,255,.06); border: 1px solid var(--stroke-soft); border-radius: 12px; padding: 8px 10px; font-size: 12.5px; }
-.ach .em { font-size: 20px; }
-.ach small { display: block; opacity: .65; font-size: 11.5px; }
-.ach.locked { opacity: .38; filter: grayscale(1); }
 @keyframes card-boom {
   0% { transform: scale(1); opacity: 1; filter: none; }
   18% { transform: translateX(-6px); filter: brightness(2.2) saturate(1.6); }

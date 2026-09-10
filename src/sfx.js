@@ -161,6 +161,16 @@ const cristal = {
     noise({ t: 0.08, hp: 2500, v: 0.5, master: m, wet: 0.4 });
     partial({ f: 620, f2: 180, t: 0.18, type: 'sawtooth', v: 0.25, master: m, wet: 0.3 });
   },
+  // Quien vuela: barrido ascendente + aire
+  whoosh: (m) => {
+    noise({ t: 0.5, bp: 800, v: 0.4, q: 1.2, master: m, wet: 0.5 });
+    partial({ f: 180, f2: 720, t: 0.45, type: 'sine', v: 0.25, master: m, wet: 0.6 });
+  },
+  // Aterrizaje: campana doble cristalina
+  chime: (m) => {
+    partial({ f: 1319, t: 0.8, type: 'sine', v: 0.3, master: m, wet: 0.8 });
+    partial({ f: 1760, t: 1.0, type: 'sine', v: 0.2, delay: 0.08, master: m, wet: 0.8 });
+  },
 };
 
 const asmr = {
@@ -195,6 +205,16 @@ const asmr = {
     keyHit(m, { f: 95, bright: 0.4, deep: true });
     noise({ t: 0.4, lp: 700, v: 0.6, master: m, wet: 0.4 });
     noise({ t: 0.09, bp: 1800, v: 0.4, q: 1, master: m, wet: 0.3 });
+  },
+  // Aire que pasa + tecla grave de llegada
+  whoosh: (m) => {
+    noise({ t: 0.5, bp: 1100, v: 0.35, q: 1.4, master: m, wet: 0.6, attack: 0.02 });
+    keyHit(m, { f: 140, bright: 0.3, deep: true, delay: 0.35 });
+  },
+  // Dos toques de cuenco
+  chime: (m) => {
+    partial({ f: 1568, t: 0.8, type: 'sine', v: 0.15, master: m, wet: 0.85, attack: 0.01 });
+    partial({ f: 2093, t: 0.9, type: 'sine', v: 0.12, delay: 0.1, master: m, wet: 0.85, attack: 0.01 });
   },
 };
 

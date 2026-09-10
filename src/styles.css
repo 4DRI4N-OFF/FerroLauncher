@@ -255,6 +255,8 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
 }
 .intro-full { width: 100%; height: 100%; display: block; border-radius: 18px; }
 .intro-mini { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; border-radius: 18px; }
+.intro-trail { position: fixed; border-radius: 50%; background: radial-gradient(circle, #ffd166, rgba(255,110,30,0) 70%); pointer-events: none; z-index: 101; }
+.intro-ring { position: fixed; width: 120px; height: 120px; border-radius: 50%; border: 2px solid rgba(255,182,46,.8); box-shadow: 0 0 24px rgba(255,182,46,.5), inset 0 0 24px rgba(255,182,46,.3); pointer-events: none; z-index: 101; }
 .side button {
   display: flex;
   align-items: center;

@@ -854,6 +854,23 @@ export default function App() {
       // Escala por dibujo visible (contain), no por caja: el mini es cuadrado.
       const glyph = (r) => Math.min(r.width, r.height);
       const s = glyph(baseTiny) > 0 ? glyph(rl) / glyph(baseTiny) : r2.width / r1.width;
+      sfx.play('whoosh');
+      const trailTimer = setInterval(() => {
+        try {
+          const rr = img.getBoundingClientRect();
+          const d = document.createElement('div');
+          d.className = 'intro-trail';
+          const sz = 4 + Math.random() * 8;
+          d.style.width = d.style.height = sz.toFixed(0) + 'px';
+          d.style.left = (rr.left + rr.width / 2) + 'px';
+          d.style.top = (rr.top + rr.height / 2) + 'px';
+          (ov || document.body).appendChild(d);
+          d.animate([
+            { transform: 'translate(-50%,-50%) scale(1)', opacity: 0.9 },
+            { transform: 'translate(-50%,-50%) scale(0)', opacity: 0 },
+          ], { duration: 550, easing: 'ease-out' }).finished.catch(() => {}).finally(() => { try { d.remove(); } catch {} });
+        } catch {}
+      }, 80);
       try {
         const a1 = img.animate([
           { transform: 'translate(0, 0) scale(1)' },
@@ -867,6 +884,27 @@ export default function App() {
           { opacity: 1, transform: 'scale(1)' },
         ], { duration: 900, delay: 300, easing: 'ease-out', fill: 'forwards' }).finished);
         await Promise.all(jobs);
+      } catch {}
+      clearInterval(trailTimer);
+      // Aterrizaje: onda + punch cinematografico + campana
+      sfx.play('chime');
+      try {
+        document.querySelector('.layout')?.animate(
+          [{ transform: 'scale(.985)', opacity: 0.65 }, { transform: 'scale(1)', opacity: 1 }],
+          { duration: 550, easing: 'cubic-bezier(.2,1.2,.3,1)' });
+      } catch {}
+      try {
+        const ring = document.createElement('div');
+        ring.className = 'intro-ring';
+        const rt = target.getBoundingClientRect();
+        ring.style.left = (rt.left + rt.width / 2) + 'px';
+        ring.style.top = (rt.top + rt.height / 2) + 'px';
+        (ov || document.body).appendChild(ring);
+        await ring.animate([
+          { transform: 'translate(-50%,-50%) scale(.2)', opacity: 0.85 },
+          { transform: 'translate(-50%,-50%) scale(1)', opacity: 0 },
+        ], { duration: 650, easing: 'ease-out', fill: 'forwards' }).finished.catch(() => {});
+        ring.remove();
       } catch {}
       // Fundido del fondo: la overlay se disuelve sobre la app en vez de cortarse.
       try {

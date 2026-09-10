@@ -1141,6 +1141,7 @@ export default function App() {
         <div className="brand-swap" ref={sideLogoRef}>
           <img className="brand-logo brand-full" src={brand} alt="FerroLauncher" />
           <img className="brand-logo brand-mini" src={flMark} alt="FL" />
+          <button className={`pin${sidePinned ? ' on' : ''}`} onClick={()=>{ const v = !sidePinned; setSidePinned(v); setSideOpen(v); try { localStorage.setItem('ferro-sidepin', v ? '1' : '0'); } catch {} }} title="Pin">{sidePinned ? <PinOff size={14} /> : <Pin size={14} />}</button>
         </div>
         <button className={tab==='jugar'?'active':''} onClick={()=>setTab('jugar')}><Play size={16} /><span className="nav-label">{t('tab.play')}</span></button>
         <button className={tab==='versiones'?'active':''} onClick={()=>setTab('versiones')}><Layers size={16} /><span className="nav-label">{t('tab.versions')}</span></button>
@@ -1157,7 +1158,6 @@ export default function App() {
           <span className={`dot ${account ? 'on' : ''}`} />
         </div>
         <div className="ver">v{appVer || '?'} · {t('footerTag')}</div>
-        <button className={`pin${sidePinned ? ' on' : ''}`} onClick={()=>{ const v = !sidePinned; setSidePinned(v); setSideOpen(v); try { localStorage.setItem('ferro-sidepin', v ? '1' : '0'); } catch {} }} title="Pin">{sidePinned ? <PinOff size={14} /> : <Pin size={14} />}</button>
       </div>
       <div className="main" key={tab}>
         <div className="bounce">

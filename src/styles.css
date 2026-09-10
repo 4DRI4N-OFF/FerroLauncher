@@ -230,6 +230,10 @@ body::after {
 }
 .side .pin:hover { color: var(--ink); background: rgba(255, 255, 255, 0.07); }
 .side .pin.on { color: var(--amber); }
+.brand-swap .pin { position: absolute; top: -8px; right: -8px; z-index: 3; width: 30px; height: 30px; padding: 0; background: rgba(10,8,6,.6); border: 1px solid var(--stroke-soft); opacity: .85; }
+.brand-swap .pin:hover { opacity: 1; }
+.side.collapsed .brand-swap .pin { opacity: 0; pointer-events: none; transform: scale(.8); }
+.side.collapsed:hover .brand-swap .pin { opacity: .85; pointer-events: auto; transform: none; }
 .brand-swap .brand-logo {
   filter: drop-shadow(0 8px 22px var(--glow));
 }

@@ -40,17 +40,35 @@ function initSpringScroll() {
     if (!box) return;
     e.preventDefault();
     let s = state.get(box);
-    if (!s) { s = { pull: 0, timer: 0, back: 0 }; state.set(box, s); }
+    if (!s) { s = { pull: 0, timer: 0, back: 0, dir: 1 }; state.set(box, s); }
     clearTimeout(s.timer); clearTimeout(s.back);
+    try { box.getAnimations().forEach((a) => a.cancel()); } catch {}
     box.style.transition = 'none';
     s.pull = Math.max(-MAX, Math.min(MAX, s.pull + e.deltaY * 0.42));
-    box.style.transform = `translateY(${(-s.pull).toFixed(1)}px)`;
+    // Squash mientras tiras: se comprime en Y y se ensancha en X desde el borde.
+    const k = Math.min(1, Math.abs(s.pull) / MAX);
+    s.dir = s.pull < 0 ? -1 : 1;
+    box.style.transformOrigin = s.dir < 0 ? '50% 0%' : '50% 100%';
+    box.style.transform = `translateY(${(-s.pull).toFixed(1)}px) scale(${(1 + 0.1 * k).toFixed(3)},${(1 - 0.16 * k).toFixed(3)})`;
     s.timer = setTimeout(() => {
-      const p = s.pull; s.pull = 0;
-      if (Math.abs(p) < 1) { box.style.transform = ''; return; }
-      box.style.transition = 'transform .55s cubic-bezier(.18,1.55,.32,1)';
+      const p = s.pull, d = s.dir || 1; s.pull = 0;
+      if (Math.abs(p) < 8) { box.style.transform = ''; box.style.transformOrigin = ''; return; }
+      // Al soltar: elastico que se estira, se aplasta y se asienta.
+      const kk = Math.min(1, Math.abs(p) / MAX);
+      const org = d < 0 ? '50% 0%' : '50% 100%';
+      const y0 = (-p).toFixed(1), sx0 = (1 + 0.1 * kk).toFixed(3), sy0 = (1 - 0.16 * kk).toFixed(3);
       box.style.transform = '';
-      s.back = setTimeout(() => { try { box.style.transition = ''; } catch {} }, 600);
+      box.style.transformOrigin = org;
+      try {
+        box.animate([
+          { transform: `translateY(${y0}px) scale(${sx0},${sy0})`, transformOrigin: org },
+          { transform: 'translateY(0px) scale(0.94,1.10)', transformOrigin: org },
+          { transform: 'translateY(0px) scale(1.03,0.94)', transformOrigin: org },
+          { transform: 'translateY(0px) scale(0.99,1.02)', transformOrigin: org },
+          { transform: 'translateY(0px) scale(1,1)', transformOrigin: org },
+        ], { duration: 700, easing: 'ease-out' });
+      } catch {}
+      s.back = setTimeout(() => { try { box.style.transformOrigin = ''; } catch {} }, 750);
     }, 110);
   };
   document.addEventListener('wheel', onWheel, { passive: false, capture: true });

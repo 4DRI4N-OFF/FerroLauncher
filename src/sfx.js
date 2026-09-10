@@ -171,13 +171,19 @@ const cristal = {
     partial({ f: 1319, t: 0.8, type: 'sine', v: 0.3, master: m, wet: 0.8 });
     partial({ f: 1760, t: 1.0, type: 'sine', v: 0.2, delay: 0.08, master: m, wet: 0.8 });
   },
-  // Subida THX: racimo de voces ascendentes + lecho de aire + grave
+  // Subida THX fiel a Moorer: 30 voces 200-400 Hz vagando y luego
+  // desliz directo a la pila D mayor (3 por nota, 2 en graves).
   riser: (m) => {
-    [196, 220, 247, 262, 294, 330, 370, 415].forEach((f, i) => {
-      partial({ f, f2: f * 1.5, t: 0.95, type: i % 2 ? 'triangle' : 'sine', v: 0.16, delay: i * 0.03, master: m, wet: 0.7, attack: 0.09 });
+    const targets = [73.42, 73.42, 110, 110, 146.83, 146.83, 220, 220, 220, 293.66, 293.66, 293.66, 369.99, 369.99, 369.99, 440, 440, 440, 587.33, 587.33, 587.33, 739.99, 739.99, 739.99, 880, 880, 880, 1174.66, 1174.66, 1174.66];
+    targets.forEach((ft) => {
+      const f0 = 200 + Math.random() * 200;
+      const drift = f0 * (1 + (Math.random() - 0.5) * 0.06);
+      const dt = ft * (1 + (Math.random() - 0.5) * 0.004);
+      const deep = ft < 150;
+      partial({ f: f0, f2: drift, t: 0.5, type: 'sine', v: 0.05, master: m, wet: 0.75, attack: 0.2 });
+      partial({ f: drift, f2: dt, t: 1.05, type: deep ? 'triangle' : 'sine', v: deep ? 0.09 : 0.06, delay: 0.42, master: m, wet: 0.7, attack: 0.35 });
     });
-    noise({ t: 0.9, bp: 900, v: 0.22, q: 1.2, master: m, wet: 0.6, attack: 0.15 });
-    partial({ f: 55, f2: 110, t: 1.0, type: 'sine', v: 0.4, master: m, wet: 0.3, attack: 0.1 });
+    noise({ t: 1.2, bp: 600, v: 0.1, q: 1, master: m, wet: 0.6, attack: 0.3 });
   },
   // Golpe triple-forte: sub + acorde + crash + brillo
   deepHit: (m) => {
@@ -233,12 +239,14 @@ const asmr = {
     partial({ f: 1568, t: 0.8, type: 'sine', v: 0.15, master: m, wet: 0.85, attack: 0.01 });
     partial({ f: 2093, t: 0.9, type: 'sine', v: 0.12, delay: 0.1, master: m, wet: 0.85, attack: 0.01 });
   },
-  // Subida suave: voces aireadas ascendentes
+  // Subida suave: 12 voces vagando hacia el acorde
   riser: (m) => {
-    [180, 226, 269, 320].forEach((f, i) => {
-      partial({ f, f2: f * 1.4, t: 0.9, type: 'sine', v: 0.14, delay: i * 0.05, master: m, wet: 0.8, attack: 0.12 });
+    [73.42, 110, 146.83, 220, 293.66, 369.99, 440, 587.33, 739.99, 880, 587.33, 293.66].forEach((ft, i) => {
+      const f0 = 200 + Math.random() * 200;
+      const dt = ft * (1 + (Math.random() - 0.5) * 0.004);
+      partial({ f: f0, f2: dt, t: 1.2, type: 'sine', v: 0.07, delay: i * 0.02, master: m, wet: 0.85, attack: 0.25 });
     });
-    noise({ t: 0.9, bp: 700, v: 0.2, q: 1.5, master: m, wet: 0.7, attack: 0.2 });
+    noise({ t: 1.1, bp: 500, v: 0.12, q: 1.4, master: m, wet: 0.75, attack: 0.3 });
   },
   // Llegada honda: golpe grave + acorde + aire
   deepHit: (m) => {

@@ -361,64 +361,62 @@ export default function App() {
     };
     tick();
   };
-  // Explosión de tarjeta: destello + metralla de brasas + humo sobre la tarjeta.
-  // A prueba de fallos: cualquier error limpia el canvas y un temporizador lo elimina si o si.
-  const boomBurst = (x, y) => {
+  // Explosión de tarjeta: destello + metralla + humo con piezas DOM animadas
+  // por el compositor (WAAPI): va fluido incluso sin aceleracion de canvas.
+  const boomBurst = (rect) => {
     const ctl = boomCtl.current;
-    try { cancelAnimationFrame(ctl.raf || 0); } catch {}
     clearTimeout(ctl.kill || 0);
-    let cv = document.getElementById('boom-fx');
-    if (!cv) { cv = document.createElement('canvas'); cv.id = 'boom-fx'; document.body.appendChild(cv); }
-    cv.width = innerWidth; cv.height = innerHeight;
-    const ctx = cv.getContext('2d');
-    if (!ctx) return;
+    try { document.getElementById('boom-fx')?.remove(); } catch {}
+    const layer = document.createElement('div');
+    layer.id = 'boom-fx';
+    document.body.appendChild(layer);
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
     const cols = ['#fff7d6', '#ffd166', '#ffb62e', '#ff6e1e', '#ff3d00'];
-    const shards = Array.from({ length: 70 }, () => {
-      const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 9;
-      return { x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 3, s: 2 + Math.random() * 5, r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.4, c: cols[(Math.random() * cols.length) | 0], life: 1, decay: 0.012 + Math.random() * 0.014 };
-    });
-    const smoke = Array.from({ length: 14 }, () => ({ x: x + (Math.random() - 0.5) * 60, y: y + (Math.random() - 0.5) * 30, vx: (Math.random() - 0.5), vy: -0.6 - Math.random(), r: 10 + Math.random() * 22, life: 1, decay: 0.008 + Math.random() * 0.006 }));
-    let flash = 1;
-    let f = 0;
-    const tick = () => {
-      let alive = false;
-      try {
-        ctx.clearRect(0, 0, cv.width, cv.height);
-        if (flash > 0) {
-          alive = true;
-          const fr = 30 + (1 - flash) * 130;
-          const g = ctx.createRadialGradient(x, y, 0, x, y, fr);
-          g.addColorStop(0, `rgba(255,240,200,${(flash * 0.9).toFixed(3)})`);
-          g.addColorStop(1, 'rgba(255,110,30,0)');
-          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, fr, 0, 7); ctx.fill();
-          flash -= 0.09;
-        }
-        for (const p of shards) {
-          p.vy += 0.3; p.vx *= 0.985; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life -= p.decay;
-          if (p.life > 0) { alive = true; ctx.save(); ctx.globalAlpha = Math.max(0, p.life); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s * 0.6); ctx.restore(); }
-        }
-        for (const p of smoke) {
-          p.x += p.vx; p.y += p.vy; p.r += 0.4; p.life -= p.decay;
-          if (p.life > 0) { alive = true; ctx.save(); ctx.globalAlpha = Math.max(0, p.life * 0.35); ctx.fillStyle = '#8a8a8a'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); ctx.restore(); }
-        }
-      } catch { alive = false; }
-      if (alive && ++f < 200) ctl.raf = requestAnimationFrame(tick);
-      else { try { ctx.clearRect(0, 0, cv.width, cv.height); } catch {} }
-    };
-    tick();
-    // Interruptor final: pase lo que pase, el canvas desaparece a los 2.5 s.
-    ctl.kill = setTimeout(() => {
-      try { cancelAnimationFrame(ctl.raf || 0); } catch {}
-      try { document.getElementById('boom-fx')?.remove(); } catch {}
-    }, 2500);
+    const flash = document.createElement('div');
+    flash.className = 'boom-flash';
+    flash.style.left = cx + 'px'; flash.style.top = cy + 'px';
+    layer.appendChild(flash);
+    try {
+      flash.animate(
+        [{ transform: 'translate(-50%,-50%) scale(.2)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 0 }],
+        { duration: 450, easing: 'ease-out', fill: 'forwards' });
+      for (let k = 0; k < 28; k++) {
+        const s = document.createElement('div');
+        s.className = 'boom-shard';
+        const sz = 4 + Math.random() * 7;
+        s.style.left = cx + 'px'; s.style.top = cy + 'px';
+        s.style.width = sz.toFixed(1) + 'px'; s.style.height = (sz * (0.5 + Math.random() * 0.7)).toFixed(1) + 'px';
+        s.style.background = cols[(Math.random() * cols.length) | 0];
+        layer.appendChild(s);
+        const a = Math.random() * Math.PI * 2, d = 60 + Math.random() * 170;
+        s.animate(
+          [{ transform: 'translate(-50%,-50%) rotate(0deg)', opacity: 1 },
+           { transform: `translate(calc(-50% + ${(Math.cos(a) * d).toFixed(1)}px), calc(-50% + ${(Math.sin(a) * d - 50).toFixed(1)}px)) rotate(${((Math.random() - 0.5) * 540).toFixed(0)}deg)`, opacity: 0 }],
+          { duration: 600 + Math.random() * 500, easing: 'cubic-bezier(.15,.7,.3,1)', fill: 'forwards' });
+      }
+      for (let k = 0; k < 8; k++) {
+        const m = document.createElement('div');
+        m.className = 'boom-smoke';
+        const sz = 26 + Math.random() * 40;
+        m.style.left = (cx + (Math.random() - 0.5) * 90).toFixed(1) + 'px';
+        m.style.top = (cy + (Math.random() - 0.5) * 40).toFixed(1) + 'px';
+        m.style.width = sz.toFixed(1) + 'px'; m.style.height = sz.toFixed(1) + 'px';
+        layer.appendChild(m);
+        m.animate(
+          [{ transform: 'translate(-50%,-50%) scale(.5)', opacity: 0.4 }, { transform: `translate(-50%,calc(-50% + ${(-80 - Math.random() * 70).toFixed(0)}px)) scale(1.4)`, opacity: 0 }],
+          { duration: 1000 + Math.random() * 400, easing: 'ease-out', fill: 'forwards' });
+      }
+    } catch {}
+    // Interruptor final: la capa desaparece a los 1.6 s pase lo que pase.
+    ctl.kill = setTimeout(() => { try { document.getElementById('boom-fx')?.remove(); } catch {} }, 1600);
   };
   // Borrar con explosión: la tarjeta tiembla, brilla y revienta; luego se borra de verdad.
   const explodeInstance = (name, cardEl) => {
     try {
-      const r = cardEl ? cardEl.getBoundingClientRect() : { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
+      const r = cardEl ? cardEl.getBoundingClientRect() : { left: innerWidth / 2 - 150, top: innerHeight / 2 - 100, width: 300, height: 200 };
       setExploding(name);
       sfx.play('boom');
-      boomBurst(r.left + r.width / 2, r.top + r.height / 2);
+      boomBurst(r);
     } catch {}
     setTimeout(async () => {
       try { await window.ferro.deleteInstance({ instanceName: name }); } catch {}

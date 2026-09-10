@@ -12,6 +12,21 @@ import {
   MessageCircle, ExternalLink, Server, Pin, PinOff,
 } from 'lucide-react';
 
+// Resortes al fijar/soltar la sidebar: los botones entran en cascada con muelle.
+function springNav() {
+  try {
+    document.querySelectorAll('.side > button').forEach((b, i) => {
+      try {
+        b.animate([
+          { transform: 'translateX(-10px)', opacity: 0.4 },
+          { transform: 'translateX(4px)', opacity: 1 },
+          { transform: 'translateX(0px)', opacity: 1 },
+        ], { duration: 450, delay: i * 35, easing: 'cubic-bezier(.2,1.4,.4,1)' });
+      } catch {}
+    });
+  } catch {}
+}
+
 // Resorte de Apple al hacer scroll: al llegar al tope, el contenido cede
 // con resistencia y vuelve con muelle. Un solo listener global.
 function initSpringScroll() {
@@ -1141,7 +1156,7 @@ export default function App() {
         <div className="brand-swap" ref={sideLogoRef}>
           <img className="brand-logo brand-full" src={brand} alt="FerroLauncher" />
           <img className="brand-logo brand-mini" src={flMark} alt="FL" />
-          <button className={`pin${sidePinned ? ' on' : ''}`} onClick={()=>{ const v = !sidePinned; setSidePinned(v); setSideOpen(v); try { localStorage.setItem('ferro-sidepin', v ? '1' : '0'); } catch {} }} title="Pin">{sidePinned ? <PinOff size={14} /> : <Pin size={14} />}</button>
+          <button className={`pin${sidePinned ? ' on' : ''}`} onClick={()=>{ springNav(); const v = !sidePinned; setSidePinned(v); setSideOpen(v); try { localStorage.setItem('ferro-sidepin', v ? '1' : '0'); } catch {} }} title="Pin">{sidePinned ? <PinOff size={14} /> : <Pin size={14} />}</button>
         </div>
         <button className={tab==='jugar'?'active':''} onClick={()=>setTab('jugar')}><Play size={16} /><span className="nav-label">{t('tab.play')}</span></button>
         <button className={tab==='versiones'?'active':''} onClick={()=>setTab('versiones')}><Layers size={16} /><span className="nav-label">{t('tab.versions')}</span></button>

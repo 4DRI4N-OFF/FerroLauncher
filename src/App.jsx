@@ -927,15 +927,27 @@ export default function App() {
       const img = introImgRef.current, target = sideLogoRef.current, ov = overlayRef.current;
       if (!img || !target) { unlock(); setIntro(false); return; }
       const r1 = img.getBoundingClientRect(), r2 = target.getBoundingClientRect();
-      const dx = r2.left + r2.width / 2 - (r1.left + r1.width / 2);
-      const dy = r2.top + r2.height / 2 - (r1.top + r1.height / 2);
-      const s = r2.width / r1.width;
+      // Aterriza sobre el mini real (no sobre la caja): el fundido lo deja ya con su forma.
+      const tiny0 = img.querySelector('.intro-mini'), full0 = img.querySelector('.intro-full');
+      const land = (target.querySelector && target.querySelector('.brand-mini')) || target;
+      const rl = land.getBoundingClientRect();
+      const dx = rl.left + rl.width / 2 - (r1.left + r1.width / 2);
+      const dy = rl.top + rl.height / 2 - (r1.top + r1.height / 2);
+      const baseMini = tiny0 ? tiny0.getBoundingClientRect().width : r1.width;
+      const s = baseMini > 0 ? rl.width / baseMini : r2.width / r1.width;
       try {
-        const anim = img.animate([
-          { transform: 'translate(0, 0) scale(1) rotate(0deg)' },
-          { transform: `translate(${dx}px, ${dy}px) scale(${s}) rotate(-360deg)` },
+        const a1 = img.animate([
+          { transform: 'translate(0, 0) scale(1)' },
+          { transform: `translate(${dx}px, ${dy}px) scale(${s})` },
         ], { duration: 1100, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'forwards' });
-        await anim.finished;
+        const jobs = [a1.finished];
+        if (full0) jobs.push(full0.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 450, easing: 'ease-in', fill: 'forwards' }).finished);
+        if (tiny0) jobs.push(tiny0.animate([
+          { opacity: 0, transform: 'scale(.5)' },
+          { opacity: 1, transform: 'scale(1.06)', offset: 0.7 },
+          { opacity: 1, transform: 'scale(1)' },
+        ], { duration: 900, delay: 300, easing: 'ease-out', fill: 'forwards' }).finished);
+        await Promise.all(jobs);
       } catch {}
       // Corte seco al logo real: sin fundido que delate 1px de diferencia
       unlock();
@@ -1744,7 +1756,10 @@ export default function App() {
       </div>
       {intro && (
         <div className="intro-overlay" ref={overlayRef}>
-          <img ref={introImgRef} className="intro-logo" src={brand} alt="" />
+          <div ref={introImgRef} className="intro-logo">
+            <img className="intro-full" src={brand} alt="" />
+            <img className="intro-mini" src={flMark} alt="FL" />
+          </div>
         </div>
       )}
       {flashKey > 0 && <div key={flashKey} className="vignette" />}

@@ -250,10 +250,11 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
   background: radial-gradient(420px 260px at 50% 30%, rgba(255,110,40,.25), transparent 70%), rgba(13, 9, 8, 0.92);
 }
 .intro-logo {
-  width: 300px; aspect-ratio: 2030 / 701; height: auto; display: block;
-  border-radius: 18px;
+  position: relative; width: 300px; aspect-ratio: 2030 / 701; height: auto; display: block;
   filter: drop-shadow(0 12px 34px rgba(255, 120, 25, 0.5));
 }
+.intro-full { width: 100%; height: 100%; display: block; border-radius: 18px; }
+.intro-mini { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; border-radius: 18px; }
 .side button {
   display: flex;
   align-items: center;

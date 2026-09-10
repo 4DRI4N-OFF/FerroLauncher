@@ -159,15 +159,27 @@ function setLang(l) {
 }
 btn.onclick = () => setLang(document.documentElement.lang === 'en' ? 'es' : 'en');
 setLang((() => { try { return localStorage.getItem('ferro-site-lang') || 'es'; } catch { return 'es'; } })());
-// Navbar + progreso + arriba
+// Navbar + progreso + arriba + parallax del hero
 const top = document.getElementById('top');
 const prog = document.getElementById('progress');
 const toTop = document.getElementById('toTop');
+const heroEl = document.querySelector('.hero');
+const mockEl = document.getElementById('mockwrap');
+let scrollTick = false;
 addEventListener('scroll', () => {
   top.classList.toggle('scrolled', scrollY > 24);
   const h = document.documentElement.scrollHeight - innerHeight;
   prog.style.width = (h > 0 ? (scrollY / h) * 100 : 0) + '%';
   toTop.classList.toggle('show', scrollY > 600);
+  if (!scrollTick) {
+    scrollTick = true;
+    requestAnimationFrame(() => {
+      scrollTick = false;
+      const y = Math.min(scrollY, innerHeight);
+      if (heroEl) heroEl.style.transform = `translateY(${y * 0.12}px)`;
+      if (mockEl) mockEl.style.transform = `translateY(${Math.max(0, y - 200) * 0.05}px)`;
+    });
+  }
 }, { passive: true });
 toTop.onclick = () => scrollTo({ top: 0, behavior: 'smooth' });
 // Loader fuera
@@ -181,6 +193,18 @@ setTimeout(() => document.getElementById('loader').classList.add('done'), 2500);
   addEventListener('pointermove', (e) => { tx = e.clientX; ty = e.clientY; }, { passive: true });
   (function follow() { x += (tx - x) * 0.12; y += (ty - y) * 0.12; c.style.transform = `translate(${x - 170}px, ${y - 170}px)`; requestAnimationFrame(follow); })();
 })();
+// Botones magnéticos: siguen al cursor con muelle
+if (!matchMedia('(pointer: coarse)').matches) {
+  document.querySelectorAll('.btn.primary, .mock-play').forEach((b) => {
+    b.addEventListener('pointermove', (e) => {
+      const r = b.getBoundingClientRect();
+      const dx = (e.clientX - (r.left + r.width / 2)) / r.width;
+      const dy = (e.clientY - (r.top + r.height / 2)) / r.height;
+      b.style.transform = `translate(${dx * 7}px, ${dy * 5 - 2}px) scale(1.03)`;
+    });
+    b.addEventListener('pointerleave', () => { b.style.transform = ''; });
+  });
+}
 // Tilt del mockup
 (function () {
   const wrap = document.getElementById('mockwrap');

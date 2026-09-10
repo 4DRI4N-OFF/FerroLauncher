@@ -9,6 +9,26 @@ export default function DynamicIsland(p) {
     const t = setTimeout(() => { try { inputRef.current?.focus(); } catch {} }, 60);
     return () => clearTimeout(t);
   }, [p.focusSignal]);
+  // Los ojitos siguen al raton (con calma, via rAF).
+  useEffect(() => {
+    let raf = 0;
+    const onMove = (e) => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        try {
+          const el = document.querySelector('.island');
+          if (!el) return;
+          const r = el.getBoundingClientRect();
+          const dx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / 200));
+          const dy = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / 200));
+          el.style.setProperty('--ex', (dx * 3).toFixed(1) + 'px');
+          el.style.setProperty('--ey', (dy * 2.5).toFixed(1) + 'px');
+        } catch {}
+      });
+    };
+    window.addEventListener('mousemove', onMove);
+    return () => { window.removeEventListener('mousemove', onMove); cancelAnimationFrame(raf); };
+  }, []);
   const lastAi = [...(p.aiMsgs || [])].reverse().find((m) => m.role === 'ai');
   const maybeHide = (e) => {
     try {
@@ -23,7 +43,7 @@ export default function DynamicIsland(p) {
       onMouseLeave={maybeHide}
       onMouseEnter={() => { p.setVisible(true); p.dismissGreet(); }}
     >
-      <span className="island-ico"><Sparkles size={17} /></span>
+      <span className="island-ico"><span className="face"><i className="eye" /><i className="eye" /></span></span>
       <input
         ref={inputRef}
         className="island-field"

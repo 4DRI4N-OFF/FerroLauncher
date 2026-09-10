@@ -29,7 +29,6 @@ const crashes = require('../core/crashService');
 const gallery = require('../core/galleryService');
 const { notify } = require('../core/notifyService');
 const cf = require('../core/curseforgeService');
-const ai = require('../core/aiService');
 const res = require('../core/resourceService');
 const perf = require('../core/perfService');
 const doctor = require('../core/crashDoctor');
@@ -304,9 +303,6 @@ ipcMain.handle('ferro:modUpdate', async (_, { instanceName, file, projectId }) =
 });
 ipcMain.handle('ferro:cfKey', async () => (cf.getKey(getDirs().base) ? '••••' + cf.getKey(getDirs().base).slice(-4) : ''));
   ipcMain.handle('ferro:cfSetKey', async (_, { key }) => cf.setKey(getDirs().base, key));
-  ipcMain.handle('ferro:aiHasKey', async () => ai.hasKey(getDirs().base));
-  ipcMain.handle('ferro:aiModels', async () => ai.models(getDirs().base));
-  ipcMain.handle('ferro:aiChat', async (_, { model, system, history }) => ai.chat(getDirs().base, { model, system, history }));
 ipcMain.handle('ferro:cfSearch', async (_, { query, mcVersion, kind, sort }) => cf.search(getDirs().base, query || '', mcVersion, kind, sort));
 ipcMain.handle('ferro:cfTrending', async () => cf.trending(getDirs().base));
 ipcMain.handle('ferro:cfFiles', async (_, { modId, mcVersion, loader }) => cf.files(getDirs().base, modId, mcVersion, loader));

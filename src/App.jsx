@@ -2,11 +2,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import brand from './assets/brand.png';
 import flMark from './assets/fl.png';
 import { sfx } from './sfx.js';
-import { geminiChat, geminiModels, aiErrorKey } from './ai.js';
 import { STR, getLang } from './i18n.js';
 import { GithubIcon, DiscordIcon, YoutubeIcon, XIcon } from './brands.jsx';
 import Embers from './embers.jsx';
-import DynamicIsland from './island.jsx';
 import {
   Play, Square, Layers, Package, LayoutGrid, Gift, User, Palette,
   Settings, Search, Plus, RefreshCw, FolderOpen, Copy, Pencil, Trash2,
@@ -517,113 +515,10 @@ export default function App() {
       refresh();
     }, 760);
   };
-  // --- Asistente IA ---
-  const aiSystem = () => {
-    const names = (instances || []).slice(0, 12).map((i) => `${i.name} (${i.versionId}${i.type !== 'vanilla' ? ' ' + i.type : ''})`).join(', ') || '—';
-    const base = lang === 'en'
-      ? 'You are the FerroLauncher assistant, a Minecraft Java launcher for Windows (Electron). Help with: Minecraft versions, loaders (Vanilla/Fabric/Quilt/Forge/NeoForge), Modrinth/CurseForge mods, shaders, Java and RAM, errors and crashes. Reply in English, short and direct, with concrete steps. If given console/log text, diagnose the likely cause.'
-      : 'Eres el asistente de FerroLauncher, un launcher de Minecraft Java para Windows (Electron). Ayudas con: versiones de Minecraft, loaders (Vanilla/Fabric/Quilt/Forge/NeoForge), mods de Modrinth/CurseForge, shaders, Java y RAM, errores y cuelgues. Responde en español, breve y directo, con pasos concretos. Si te pegan consola o log, diagnostica la causa probable.';
-    return `${base} Context: FerroLauncher v${appVer || '?'}, instances: ${names}.`;
-  };
-  const saveAiKey = async () => {
-    const k = aiKeyInput.trim();
-    if (!k) return;
-    setAiKey(k);
-    try { localStorage.setItem('ferro-ai-key', k); } catch {}
-    setAiKeyInput('');
-    pushToast('success', t('ai.keySaved'));
-    loadAiModels(k);
-  };
-  const loadAiModels = async (k) => {
-    if (aiBuiltIn && window.ferro?.aiModels) {
-      try {
-        const ms = await window.ferro.aiModels();
-        if (ms.length) {
-          setAiModels(ms);
-          if (!ms.some((m) => m.id === aiModel)) {
-            const stable = ms.filter((m) => !/preview|tts|image|transcribe|lyria|robotics|computer-use|antigravity|deep-research|nano-banana|gemma|latest$/i.test(m.id));
-            const pick = stable.find((m) => /flash-lite/i.test(m.id)) || stable.find((m) => /flash/i.test(m.id)) || ms[0];
-            setAiModel(pick.id);
-            try { localStorage.setItem('ferro-ai-model', pick.id); } catch {}
-          }
-          pushToast('success', `${ms.length} ✓`);
-        } else pushToast('error', t('ai.errOther'));
-      } catch (e) { pushToast('error', t(aiErrorKey(e))); }
-      return;
-    }
-    const key = (k || aiKey || '').trim();
-    if (!key) { pushToast('error', t('ai.needKey')); return; }
-    try {
-      const ms = await geminiModels(key);
-      if (ms.length) {
-        setAiModels(ms);
-        if (!ms.some((m) => m.id === aiModel)) {
-          const pick = ms.find((m) => /flash/i.test(m.id)) || ms[0];
-          setAiModel(pick.id);
-          try { localStorage.setItem('ferro-ai-model', pick.id); } catch {}
-        }
-        pushToast('success', `${ms.length} ✓`);
-      } else pushToast('error', t('ai.errKey'));
-    } catch (e) { pushToast('error', t(aiErrorKey(e))); }
-  };
-  const sendAi = async () => {
-    const text = aiInput.trim();
-    if (!text || aiBusy) return;
-    if (!aiBuiltIn && !aiKey) { pushToast('error', t('ai.needKey')); setIslandOpen(true); return; }
-    const next = [...aiMsgs, { role: 'user', text }].slice(-60);
-    setAiMsgs(next);
-    setAiInput('');
-    setAiBusy(true);
-    try {
-      const reply = (aiBuiltIn && window.ferro?.aiChat)
-        ? await window.ferro.aiChat({ model: aiModel, system: aiSystem(), history: next.slice(-12) })
-        : await geminiChat({ key: aiKey, model: aiModel, system: aiSystem(), history: next.slice(-12) });
-      setAiMsgs((m) => [...m, { role: 'ai', text: reply }].slice(-60));
-      setIslandOpen(true);
-    } catch (e) {
-      if (e?.status === 404) { try { await loadAiModels(); } catch {} }
-      setAiMsgs((m) => [...m, { role: 'ai', text: `⚠ ${t(aiErrorKey(e))}` }].slice(-60));
-      setIslandOpen(true);
-    } finally { setAiBusy(false); }
-  };
-  const attachLog = () => {
-    const tail = String(log || '').slice(-4000);
-    setAiMsgs((m) => [...m, { role: 'user', text: `${t('ai.logAttached')}\n\`\`\`\n${tail}\n\`\`\`` }].slice(-60));
-  };
-  const clearAi = () => { setAiMsgs([]); try { localStorage.removeItem('ferro-ai-chat'); } catch {} };
   const askConfirm = (message, onOk) => setConfirmDlg({ message, onOk, input: false });
   const askRename = (current, onOk) => { setConfirmInput(current); setConfirmDlg({ message: t('inst.renamePrompt'), input: true, onOk: (v) => { if (v && v !== current) onOk(v); } }); };
   const [saving, setSaving] = useState(false);
   const [instFilter, setInstFilter] = useState('');
-  // Chat IA (Gemini, clave del usuario guardada solo en su PC)
-  const [aiKey, setAiKey] = useState(() => { try { return localStorage.getItem('ferro-ai-key') || ''; } catch { return ''; } });
-  const [aiKeyInput, setAiKeyInput] = useState('');
-  const [aiModel, setAiModel] = useState(() => { try { return localStorage.getItem('ferro-ai-model') || 'gemini-3.5-flash-lite'; } catch { return 'gemini-3.5-flash-lite'; } });
-  const [aiModels, setAiModels] = useState([]);
-  const [aiMsgs, setAiMsgs] = useState(() => { try { return JSON.parse(localStorage.getItem('ferro-ai-chat') || '[]').slice(-60); } catch { return []; } });
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiInput, setAiInput] = useState('');
-  const aiEndRef = useRef(null);
-  const [islandOpen, setIslandOpen] = useState(false);
-  const [islandVisible, setIslandVisible] = useState(false);
-  const [islandFocus, setIslandFocus] = useState(0);
-  const [islandGreet, setIslandGreet] = useState(false);
-  useEffect(() => { try { localStorage.setItem('ferro-ai-chat', JSON.stringify(aiMsgs.slice(-60))); } catch {} }, [aiMsgs]);
-  // Clave integrada (proceso principal): si existe, no se pide ni se muestra ninguna clave.
-  const [aiBuiltIn, setAiBuiltIn] = useState(false);
-  useEffect(() => { try { window.ferro?.aiHasKey?.()?.then?.((v) => { if (v) setAiBuiltIn(true); })?.catch?.(() => {}); } catch {} }, []);
-  useEffect(() => { if (aiBuiltIn && aiModels.length === 0 && !aiBusy) loadAiModels(); }, [aiBuiltIn]);
-  // La isla solo se muestra al llamarla, al trabajar o al responder.
-  useEffect(() => { if (aiBusy || islandOpen) setIslandVisible(true); }, [aiBusy, islandOpen]);
-  // Saludo tras la intro: se queda hasta que lo toques (clic, hover, foco o Escape).
-  const dismissGreet = () => setIslandGreet(false);
-  const summonIsland = () => { setIslandVisible(true); dismissGreet(); setIslandFocus((k) => k + 1); };
-  useEffect(() => {
-    if (intro) return;
-    setIslandVisible(true);
-    setIslandGreet(true);
-  }, [intro]);
-  useEffect(() => { try { aiEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch {} }, [aiMsgs, aiBusy, tab, islandOpen]);
   const [launchProg, setLaunchProg] = useState(null);
   const [dragOn, setDragOn] = useState(false);
   const dragCount = useRef(0);
@@ -1185,11 +1080,8 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setIslandVisible(true); setIslandFocus((k) => k + 1); return; }
       if (e.key !== 'Escape') return;
-      if (islandOpen) { setIslandOpen(false); setIslandVisible(false); }
-      else if (islandGreet) { setIslandGreet(false); setIslandVisible(false); }
-      else if (galName) closeGallery();
+      if (galName) closeGallery();
       else if (settingsFor) closeModal();
       else if (confirmDlg) setConfirmDlg(null);
       else if (dragOn) { dragCount.current = 0; setDragOn(false); }
@@ -1197,7 +1089,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [galName, settingsFor, confirmDlg, dragOn, tourIdx, islandOpen, islandGreet]);
+  }, [galName, settingsFor, confirmDlg, dragOn, tourIdx]);
 
   const confirmGo = () => { const v = confirmDlg.input ? confirmInput : true; const f = confirmDlg.onOk; setConfirmDlg(null); f(v); };
 
@@ -1820,12 +1712,6 @@ export default function App() {
           <div className="scare-warn">{t('scare.warn')}</div>
         </div>
       )}
-      {!intro && (<DynamicIsland open={islandOpen} setOpen={setIslandOpen} t={t}
-        visible={islandVisible} setVisible={setIslandVisible} focusSignal={islandFocus}
-        aiMsgs={aiMsgs} aiBusy={aiBusy} aiInput={aiInput} setAiInput={setAiInput} sendAi={sendAi} aiEndRef={aiEndRef}
-        aiBuiltIn={aiBuiltIn} aiKey={aiKey} aiKeyInput={aiKeyInput} setAiKeyInput={setAiKeyInput} saveAiKey={saveAiKey}
-        aiModels={aiModels} aiModel={aiModel} setAiModel={setAiModel} loadAiModels={loadAiModels}
-        attachLog={attachLog} clearAi={clearAi} greet={islandGreet} dismissGreet={dismissGreet} summon={summonIsland} />)}
       <div className="toasts">
         {toasts.map((t)=>(
           <div key={t.id} className={`toast ${t.type}`}>

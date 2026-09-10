@@ -608,9 +608,6 @@ export default function App() {
   const [islandVisible, setIslandVisible] = useState(false);
   const [islandFocus, setIslandFocus] = useState(0);
   const [islandGreet, setIslandGreet] = useState(false);
-  const greetTimer = useRef(0);
-  const busyRef = useRef(aiBusy); busyRef.current = aiBusy;
-  const openRef = useRef(islandOpen); openRef.current = islandOpen;
   useEffect(() => { try { localStorage.setItem('ferro-ai-chat', JSON.stringify(aiMsgs.slice(-60))); } catch {} }, [aiMsgs]);
   // Clave integrada (proceso principal): si existe, no se pide ni se muestra ninguna clave.
   const [aiBuiltIn, setAiBuiltIn] = useState(false);
@@ -618,19 +615,13 @@ export default function App() {
   useEffect(() => { if (aiBuiltIn && aiModels.length === 0 && !aiBusy) loadAiModels(); }, [aiBuiltIn]);
   // La isla solo se muestra al llamarla, al trabajar o al responder.
   useEffect(() => { if (aiBusy || islandOpen) setIslandVisible(true); }, [aiBusy, islandOpen]);
-  // Saludo tras la intro: se presenta y se esconde solo si no le haces caso.
-  const dismissGreet = () => { clearTimeout(greetTimer.current); setIslandGreet(false); };
+  // Saludo tras la intro: se queda hasta que lo toques (clic, hover, foco o Escape).
+  const dismissGreet = () => setIslandGreet(false);
   const summonIsland = () => { setIslandVisible(true); dismissGreet(); setIslandFocus((k) => k + 1); };
   useEffect(() => {
     if (intro) return;
     setIslandVisible(true);
     setIslandGreet(true);
-    clearTimeout(greetTimer.current);
-    greetTimer.current = setTimeout(() => {
-      setIslandGreet(false);
-      if (!busyRef.current && !openRef.current) setIslandVisible(false);
-    }, 6000);
-    return () => clearTimeout(greetTimer.current);
   }, [intro]);
   useEffect(() => { try { aiEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch {} }, [aiMsgs, aiBusy, tab, islandOpen]);
   const [launchProg, setLaunchProg] = useState(null);
@@ -1197,6 +1188,7 @@ export default function App() {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setIslandVisible(true); setIslandFocus((k) => k + 1); return; }
       if (e.key !== 'Escape') return;
       if (islandOpen) { setIslandOpen(false); setIslandVisible(false); }
+      else if (islandGreet) { setIslandGreet(false); setIslandVisible(false); }
       else if (galName) closeGallery();
       else if (settingsFor) closeModal();
       else if (confirmDlg) setConfirmDlg(null);
@@ -1205,7 +1197,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [galName, settingsFor, confirmDlg, dragOn, tourIdx, islandOpen]);
+  }, [galName, settingsFor, confirmDlg, dragOn, tourIdx, islandOpen, islandGreet]);
 
   const confirmGo = () => { const v = confirmDlg.input ? confirmInput : true; const f = confirmDlg.onOk; setConfirmDlg(null); f(v); };
 

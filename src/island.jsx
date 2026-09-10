@@ -37,7 +37,7 @@ export default function DynamicIsland(p) {
     </div>
     {p.greet && !p.open && (
       <div className="island-hello" onClick={p.summon}>
-        <Sparkles size={13} /> {p.t('ai.greet')}
+        <Sparkles size={13} /> <span className="premium-shine">{p.t('ai.greet')}</span>
       </div>
     )}
     {p.open && (

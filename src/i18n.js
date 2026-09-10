@@ -118,7 +118,7 @@ es: {
   'ai.errOther': 'La IA no respondió: prueba de nuevo.',
   'ai.errModel': 'Ese modelo ya no existe: se ha buscado otro, prueba de nuevo.',
   'ai.builtin': 'Clave integrada ✓',
-  'ai.greet': '¿Necesitas ayuda? Pregúntame lo que sea ✦',
+  'ai.greet': '¿Necesitas ayuda? Pregúntame lo que sea',
 },
 en: {
   'tab.play': 'Play', 'tab.versions': 'Versions', 'tab.instances': 'Instances',
@@ -236,7 +236,7 @@ en: {
   'ai.errOther': 'The AI did not answer: try again.',
   'ai.errModel': 'That model is retired: another was picked, try again.',
   'ai.builtin': 'Built-in key ✓',
-  'ai.greet': 'Need help? Ask me anything ✦',
+  'ai.greet': 'Need help? Ask me anything',
 },
 };
 

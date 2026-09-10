@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import brand from './assets/brand.png';
+import flMark from './assets/fl.png';
 import { sfx } from './sfx.js';
 import { STR, getLang } from './i18n.js';
 import { GithubIcon, DiscordIcon, YoutubeIcon, XIcon } from './brands.jsx';
@@ -8,7 +9,7 @@ import {
   Play, Square, Layers, Package, LayoutGrid, Gift, User, Palette,
   Settings, Search, Plus, RefreshCw, FolderOpen, Copy, Pencil, Trash2,
   Download, Upload, Check, X, AlertTriangle, Info, Camera,
-  MessageCircle, ExternalLink, Server,
+  MessageCircle, ExternalLink, Server, Pin, PinOff,
 } from 'lucide-react';
 
 // El recuadro del botón crece hasta convertirse en la ventana (morph ida y vuelta)
@@ -54,6 +55,14 @@ function MorphModal({ origin, closing, onClose, title, children }) {
 
 export default function App() {
   const [tab, setTab] = useState('jugar');
+  const [sideOpen, setSideOpen] = useState(true);
+  const [sidePinned, setSidePinned] = useState(false);
+  const sideBig = sideOpen || sidePinned;
+  const firstTab = useRef(true);
+  useEffect(() => {
+    if (firstTab.current) { firstTab.current = false; return; }
+    if (!sidePinned) setSideOpen(false);
+  }, [tab, sidePinned]);
   const [lang, setLang] = useState(getLang());
   const t = (k, vars) => {
     let s = (STR[lang] && STR[lang][k]) || STR.es[k] || k;
@@ -916,23 +925,27 @@ export default function App() {
   return (
     <div className="layout">
       <Embers />
-      <div className="side">
-        <img ref={sideLogoRef} className="brand-logo" src={brand} alt="FerroLauncher" />
-        <button className={tab==='jugar'?'active':''} onClick={()=>setTab('jugar')}><Play size={16} /> {t('tab.play')}</button>
-        <button className={tab==='versiones'?'active':''} onClick={()=>setTab('versiones')}><Layers size={16} /> {t('tab.versions')}</button>
-        <button className={tab==='instancias'?'active':''} onClick={()=>setTab('instancias')}><Package size={16} /> {t('tab.instances')}</button>
-        <button className={tab==='mods'?'active':''} onClick={()=>{setTab('mods'); if(modsFor) loadMods(modsFor);}}><LayoutGrid size={16} /> {t('tab.content')}</button>
-        <button className={tab==='packs'?'active':''} onClick={()=>setTab('packs')}><Gift size={16} /> {t('tab.packs')}</button>
-        <button className={tab==='cuenta'?'active':''} onClick={()=>{setTab('cuenta'); loadAuth();}}><User size={16} /> {t('tab.account')}</button>
-        <button className={tab==='skin'?'active':''} onClick={()=>{setTab('skin'); loadSkin();}}><Palette size={16} /> {t('tab.skin')}</button>
-        <button className={tab==='ajustes'?'active':''} onClick={()=>setTab('ajustes')}><Settings size={16} /> {t('tab.settings')}</button>
-        <button className={tab==='servers'?'active':''} onClick={()=>{setTab('servers'); loadServers();}}><Server size={16} /> {t('tab.servers')}</button>
+      <div className={`side${sideBig ? '' : ' collapsed'}`}>
+        <div className="brand-swap" ref={sideLogoRef}>
+          <img className="brand-logo brand-full" src={brand} alt="FerroLauncher" />
+          <img className="brand-logo brand-mini" src={flMark} alt="FL" />
+        </div>
+        <button className={tab==='jugar'?'active':''} onClick={()=>setTab('jugar')}><Play size={16} /><span className="nav-label">{t('tab.play')}</span></button>
+        <button className={tab==='versiones'?'active':''} onClick={()=>setTab('versiones')}><Layers size={16} /><span className="nav-label">{t('tab.versions')}</span></button>
+        <button className={tab==='instancias'?'active':''} onClick={()=>setTab('instancias')}><Package size={16} /><span className="nav-label">{t('tab.instances')}</span></button>
+        <button className={tab==='mods'?'active':''} onClick={()=>{setTab('mods'); if(modsFor) loadMods(modsFor);}}><LayoutGrid size={16} /><span className="nav-label">{t('tab.content')}</span></button>
+        <button className={tab==='packs'?'active':''} onClick={()=>setTab('packs')}><Gift size={16} /><span className="nav-label">{t('tab.packs')}</span></button>
+        <button className={tab==='cuenta'?'active':''} onClick={()=>{setTab('cuenta'); loadAuth();}}><User size={16} /><span className="nav-label">{t('tab.account')}</span></button>
+        <button className={tab==='skin'?'active':''} onClick={()=>{setTab('skin'); loadSkin();}}><Palette size={16} /><span className="nav-label">{t('tab.skin')}</span></button>
+        <button className={tab==='ajustes'?'active':''} onClick={()=>setTab('ajustes')}><Settings size={16} /><span className="nav-label">{t('tab.settings')}</span></button>
+        <button className={tab==='servers'?'active':''} onClick={()=>{setTab('servers'); loadServers();}}><Server size={16} /><span className="nav-label">{t('tab.servers')}</span></button>
         <div className="player-chip" onClick={()=>setTab('cuenta')} title={t('tab.account')}>
           {playFace ? <img className="face" src={playFace} alt="" onError={()=>setPlayFace(null)} /> : <User size={18} />}
           <div className="pc-id"><b>{account?.name || username || '—'}</b><span>{account ? t('play.online') : t('play.offline')}</span></div>
           <span className={`dot ${account ? 'on' : ''}`} />
         </div>
         <div className="ver">v{appVer || '?'} · {t('footerTag')}</div>
+        <button className={`pin${sidePinned ? ' on' : ''}`} onClick={()=>{ if (!sidePinned) setSideOpen(true); setSidePinned(!sidePinned); }} title="Pin">{sidePinned ? <PinOff size={14} /> : <Pin size={14} />}</button>
       </div>
       <div className="main" key={tab}>
         {tab==='jugar' && (<>

@@ -140,7 +140,7 @@ body::after {
 /* ——— Brasas ——— */
 .embers { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
 
-.layout { display: grid; grid-template-columns: 248px 1fr; height: 100vh; }
+.layout { display: grid; grid-template-columns: auto 1fr; height: 100vh; }
 
 /* ——— Sidebar cristal ——— */
 .side {
@@ -149,6 +149,9 @@ body::after {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 248px;
+  overflow: hidden;
+  transition: width 0.3s ease;
   background: var(--glass-strong);
   -webkit-backdrop-filter: blur(28px) saturate(1.7);
   backdrop-filter: blur(28px) saturate(1.7);
@@ -166,15 +169,57 @@ body::after {
   color: transparent;
   font-weight: 800;
 }
-.brand-logo {
-  width: 100%;
-  aspect-ratio: 2030 / 701;
-  height: auto;
-  display: block;
-  border-radius: 16px;
+.side.collapsed { width: 78px; }
+.side.collapsed:hover { width: 248px; }
+.brand-swap {
+  position: relative;
+  height: 56px;
   margin: 2px 0 12px;
+  flex-shrink: 0;
+}
+.brand-swap .brand-logo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  margin: 0;
+  border-radius: 12px;
+  object-fit: contain;
+  object-position: left center;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.side .brand-full { opacity: 1; transform: scale(1); }
+.side .brand-mini { opacity: 0; transform: scale(.85); }
+.side.collapsed .brand-full { opacity: 0; transform: scale(.9); }
+.side.collapsed .brand-mini { opacity: 1; transform: scale(1); }
+.side.collapsed:hover .brand-full { opacity: 1; transform: scale(1); }
+.side.collapsed:hover .brand-mini { opacity: 0; transform: scale(.85); }
+.side .nav-label {
+  display: inline-block;
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 150px;
+  opacity: 1;
+  transition: opacity 0.18s ease, max-width 0.3s ease;
+}
+.side.collapsed .nav-label { opacity: 0; max-width: 0; }
+.side.collapsed:hover .nav-label { opacity: 1; max-width: 150px; }
+.side.collapsed button { justify-content: center; }
+.side .pc-id, .side .ver { transition: opacity 0.2s ease, max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease; max-height: 60px; overflow: hidden; }
+.side.collapsed .pc-id, .side.collapsed .ver { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0; border-width: 0; }
+.side.collapsed:hover .pc-id, .side.collapsed:hover .ver { opacity: 1; max-height: 60px; }
+.side.collapsed .player-chip { justify-content: center; }
+.side .pin {
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid transparent;
+  color: var(--muted); border-radius: 12px; padding: 8px;
+  cursor: pointer; transition: all 0.2s ease; flex-shrink: 0;
+}
+.side .pin:hover { color: var(--ink); background: rgba(255, 255, 255, 0.07); }
+.side .pin.on { color: var(--amber); }
+.brand-swap .brand-logo {
   filter: drop-shadow(0 8px 22px var(--glow));
-  transition: transform 0.25s ease, filter 0.25s ease;
 }
 .brand-logo:hover {
   transform: scale(1.03) translateY(-1px);

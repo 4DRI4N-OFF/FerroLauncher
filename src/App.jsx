@@ -607,6 +607,10 @@ export default function App() {
   const [islandOpen, setIslandOpen] = useState(false);
   const [islandVisible, setIslandVisible] = useState(false);
   const [islandFocus, setIslandFocus] = useState(0);
+  const [islandGreet, setIslandGreet] = useState(false);
+  const greetTimer = useRef(0);
+  const busyRef = useRef(aiBusy); busyRef.current = aiBusy;
+  const openRef = useRef(islandOpen); openRef.current = islandOpen;
   useEffect(() => { try { localStorage.setItem('ferro-ai-chat', JSON.stringify(aiMsgs.slice(-60))); } catch {} }, [aiMsgs]);
   // Clave integrada (proceso principal): si existe, no se pide ni se muestra ninguna clave.
   const [aiBuiltIn, setAiBuiltIn] = useState(false);
@@ -614,6 +618,20 @@ export default function App() {
   useEffect(() => { if (aiBuiltIn && aiModels.length === 0 && !aiBusy) loadAiModels(); }, [aiBuiltIn]);
   // La isla solo se muestra al llamarla, al trabajar o al responder.
   useEffect(() => { if (aiBusy || islandOpen) setIslandVisible(true); }, [aiBusy, islandOpen]);
+  // Saludo tras la intro: se presenta y se esconde solo si no le haces caso.
+  const dismissGreet = () => { clearTimeout(greetTimer.current); setIslandGreet(false); };
+  const summonIsland = () => { setIslandVisible(true); dismissGreet(); setIslandFocus((k) => k + 1); };
+  useEffect(() => {
+    if (intro) return;
+    setIslandVisible(true);
+    setIslandGreet(true);
+    clearTimeout(greetTimer.current);
+    greetTimer.current = setTimeout(() => {
+      setIslandGreet(false);
+      if (!busyRef.current && !openRef.current) setIslandVisible(false);
+    }, 6000);
+    return () => clearTimeout(greetTimer.current);
+  }, [intro]);
   useEffect(() => { try { aiEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch {} }, [aiMsgs, aiBusy, tab, islandOpen]);
   const [launchProg, setLaunchProg] = useState(null);
   const [dragOn, setDragOn] = useState(false);
@@ -1814,7 +1832,7 @@ export default function App() {
         aiMsgs={aiMsgs} aiBusy={aiBusy} aiInput={aiInput} setAiInput={setAiInput} sendAi={sendAi} aiEndRef={aiEndRef}
         aiBuiltIn={aiBuiltIn} aiKey={aiKey} aiKeyInput={aiKeyInput} setAiKeyInput={setAiKeyInput} saveAiKey={saveAiKey}
         aiModels={aiModels} aiModel={aiModel} setAiModel={setAiModel} loadAiModels={loadAiModels}
-        attachLog={attachLog} clearAi={clearAi} />)}
+        attachLog={attachLog} clearAi={clearAi} greet={islandGreet} dismissGreet={dismissGreet} summon={summonIsland} />)}
       <div className="toasts">
         {toasts.map((t)=>(
           <div key={t.id} className={`toast ${t.type}`}>

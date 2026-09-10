@@ -21,6 +21,7 @@ export default function DynamicIsland(p) {
     <div
       className={`island${p.open ? ' open' : ''}${p.aiBusy ? ' busy' : ''}${p.visible ? '' : ' gone'}`}
       onMouseLeave={maybeHide}
+      onMouseEnter={() => { p.setVisible(true); p.dismissGreet(); }}
     >
       <span className="island-ico"><Sparkles size={17} /></span>
       <input
@@ -29,10 +30,16 @@ export default function DynamicIsland(p) {
         value={p.aiInput}
         onChange={(e) => p.setAiInput(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); p.sendAi(); } }}
+        onFocus={p.dismissGreet}
         placeholder={p.t('ai.ph')}
       />
       {p.aiBusy && <span className="is-dots"><i /><i /><i /></span>}
     </div>
+    {p.greet && !p.open && (
+      <div className="island-hello" onClick={p.summon}>
+        <Sparkles size={13} /> {p.t('ai.greet')}
+      </div>
+    )}
     {p.open && (
       <div className="island-answer" onMouseLeave={maybeHide}>
         <div className="island-answer-head">

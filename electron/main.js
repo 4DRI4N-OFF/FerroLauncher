@@ -353,7 +353,7 @@ ipcMain.handle('ferro:packInstall', async (_, { name, projectId, packVersionId, 
 });
 ipcMain.handle('ferro:java', async () => (await findJava()) || null);
 
-ipcMain.handle('ferro:clientId', async () => auth.getClientId(getDirs().base));
+ipcMain.handle('ferro:clientId', async () => auth.getClientIdPublic(getDirs().base));
 ipcMain.handle('ferro:discord', async () => ({ ...auth.getDiscord(getDirs().base), webhook: readWebhook(getDirs().base) }));
 ipcMain.handle('ferro:setDiscord', async (_, patch) => {
   const d = writeWebhook(getDirs().base, patch || {});
@@ -515,7 +515,23 @@ ipcMain.handle('ferro:openFolder', async (_, { instanceName }) => {
   return true;
 });
 ipcMain.handle('ferro:duplicateInstance', async (_, { instanceName }) => duplicateInstance(getDirs().instances, instanceName));
-ipcMain.handle('ferro:deleteInstance', async (_, { instanceName }) => deleteInstance(getDirs().instances, instanceName));
+ipcMain.handle('ferro:deleteInstance', async (_, { instanceName }) => {
+  const d = getDirs();
+  const inst = findInstance(d, instanceName);
+  try {
+    const r = shell.trashItem(inst.path);
+    if (r && typeof r.then === 'function') await r;
+    return true;
+  } catch {}
+  try {
+    return deleteInstance(d.instances, instanceName);
+  } catch (e) {
+    if (e.code === 'EBUSY' || /EBUSY/.test(e.message || '')) {
+      throw new Error('Carpeta en uso: cierra el juego y el explorador e inténtalo de nuevo');
+    }
+    throw e;
+  }
+});
 ipcMain.handle('ferro:renameInstance', async (_, { instanceName, newName }) => renameInstance(getDirs().instances, instanceName, newName));
 
 ipcMain.handle('ferro:exportInstance', async (_, { instanceName }) => {

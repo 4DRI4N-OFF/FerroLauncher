@@ -40,6 +40,18 @@ function getClientId(baseDir) {
   return readJson(authPaths(baseDir).config, {}).clientId || process.env.FERRO_CLIENT_ID || localSecrets().clientId || DEFAULT_CLIENT_ID;
 }
 
+// Versión pública para la UI: nunca expone el ID completo
+function maskId(id) {
+  const s = String(id || '');
+  if (!s) return '';
+  return '••••' + s.slice(-4);
+}
+
+function getClientIdPublic(baseDir) {
+  const id = getClientId(baseDir);
+  return { masked: maskId(id), configured: !!id };
+}
+
 function setClientId(baseDir, clientId) {
   const p = authPaths(baseDir).config;
   const cfg = readJson(p, {});
@@ -248,7 +260,7 @@ async function validAccount(baseDir, clientId) {
 }
 
 module.exports = {
-  getClientId, setClientId, getDiscord, setDiscord, deviceStart, devicePollOnce,
+  getClientId, getClientIdPublic, maskId, setClientId, getDiscord, setDiscord, deviceStart, devicePollOnce,
   completeLogin, validAccount, loadAccount, clearAccount,
   listAccounts, setActive, removeAccount,
   exchangeCode, authorizeUrl, NATIVE_REDIRECT, SCOPE,

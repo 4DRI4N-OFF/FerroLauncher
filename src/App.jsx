@@ -121,6 +121,7 @@ export default function App() {
   const [cfPackVers, setCfPackVers] = useState({});
   const [cfPackBusy, setCfPackBusy] = useState(null);
   const [clientId, setClientId] = useState('');
+  const [idInfo, setIdInfo] = useState({ masked: '', configured: false });
   const [account, setAccount] = useState(null);
   const [accts, setAccts] = useState([]);
   const [authStep, setAuthStep] = useState(null);
@@ -609,7 +610,9 @@ export default function App() {
 
   const loadAuth = async () => {
     try {
-      setClientId(await window.ferro.clientId() || '');
+      const ci = await window.ferro.clientId().catch(() => null);
+      setIdInfo(ci || { masked: '', configured: false });
+      setClientId('');
       setAccount(await window.ferro.authStatus());
       setAccts(await window.ferro.accounts());
       const dc = await window.ferro.discord().catch(()=>({clientId:'',enabled:true}));
@@ -747,6 +750,7 @@ export default function App() {
 
   const doAuthStart = async () => {
     try {
+      if (clientId.trim()) await window.ferro.setClientId({ clientId });
       const s = await window.ferro.authStart();
       setAuthStep(s);
       setPollCount(0);
@@ -1301,8 +1305,10 @@ export default function App() {
             <h2>{t('acct.title')}</h2>
             <p>{t('acct.desc')}</p>
             <div className="row">
-              <input value={clientId} onChange={(e)=>setClientId(e.target.value)} placeholder={t('acct.clientPh')} style={{minWidth:300}} />
-              <button className="ghost" onClick={async()=>{await window.ferro.setClientId({ clientId }); setLog((l)=>l+'[ferro] client ID guardado\n');}}>{t('acct.save')}</button>
+              {idInfo.configured && <span className="pill green">✓ {t('acct.idOn')} {idInfo.masked}</span>}
+              <input value={clientId} onChange={(e)=>setClientId(e.target.value)} placeholder={idInfo.configured ? t('acct.replacePh') : t('acct.clientPh')} style={{minWidth:300}} />
+              <button className="ghost" onClick={async()=>{ if (!clientId.trim()) return; await window.ferro.setClientId({ clientId }); setLog((l)=>l+'[ferro] client ID guardado\n'); loadAuth();}}>{t('acct.save')}</button>
+              {idInfo.configured && <button className="ghost danger" onClick={async()=>{await window.ferro.setClientId({ clientId: '' }); setLog((l)=>l+'[ferro] override quitado\n'); loadAuth();}}>{t('acct.clear')}</button>}
             </div>
             <h3>{t('acct.accounts')} ({accts.length})</h3>
             {accts.length===0 && <p style={{opacity:.6}}>{t('acct.noAccounts')}</p>}
@@ -1328,7 +1334,7 @@ export default function App() {
                   : null}
             {!account && !browserWaiting && (
               !authStep
-                ? <p style={{marginTop:12}}><button className="ghost" onClick={doAuthStart} disabled={!clientId}>{t('acct.altMethod')}</button></p>
+                  ? <p style={{marginTop:12}}><button className="ghost" onClick={doAuthStart} disabled={!(idInfo.configured || clientId)}>{t('acct.altMethod')}</button></p>
                 : <div className="card">
                     <p>1. {t('acct.step1')} <b>{authStep.verificationUri}</b></p>
                     <p>2. {t('acct.step2')} <b style={{fontSize:22, letterSpacing:2}}>{authStep.userCode}</b></p>

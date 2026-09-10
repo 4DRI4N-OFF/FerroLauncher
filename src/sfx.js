@@ -14,11 +14,30 @@ export const sfx = {
   cfg: loadCfg(),
   save() { try { localStorage.setItem(KEY, JSON.stringify(this.cfg)); } catch {} },
   play(name) {
-    if (!this.cfg.enabled || !PACK[this.cfg.pack]?.[name]) return;
+    if (!this.cfg.enabled) return;
     if (name === 'hover' && !this.cfg.hover) return;
+    try {
+      const arr = packSfx && packSfx[name];
+      if (arr && arr.length) {
+        const a = new Audio(arr[(Math.random() * arr.length) | 0]);
+        a.volume = Math.max(0, Math.min(1, this.cfg.volume));
+        a.play().catch(() => {});
+        return;
+      }
+    } catch {}
+    if (!PACK[this.cfg.pack]?.[name]) return;
     try { PACK[this.cfg.pack][name](this.cfg.volume); } catch {}
   },
 };
+
+// Pack de samples real (JDSherbert en tu Musica): si existe, manda el; si no, sintesis.
+let packSfx = null;
+export async function loadSfxPack() {
+  try {
+    const r = await window.ferro?.sfxPack?.();
+    if (r && Object.keys(r).length) packSfx = r;
+  } catch {}
+}
 
 let ctx = null;
 let master = null;

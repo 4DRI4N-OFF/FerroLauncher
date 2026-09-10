@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('ferro', {
   setDiscord: (data) => ipcRenderer.invoke('ferro:setDiscord', data),
   testWebhook: () => ipcRenderer.invoke('ferro:testWebhook'),
   thx: () => ipcRenderer.invoke('ferro:thx'),
+  sfxPack: () => ipcRenderer.invoke('ferro:sfxPack'),
   openUrl: (data) => ipcRenderer.invoke('ferro:openUrl', data),
   social: () => ipcRenderer.invoke('ferro:social'),
   setClientId: (data) => ipcRenderer.invoke('ferro:setClientId', data),

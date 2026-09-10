@@ -25,25 +25,19 @@
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <filter id="water" x="-20%" y="-20%" width="140%" height="140%">
-    <feTurbulence id="wt" type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="2" seed="7" result="n" />
-    <feDisplacementMap in="SourceGraphic" in2="n" scale="30" xChannelSelector="R" yChannelSelector="G" />
-  </filter>
-</svg>
 
 <div class="sea"><div class="glow a"></div><div class="glow b"></div><div class="glow c"></div></div>
 <div class="dots"></div>
 <div class="ghost" aria-hidden="true">FERRO</div>
 <div class="bubbles" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
 
-<div class="drop" id="drop" aria-hidden="true"><div class="drop-bg"></div></div>
 <div class="drop small d1" aria-hidden="true"><div class="drop-bg"></div></div>
 <div class="drop small d2" aria-hidden="true"><div class="drop-bg"></div></div>
 
 <header class="top">
   <span class="brandmark"><img src="assets/brand.png" alt="FerroLauncher" />FerroLauncher</span>
   <div class="top-right">
+    <span class="face" id="face" aria-hidden="true"><i></i><i></i></span>
     <button id="lang" class="mini">EN</button>
     <a href="#download" class="dl-pill"><span data-es="Descargar" data-en="Download">Descargar</span></a>
   </div>
@@ -100,26 +94,30 @@ fetch('https://api.github.com/repos/4DRI4N-OFF/FerroLauncher/releases/latest')
     const setup = (j.assets || []).find((a) => /Setup.*\.exe$/i.test(a.name));
     if (setup) document.getElementById('dl-setup').href = setup.browser_download_url;
   }).catch(() => {});
-// Gota que sigue al ratón + agua viva
+// Carita de palos que mira al cursor (vector normalizado, radio fijo, rAF)
 (function () {
-  const drop = document.getElementById('drop');
-  const wt = document.getElementById('wt');
-  if (!drop || matchMedia('(pointer: coarse)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) { if (drop) drop.style.display = 'none'; return; }
-  const R = 110;
-  let x = innerWidth / 2, y = innerHeight * 0.42, tx = x, ty = y, t = 0;
-  addEventListener('pointermove', (e) => { tx = e.clientX; ty = e.clientY; }, { passive: true });
-  (function loop() {
-    t += 0.016;
-    x += (tx - x) * 0.08;
-    y += (ty - y) * 0.08;
-    drop.style.left = (x - R) + 'px';
-    drop.style.top = (y - R) + 'px';
-    if (wt) {
-      const w = 0.010 + 0.003 * Math.sin(t * 1.7);
-      wt.setAttribute('baseFrequency', w.toFixed(4) + ' ' + (w * 1.7).toFixed(4));
-    }
-    requestAnimationFrame(loop);
-  })();
+  const face = document.getElementById('face');
+  if (!face || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const R = 5;
+  let raf = 0;
+  const set = (x, y) => {
+    face.style.setProperty('--ex', x.toFixed(1) + 'px');
+    face.style.setProperty('--ey', y.toFixed(1) + 'px');
+  };
+  addEventListener('mousemove', (e) => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      const r = face.getBoundingClientRect();
+      const dx = e.clientX - (r.left + r.width / 2);
+      const dy = e.clientY - (r.top + r.height / 2);
+      const len = Math.hypot(dx, dy);
+      if (len < 1) { set(0, 0); return; }
+      const f = Math.min(1, len / 220);
+      set((dx / len) * R * f, (dy / len) * R * f);
+    });
+  }, { passive: true });
+  document.addEventListener('mouseleave', () => set(0, 0));
 })();
 </script>
 </body>

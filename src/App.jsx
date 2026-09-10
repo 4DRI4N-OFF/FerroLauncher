@@ -933,8 +933,10 @@ export default function App() {
       const rl = land.getBoundingClientRect();
       const dx = rl.left + rl.width / 2 - (r1.left + r1.width / 2);
       const dy = rl.top + rl.height / 2 - (r1.top + r1.height / 2);
-      const baseMini = tiny0 ? tiny0.getBoundingClientRect().width : r1.width;
-      const s = baseMini > 0 ? rl.width / baseMini : r2.width / r1.width;
+      const baseTiny = tiny0 ? tiny0.getBoundingClientRect() : r1;
+      // Escala por dibujo visible (contain), no por caja: el mini es cuadrado.
+      const glyph = (r) => Math.min(r.width, r.height);
+      const s = glyph(baseTiny) > 0 ? glyph(rl) / glyph(baseTiny) : r2.width / r1.width;
       try {
         const a1 = img.animate([
           { transform: 'translate(0, 0) scale(1)' },

@@ -4,30 +4,27 @@ import { Sparkles, X } from 'lucide-react';
 // Isla discreta: escondida salvo hover arriba, Ctrl+K, trabajo o respuesta.
 export default function DynamicIsland(p) {
   const inputRef = useRef(null);
+  const islandRef = useRef(null);
   useEffect(() => {
     if (!p.focusSignal) return;
     const t = setTimeout(() => { try { inputRef.current?.focus(); } catch {} }, 60);
     return () => clearTimeout(t);
   }, [p.focusSignal]);
-  // Los ojitos siguen al raton (con calma, via rAF).
+  // Los ojitos siguen al raton (ref directa al nodo vivo, sin throttle).
   useEffect(() => {
-    let raf = 0;
     const onMove = (e) => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        try {
-          const el = document.querySelector('.island');
-          if (!el) return;
-          const r = el.getBoundingClientRect();
-          const dx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / 200));
-          const dy = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / 200));
-          el.style.setProperty('--ex', (dx * 3).toFixed(1) + 'px');
-          el.style.setProperty('--ey', (dy * 2.5).toFixed(1) + 'px');
-        } catch {}
-      });
+      try {
+        const el = islandRef.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        const dx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / 160));
+        const dy = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / 160));
+        el.style.setProperty('--ex', (dx * 5).toFixed(1) + 'px');
+        el.style.setProperty('--ey', (dy * 4).toFixed(1) + 'px');
+      } catch {}
     };
     window.addEventListener('mousemove', onMove);
-    return () => { window.removeEventListener('mousemove', onMove); cancelAnimationFrame(raf); };
+    return () => window.removeEventListener('mousemove', onMove);
   }, []);
   const lastAi = [...(p.aiMsgs || [])].reverse().find((m) => m.role === 'ai');
   const maybeHide = (e) => {
@@ -39,6 +36,7 @@ export default function DynamicIsland(p) {
   return (<>
     <div className="island-trigger" onMouseEnter={() => p.setVisible(true)} />
     <div
+      ref={islandRef}
       className={`island${p.open ? ' open' : ''}${p.aiBusy ? ' busy' : ''}${p.visible ? '' : ' gone'}`}
       onMouseLeave={maybeHide}
       onMouseEnter={() => { p.setVisible(true); p.dismissGreet(); }}

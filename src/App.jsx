@@ -847,9 +847,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const lv = (e) => { e.preventDefault(); dragCount.current = Math.max(0, dragCount.current - 1); if (!dragCount.current) setDragOn(false); };
-    const dr = (e) => { e.preventDefault(); };
-    const dp = async (e) => {
+    const onDragEnter = (e) => { e.preventDefault(); if (e.dataTransfer?.types?.includes('Files')) { dragCount.current++; setDragOn(true); } };
+    const onDragLeave = (e) => { e.preventDefault(); dragCount.current = Math.max(0, dragCount.current - 1); if (!dragCount.current) setDragOn(false); };
+    const onDragOver = (e) => { e.preventDefault(); };
+    const onDropFile = async (e) => {
       e.preventDefault(); dragCount.current = 0; setDragOn(false);
       const files = [...(e.dataTransfer?.files || [])].map((f) => f.path).filter(Boolean);
       if (!files.length) return;
@@ -859,11 +860,11 @@ export default function App() {
         refresh();
       } catch (err) { setLog((l) => l + `[error] ${err.message}\n`); }
     };
-    window.addEventListener('dragenter', en);
-    window.addEventListener('dragleave', lv);
-    window.addEventListener('dragover', dr);
-    window.addEventListener('drop', dp);
-    return () => { window.removeEventListener('dragenter', en); window.removeEventListener('dragleave', lv); window.removeEventListener('dragover', dr); window.removeEventListener('drop', dp); };
+    window.addEventListener('dragenter', onDragEnter);
+    window.addEventListener('dragleave', onDragLeave);
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('drop', onDropFile);
+    return () => { window.removeEventListener('dragenter', onDragEnter); window.removeEventListener('dragleave', onDragLeave); window.removeEventListener('dragover', onDragOver); window.removeEventListener('drop', onDropFile); };
   }, [modsFor]);
 
   const editSettings = (name, e) => {

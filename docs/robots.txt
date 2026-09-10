@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://4dri4n-off.github.io/FerroLauncher/sitemap.xml

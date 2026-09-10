@@ -12,6 +12,51 @@ import {
   MessageCircle, ExternalLink, Server, Pin, PinOff,
 } from 'lucide-react';
 
+// Resorte de Apple al hacer scroll: al llegar al tope, el contenido cede
+// con resistencia y vuelve con muelle. Un solo listener global.
+function initSpringScroll() {
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return () => {};
+  } catch {}
+  const state = new WeakMap();
+  const MAX = 130;
+  const onWheel = (e) => {
+    if (e.ctrlKey) return;
+    if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+    const t = e.target;
+    if (!(t instanceof Element)) return;
+    const dir = e.deltaY < 0 ? -1 : 1;
+    // Si alguien de la cadena puede hacer scroll en esta direccion, scroll nativo.
+    let n = t, can = false, box = null;
+    while (n && n !== document.documentElement) {
+      if (n instanceof HTMLElement && n.scrollHeight > n.clientHeight + 1) {
+        if (!box) box = n;
+        if ((dir < 0 && n.scrollTop > 0) || (dir > 0 && n.scrollTop + n.clientHeight < n.scrollHeight - 1)) { can = true; break; }
+      }
+      n = n.parentElement;
+    }
+    if (can) return;
+    if (!box && t.closest) box = t.closest('.main, .modal-body, .log');
+    if (!box) return;
+    e.preventDefault();
+    let s = state.get(box);
+    if (!s) { s = { pull: 0, timer: 0, back: 0 }; state.set(box, s); }
+    clearTimeout(s.timer); clearTimeout(s.back);
+    box.style.transition = 'none';
+    s.pull = Math.max(-MAX, Math.min(MAX, s.pull + e.deltaY * 0.42));
+    box.style.transform = `translateY(${(-s.pull).toFixed(1)}px)`;
+    s.timer = setTimeout(() => {
+      const p = s.pull; s.pull = 0;
+      if (Math.abs(p) < 1) { box.style.transform = ''; return; }
+      box.style.transition = 'transform .55s cubic-bezier(.18,1.55,.32,1)';
+      box.style.transform = '';
+      s.back = setTimeout(() => { try { box.style.transition = ''; } catch {} }, 600);
+    }, 110);
+  };
+  document.addEventListener('wheel', onWheel, { passive: false, capture: true });
+  return () => { try { document.removeEventListener('wheel', onWheel, { capture: true }); } catch {} };
+}
+
 // El recuadro del botón crece hasta convertirse en la ventana (morph ida y vuelta)
 function MorphModal({ origin, closing, onClose, title, children }) {
   const boxRef = useRef(null);
@@ -316,7 +361,7 @@ export default function App() {
   const [exploding, setExploding] = useState(null);
   const boomCtl = useRef({ raf: 0, kill: 0 });
   // Limpia restos de explosiones anteriores (canvas huerfano con luz congelada).
-  useEffect(() => { try { document.getElementById('boom-fx')?.remove(); } catch {} }, []);
+  useEffect(() => { try { document.getElementById('boom-fx')?.remove(); } catch {} return initSpringScroll(); }, []);
   const celebrateLogin = () => {
     setLoginFx((k) => k + 1);
     setFlashFx((k) => k + 1);

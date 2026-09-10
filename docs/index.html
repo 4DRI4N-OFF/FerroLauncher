@@ -119,6 +119,15 @@ fetch('https://api.github.com/repos/4DRI4N-OFF/FerroLauncher/releases/latest')
   }, { passive: true });
   document.addEventListener('mouseleave', () => set(0, 0));
 })();
+// La carita se emociona sobre botones de descarga
+(function () {
+  const face = document.getElementById('face');
+  if (!face) return;
+  document.querySelectorAll('.dl-pill, .btn-win, .dl-card').forEach((b) => {
+    b.addEventListener('mouseenter', () => face.classList.add('joy'));
+    b.addEventListener('mouseleave', () => face.classList.remove('joy'));
+  });
+})();
 </script>
 </body>
 </html>

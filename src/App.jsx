@@ -900,6 +900,21 @@ export default function App() {
     if (autoScroll && logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [filteredLog, autoScroll]);
 
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      if (galName) closeGallery();
+      else if (settingsFor) closeModal();
+      else if (confirmDlg) setConfirmDlg(null);
+      else if (dragOn) { dragCount.current = 0; setDragOn(false); }
+      else if (tourIdx !== null) endTour();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [galName, settingsFor, confirmDlg, dragOn, tourIdx]);
+
+  const confirmGo = () => { const v = confirmDlg.input ? confirmInput : true; const f = confirmDlg.onOk; setConfirmDlg(null); f(v); };
+
   useEffect(() => { if (!running) setLaunchProg(null); }, [running]);
 
   useEffect(() => {
@@ -1013,6 +1028,7 @@ export default function App() {
                     <span className="pill">{s.versionId}</span>
                     <span className={`pill l-${s.type}`}>{s.type==='vanilla' ? 'vanilla' : `${s.type} ${s.loaderVersion||''}`}</span>
                     <span className="pill">{((s.settings?.ramMb||2048)/1024)} GB</span>
+                    {(() => { const tt = instances.reduce((a, i) => a + (i.playSecs || 0), 0); return tt >= 60 ? (<span className="pill">{fmtPlay(tt)}</span>) : null; })()}
                   </>) : null; })()}
                   {running && <span className="pill green"><span className="spinner" />{t('play.running')}</span>}
                 </div>
@@ -1491,9 +1507,11 @@ export default function App() {
           <div className="tour-dim" onClick={endTour} />
           {tourRect && <div className="tour-ring" style={{ left: tourRect.x, top: tourRect.y, width: tourRect.w, height: tourRect.h }} />}
           <div className="tour-tip" style={tipStyle}>
-            <b>{st.title}</b>
-            <p>{st.body}</p>
-            <div className="tour-dots">{steps.map((_, i) => <span key={i} className={i === tourIdx ? 'on' : ''} />)}</div>
+            <div key={tourIdx} className="tour-body">
+              <b>{st.title}</b>
+              <p>{st.body}</p>
+            </div>
+            <div className="tour-dots">{steps.map((_, i) => <span key={i} className={i === tourIdx ? 'on' : ''} />)}<span className="tour-count">{tourIdx + 1}/{steps.length}</span></div>
             <div className="row">
               <button className="mini" onClick={endTour}>{t('tour.skip')}</button>
               <span style={{ flex: 1 }} />
@@ -1535,10 +1553,10 @@ export default function App() {
           <div className="card" onClick={(e)=>e.stopPropagation()} style={{minWidth:320, maxWidth:440}}>
             <div className="card-title">{t('ui.confirmTitle')}</div>
             <p style={{opacity:.8}}>{confirmDlg.message}</p>
-            {confirmDlg.input && <input autoFocus value={confirmInput} onChange={(e)=>setConfirmInput(e.target.value)} placeholder={t('ui.enterName')} style={{width:'100%', marginTop:8}} />}
+            {confirmDlg.input && <input autoFocus value={confirmInput} onChange={(e)=>setConfirmInput(e.target.value)} onKeyDown={(e)=>{ if (e.key==='Enter') confirmGo(); }} placeholder={t('ui.enterName')} style={{width:'100%', marginTop:8}} />}
             <div className="row" style={{marginTop:12, justifyContent:'flex-end'}}>
               <button className="ghost" onClick={()=>setConfirmDlg(null)}>{t('ui.cancel')}</button>
-              <button className="primary" onClick={()=>{const v = confirmDlg.input ? confirmInput : true; const f = confirmDlg.onOk; setConfirmDlg(null); f(v);}}>{t('ui.confirm')}</button>
+              <button className="primary" onClick={confirmGo}>{t('ui.confirm')}</button>
             </div>
           </div>
         </div>

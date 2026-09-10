@@ -89,6 +89,7 @@
     <div class="stat"><b id="st-ver">v0.6.0</b><span data-es="Última versión" data-en="Latest release">Última versión</span></div>
     <div class="stat"><b id="st-dl">…</b><span data-es="Descargas" data-en="Downloads">Descargas</span></div>
     <div class="stat"><b id="st-stars">…</b><span>Stars</span></div>
+    <div class="stat"><b id="st-issues">…</b><span data-es="Temas abiertos" data-en="Open issues">Temas abiertos</span></div>
   </div>
   <h3 style="margin-top:22px" data-es="Cambios recientes" data-en="Recent changes">Cambios recientes</h3>
   <div id="changelog"><p style="opacity:.6">…</p></div>
@@ -120,10 +121,13 @@
   <div class="eyebrow">05 · <span data-es="Comunidad" data-en="Community">Comunidad</span></div>
   <h2 data-es="Construyámoslo juntos" data-en="Let's build it together">Construyámoslo juntos</h2>
   <p data-es="Reporta bugs, pide funciones o echa un cable. Todo pasa por GitHub y Discord." data-en="Report bugs, request features or lend a hand. Everything goes through GitHub and Discord.">Reporta bugs, pide funciones o echa un cable. Todo pasa por GitHub y Discord.</p>
+  <div class="team" id="team"></div>
+  <p class="commit-line" id="commitline" hidden></p>
   <div class="cta" style="justify-content:flex-start">
     <a class="btn ghost" href="https://discord.gg/vTujTm3hE">Discord</a>
     <a class="btn ghost" href="https://github.com/4DRI4N-OFF/FerroLauncher/issues">Issues</a>
     <a class="btn ghost" href="https://www.youtube.com/@4dri4n-08">YouTube</a>
+    <a class="btn ghost" id="star-btn" href="https://github.com/4DRI4N-OFF/FerroLauncher">★ Star</a>
   </div>
 </section>
 
@@ -264,10 +268,60 @@ fetch('https://api.github.com/repos/4DRI4N-OFF/FerroLauncher/releases/latest')
     const setup = (j.assets || []).find((a) => /Setup.*\.exe$/i.test(a.name));
     if (setup) document.getElementById('dl-setup').href = setup.browser_download_url;
   }).catch(() => {});
+// Equipo vivo desde GitHub: contribuidores, issues, último cambio y estrella
+function relTime(iso) {
+  const en = document.documentElement.lang === 'en';
+  const s = Math.max(0, (Date.now() - new Date(iso)) / 1000);
+  if (s < 3600) return en ? 'just now' : 'ahora mismo';
+  if (s < 86400) { const h = Math.floor(s / 3600); return en ? `${h}h ago` : `hace ${h} h`; }
+  const d = Math.floor(s / 86400);
+  return en ? `${d}d ago` : `hace ${d} d`;
+}
+fetch('https://api.github.com/repos/4DRI4N-OFF/FerroLauncher/contributors?per_page=12')
+  .then((r) => r.json())
+  .then((list) => {
+    if (!Array.isArray(list) || !list.length) return;
+    const box = document.getElementById('team');
+    box.innerHTML = '';
+    for (const u of list) {
+      const a = document.createElement('a');
+      a.href = u.html_url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.className = 'mate';
+      a.title = `${u.login} · ${u.contributions} commits`;
+      a.innerHTML = `<img loading="lazy" alt="" /><span></span>`;
+      a.querySelector('img').src = u.avatar_url + '&s=96';
+      a.querySelector('span').textContent = u.login;
+      box.appendChild(a);
+    }
+  }).catch(() => {});
+fetch('https://api.github.com/repos/4DRI4N-OFF/FerroLauncher/commits?sha=main&per_page=1')
+  .then((r) => r.json())
+  .then((list) => {
+    const c = Array.isArray(list) && list[0];
+    if (!c) return;
+    const el = document.getElementById('commitline');
+    const en = document.documentElement.lang === 'en';
+    el.hidden = false;
+    el.innerHTML = `<b></b> <span></span>`;
+    el.querySelector('b').textContent = (en ? 'Latest change: ' : 'Último cambio: ') + (c.commit.message || '').split('\n')[0].slice(0, 90);
+    el.querySelector('span').textContent = ' · ' + relTime(c.commit.author?.date || c.commit.committer?.date);
+  }).catch(() => {});
 // Stats + changelog en vivo
 fetch('https://api.github.com/repos/4DRI4N-OFF/FerroLauncher')
   .then((r) => r.json())
-  .then((j) => { if (j.stargazers_count !== undefined) countUp(document.getElementById('st-stars'), j.stargazers_count); })
+  .then((j) => {
+    if (j.stargazers_count !== undefined) {
+      countUp(document.getElementById('st-stars'), j.stargazers_count);
+      const sb = document.getElementById('star-btn');
+      if (sb) sb.textContent = `★ Star · ${j.stargazers_count}`;
+    }
+    if (j.open_issues_count !== undefined) {
+      const el = document.getElementById('st-issues');
+      if (el) el.textContent = j.open_issues_count;
+    }
+  })
   .catch(() => {});
 fetch('https://api.github.com/repos/4DRI4N-OFF/FerroLauncher/releases?per_page=3')
   .then((r) => r.json())

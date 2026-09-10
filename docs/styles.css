@@ -212,6 +212,14 @@ footer a { color: var(--amber); }
 .stats-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
 .stat { flex: 1; min-width: 140px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09); border-radius: 16px; padding: 16px; text-align: center; }
 .stat b { display: block; font-size: 26px; color: var(--gold); }
+.team { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.team:empty { display: none; }
+.mate { display: flex; flex-direction: column; align-items: center; gap: 6px; text-decoration: none; transition: transform 0.3s var(--spring-soft); }
+.mate:hover { transform: translateY(-4px) scale(1.05); }
+.mate img { width: 56px; height: 56px; border-radius: 50%; border: 2px solid rgba(255,182,46,.4); box-shadow: 0 8px 22px rgba(0,0,0,.5); background: rgba(255,255,255,.06); }
+.mate span { font-size: 11px; color: var(--muted); max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.commit-line { font-size: 13px; color: var(--muted); margin-top: 12px; }
+.commit-line b { color: var(--ink); font-weight: 600; }
 .stat span { font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; }
 #changelog .rel { border-left: 2px solid rgba(255,182,46,.4); padding: 4px 0 4px 14px; margin: 12px 0; }
 #changelog .rel b { font-size: 15px; }

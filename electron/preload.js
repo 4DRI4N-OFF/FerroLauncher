@@ -88,6 +88,7 @@ contextBridge.exposeInMainWorld('ferro', {
   serverRemove: (data) => ipcRenderer.invoke('ferro:serverRemove', data),
   serverPing: (data) => ipcRenderer.invoke('ferro:serverPing', data),
   stop: () => ipcRenderer.invoke('ferro:stop'),
+  achievements: () => ipcRenderer.invoke('ferro:achievements'),
   status: () => ipcRenderer.invoke('ferro:status'),
   nameCheck: (data) => ipcRenderer.invoke('ferro:nameCheck', data),
   nameSuggest: (data) => ipcRenderer.invoke('ferro:nameSuggest', data),

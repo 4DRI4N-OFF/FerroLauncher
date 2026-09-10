@@ -102,6 +102,7 @@ es: {
   'toast.installed': 'instalado', 'toast.instCreated': 'Instancia {n} creada',
   'toast.packDone': 'Modpack instalado', 'toast.login': 'Sesión',
   'toast.crash': 'Crash en {n}: informe listo',
+  'ach.title': 'Logros', 'ach.locked': 'Bloqueado',
 },
 en: {
   'tab.play': 'Play', 'tab.versions': 'Versions', 'tab.instances': 'Instances',
@@ -203,6 +204,7 @@ en: {
   'toast.installed': 'installed', 'toast.instCreated': 'Instance {n} created',
   'toast.packDone': 'Modpack installed', 'toast.login': 'Signed in',
   'toast.crash': 'Crash in {n}: report ready',
+  'ach.title': 'Achievements', 'ach.locked': 'Locked',
 },
 };
 

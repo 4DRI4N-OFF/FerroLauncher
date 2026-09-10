@@ -34,6 +34,7 @@ const perf = require('../core/perfService');
 const doctor = require('../core/crashDoctor');
 const imp = require('../core/importService');
 const srv = require('../core/serverService');
+const ach = require('../core/achievements');
 
 function findInstance(d, name) {
   const inst = listInstances(d.instances).find((i) => i.name === name);
@@ -76,6 +77,7 @@ let win = null;
 let splash = null;
 let D = null;
 let activeChild = null;
+let achTimer = null;
 let activeInstance = null;
 let activeT0 = null;
 let lastExit = null;
@@ -267,6 +269,7 @@ ipcMain.handle('ferro:versions', async (_, { kind } = {}) => {
 });
 
 ipcMain.handle('ferro:instances', async () => listInstances(getDirs().instances));
+ipcMain.handle('ferro:achievements', async () => ach.list(getDirs().base));
 ipcMain.handle('ferro:createInstance', async (_, { name, versionId, type, loaderVersion }) => createInstance(getDirs().instances, name, versionId, { type, loaderVersion }));
 ipcMain.handle('ferro:loaders', async (_, { mcVersion, type }) => {
   if (type === 'forge') return (await listForge(mcVersion)).map((f) => ({ loader: f.version, tag: f.tag }));
@@ -897,6 +900,25 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
   activeChild = await launch({ javaPath: javaBin, versionDetails: details, clientJar, librariesCp: cp, nativesDir, loggingPath, instanceDir: inst.path, dataDirs: d, username: username || 'Ferro', ramMb: effRam, width: effW, height: effH, onLog: send, mainClassOverride, extraClasspath, auth: authArg, jvmPreset: inst.settings?.jvmPreset, javaMajor: java.major, serverHost, serverPort });
   activeInstance = inst.name;
   activeT0 = Date.now();
+  // Logros: vigila avances del mundo local cada 5 s (solo un jugador).
+  try { if (achTimer) clearInterval(achTimer); } catch {}
+  try {
+    const achUser = (authArg && authArg.username) || username || 'Ferro';
+    const achUuid = (authArg && ach.normUuid(authArg.uuid)) || ach.offlineUuid(achUser);
+    const achInst = inst, achD = d;
+    const pollAch = () => {
+      try {
+        const fresh = ach.checkNew(achD.base, achInst.path, achInst.name, achUser, achUuid);
+        for (const f of fresh) {
+          const nm = (f.es && f.es[0]) || f.id;
+          send(`[ferro] ¡Logro desbloqueado! ${f.icon} ${nm} @${achInst.name}\n`);
+          notify(achD.base, 'ok', `🏆 ${nm}`, `${achInst.name} · FerroLauncher`);
+        }
+      } catch {}
+    };
+    setTimeout(pollAch, 8000);
+    achTimer = setInterval(pollAch, 5000);
+  } catch {}
   touchPlayed(d.instances, inst.name);
   notify(d.base, 'info', `Jugando ${details.id}`, `${inst.name} · ${inst.type === 'vanilla' ? 'vanilla' : inst.type} · ${(authArg && authArg.username) || username || 'Ferro'}`);
   // Discord RPC (no bloquea; falla en silencio sin cliente Discord)
@@ -913,6 +935,7 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
       if (total) send(`[ferro] sesión de ${Math.floor(secs / 60)} min (total ${fmtPlay(total)})\n`);
     }
     activeChild = null; activeInstance = null; activeT0 = null;
+    try { if (achTimer) { clearInterval(achTimer); achTimer = null; } } catch {}
     try {
       const dc2 = auth.getDiscord(d.base);
       if (dc2.enabled && dc2.clientId) discord.setIdle(dc2.clientId, idleInfo());

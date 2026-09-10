@@ -272,6 +272,12 @@ export default function App() {
           setTimeout(() => setScare(null), 6000);
         }
         const crashM = added.match(/crash detectado en (.+?) \(código (\d+)\)/);
+        const achM = added.match(/¡Logro desbloqueado! (.+) @(.+)/);
+        if (achM) {
+          sfx.play('success');
+          pushToast('success', `🏆 ${achM[1].trim()} · ${achM[2].trim()}`);
+          loadAch();
+        }
         if (crashM) {
           const [, instName] = crashM;
           pushToast('error', t('toast.crash', { n: instName }), {
@@ -519,6 +525,9 @@ export default function App() {
   const askRename = (current, onOk) => { setConfirmInput(current); setConfirmDlg({ message: t('inst.renamePrompt'), input: true, onOk: (v) => { if (v && v !== current) onOk(v); } }); };
   const [saving, setSaving] = useState(false);
   const [instFilter, setInstFilter] = useState('');
+  const [ach, setAch] = useState({ defs: [], unlocked: {}, total: 0 });
+  const loadAch = async () => { try { const r = await window.ferro.achievements?.(); if (r && r.defs) setAch(r); } catch {} };
+  useEffect(() => { loadAch(); }, []);
   const [launchProg, setLaunchProg] = useState(null);
   const [dragOn, setDragOn] = useState(false);
   const dragCount = useRef(0);
@@ -1244,6 +1253,16 @@ export default function App() {
               </div>
             </div>
           )}
+          <div className="card">
+            <h2>{t('ach.title')} <span className="pill">🏆 {Object.keys(ach.unlocked || {}).length}/{ach.total || (ach.defs || []).length}</span></h2>
+            <div className="ach-grid">
+              {(ach.defs || []).map((d) => {
+                const u = (ach.unlocked || {})[d.id];
+                const L = lang === 'en' ? d.en : d.es;
+                return <div key={d.id} className={'ach' + (u ? '' : ' locked')} title={u ? `${u.inst} · ${new Date(u.ts).toLocaleDateString()}` : t('ach.locked')}><span className="em">{d.icon}</span><div><b>{L[0]}</b><small>{L[1]}</small></div></div>;
+              })}
+            </div>
+          </div>
           <div className="card">
             <h3>{t('play.console')}</h3>
             <div className="row" style={{marginBottom:8}}>

@@ -1,6 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import brand from './assets/brand.png';
 import flMark from './assets/fl.png';
+import intro1 from './assets/intro1.png';
+import intro2 from './assets/intro2.png';
+import intro3 from './assets/intro3.png';
 import { sfx } from './sfx.js';
 import { STR, getLang } from './i18n.js';
 import { GithubIcon, DiscordIcon, YoutubeIcon, XIcon } from './brands.jsx';
@@ -307,6 +310,8 @@ export default function App() {
   const introImgRef = useRef(null);
   const sideLogoRef = useRef(null);
   const overlayRef = useRef(null);
+  const stageRef = useRef(null);
+  const skipRef = useRef(false);
   const pollRef = useRef(null);
   const [launchInstance, setLaunchInstance] = useState(() => { try { return localStorage.getItem('ferro-instance') || ''; } catch { return ''; } });
   useEffect(() => { try { localStorage.setItem('ferro-username', username); } catch {} }, [username]);
@@ -854,6 +859,75 @@ export default function App() {
       // Escala por dibujo visible (contain), no por caja: el mini es cuadrado.
       const glyph = (r) => Math.min(r.width, r.height);
       const s = glyph(baseTiny) > 0 ? glyph(rl) / glyph(baseTiny) : r2.width / r1.width;
+      // Cine 1+2+3: caida, subida, formacion y explosion. Despues sigue el vuelo.
+      try {
+        const stage = stageRef.current;
+        const c1 = stage && stage.querySelector('.cine-1');
+        const c2 = stage && stage.querySelector('.cine-2');
+        const c3 = stage && stage.querySelector('.cine-3');
+        const cfl = stage && stage.querySelector('.cine-flash');
+        if (stage && c1 && c2 && c3 && cfl) {
+          // Paso 1+2: FERRO cae, LAUNCHER sube (solapados)
+          const fall = c1.animate([
+            { transform: 'translate(-50%,-130vh) scale(1)', opacity: 0 },
+            { transform: 'translate(-50%,0) scale(1.03)', opacity: 1, offset: 0.82 },
+            { transform: 'translate(-50%,0) scale(1)', opacity: 1 },
+          ], { duration: 780, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'forwards' }).finished.catch(() => {});
+          const rise = c2.animate([
+            { transform: 'translate(-50%,130vh) scale(1)', opacity: 0 },
+            { transform: 'translate(-50%,0) scale(1.03)', opacity: 1, offset: 0.82 },
+            { transform: 'translate(-50%,0) scale(1)', opacity: 1 },
+          ], { duration: 780, delay: 200, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'forwards' }).finished.catch(() => {});
+          await Promise.all([fall, rise]);
+          if (skipRef.current) { unlock(); setIntro(false); return; }
+          // Paso 3a: formacion — destello + fundido al completo
+          sfx.play('chime');
+          await Promise.all([
+            cfl.animate([{ opacity: 0 }, { opacity: 0.9, offset: 0.45 }, { opacity: 0 }], { duration: 480, easing: 'ease-out', fill: 'forwards' }).finished.catch(() => {}),
+            c3.animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'scale(1.02)', offset: 0.55 }, { opacity: 1, transform: 'scale(1)' }], { duration: 560, easing: 'ease-out', fill: 'forwards' }).finished.catch(() => {}),
+            c1.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 420, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {}),
+            c2.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 420, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {}),
+          ]);
+          if (skipRef.current) { unlock(); setIntro(false); return; }
+          // Paso 3b: explosion — flashazo, metralla y sacudida
+          sfx.play('boom');
+          const sr = stage.getBoundingClientRect();
+          const scx = sr.left + sr.width / 2, scy = sr.top + sr.height / 2;
+          for (let k = 0; k < 26; k++) {
+            try {
+              const p = document.createElement('div');
+              p.className = 'cine-shard';
+              const sz = 4 + Math.random() * 8;
+              p.style.width = p.style.height = sz.toFixed(0) + 'px';
+              p.style.left = scx + 'px';
+              p.style.top = scy + 'px';
+              (ov || document.body).appendChild(p);
+              const a = Math.random() * Math.PI * 2, dd = 140 + Math.random() * 200;
+              p.animate([
+                { transform: 'translate(-50%,-50%) scale(1)', opacity: 1 },
+                { transform: `translate(calc(-50% + ${(Math.cos(a) * dd).toFixed(0)}px), calc(-50% + ${(Math.sin(a) * dd).toFixed(0)}px)) scale(.2)`, opacity: 0 },
+              ], { duration: 550 + Math.random() * 350, easing: 'cubic-bezier(.15,.7,.3,1)' }).finished.catch(() => {}).finally(() => { try { p.remove(); } catch {} });
+            } catch {}
+          }
+          try {
+            document.querySelector('.layout')?.animate([
+              { transform: 'translateX(0)' },
+              { transform: 'translateX(-12px)' },
+              { transform: 'translateX(10px)' },
+              { transform: 'translateX(-6px)' },
+              { transform: 'translateX(4px)' },
+              { transform: 'translateX(0)' },
+            ], { duration: 450, easing: 'ease-out' });
+          } catch {}
+          await cfl.animate([{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 1, offset: 0.55 }, { opacity: 1 }], { duration: 700, easing: 'ease-out', fill: 'forwards' }).finished.catch(() => {});
+          if (skipRef.current) { unlock(); setIntro(false); return; }
+          // El flash tapa el cambio: fuera escenario, dentro vuelo
+          try { stage.style.display = 'none'; } catch {}
+          try { img.style.opacity = '1'; } catch {}
+          await cfl.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 450, easing: 'ease-out', fill: 'forwards' }).finished.catch(() => {});
+          if (skipRef.current) { unlock(); setIntro(false); return; }
+        }
+      } catch {}
       sfx.play('whoosh');
       const trailTimer = setInterval(() => {
         try {
@@ -1728,8 +1802,14 @@ export default function App() {
         </div>
       </div>
       {intro && (
-        <div className="intro-overlay" ref={overlayRef}>
-          <div ref={introImgRef} className="intro-logo">
+      <div className="intro-overlay" ref={overlayRef} onClick={() => { skipRef.current = true; }}>
+        <div className="intro-stage" ref={stageRef}>
+          <img className="cine-1" src={intro1} alt="" />
+          <img className="cine-2" src={intro2} alt="" />
+          <img className="cine-3" src={intro3} alt="" />
+          <div className="cine-flash" />
+        </div>
+        <div ref={introImgRef} className="intro-logo" style={{ opacity: 0, position: 'absolute', inset: 0, margin: 'auto' }}>
             <img className="intro-full" src={brand} alt="" />
             <img className="intro-mini" src={flMark} alt="FL" />
           </div>

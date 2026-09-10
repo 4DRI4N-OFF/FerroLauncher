@@ -116,6 +116,7 @@ es: {
   'ai.errQuota': 'Cuota gratuita agotada por ahora: espera un poco.',
   'ai.errNet': 'Sin conexión con Google.',
   'ai.errOther': 'La IA no respondió: prueba de nuevo.',
+  'ai.errModel': 'Ese modelo ya no existe: se ha buscado otro, prueba de nuevo.',
   'ai.builtin': 'Clave integrada ✓',
 },
 en: {
@@ -232,6 +233,7 @@ en: {
   'ai.errQuota': 'Free quota exhausted for now: wait a bit.',
   'ai.errNet': 'No connection to Google.',
   'ai.errOther': 'The AI did not answer: try again.',
+  'ai.errModel': 'That model is retired: another was picked, try again.',
   'ai.builtin': 'Built-in key ✓',
 },
 };

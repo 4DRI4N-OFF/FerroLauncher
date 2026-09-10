@@ -17,6 +17,7 @@ async function jfetch(url, opts) {
 export function aiErrorKey(e) {
   if (e?.status === 400 || e?.status === 403) return 'ai.errKey';
   if (e?.status === 429) return 'ai.errQuota';
+  if (e?.status === 404) return 'ai.errModel';
   const m = String(e?.message || '').toLowerCase();
   if (/quota|rate|resource_exhausted|rate limit/i.test(m)) return 'ai.errQuota';
   if (/api key|api_key|key/i.test(m) && /invalid|incorrect|expired|permission/i.test(m)) return 'ai.errKey';

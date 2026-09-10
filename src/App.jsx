@@ -541,7 +541,8 @@ export default function App() {
         if (ms.length) {
           setAiModels(ms);
           if (!ms.some((m) => m.id === aiModel)) {
-            const pick = ms.find((m) => /flash/i.test(m.id)) || ms[0];
+            const stable = ms.filter((m) => !/preview|tts|image|transcribe|lyria|robotics|computer-use|antigravity|deep-research|nano-banana|gemma|latest$/i.test(m.id));
+            const pick = stable.find((m) => /flash-lite/i.test(m.id)) || stable.find((m) => /flash/i.test(m.id)) || ms[0];
             setAiModel(pick.id);
             try { localStorage.setItem('ferro-ai-model', pick.id); } catch {}
           }
@@ -568,7 +569,7 @@ export default function App() {
   const sendAi = async () => {
     const text = aiInput.trim();
     if (!text || aiBusy) return;
-    if (!aiBuiltIn && !aiKey) { pushToast('error', t('ai.needKey')); return; }
+    if (!aiBuiltIn && !aiKey) { pushToast('error', t('ai.needKey')); setIslandOpen(true); return; }
     const next = [...aiMsgs, { role: 'user', text }].slice(-60);
     setAiMsgs(next);
     setAiInput('');
@@ -580,6 +581,7 @@ export default function App() {
       setAiMsgs((m) => [...m, { role: 'ai', text: reply }].slice(-60));
       setIslandOpen(true);
     } catch (e) {
+      if (e?.status === 404) { try { await loadAiModels(); } catch {} }
       setAiMsgs((m) => [...m, { role: 'ai', text: `⚠ ${t(aiErrorKey(e))}` }].slice(-60));
       setIslandOpen(true);
     } finally { setAiBusy(false); }
@@ -596,7 +598,7 @@ export default function App() {
   // Chat IA (Gemini, clave del usuario guardada solo en su PC)
   const [aiKey, setAiKey] = useState(() => { try { return localStorage.getItem('ferro-ai-key') || ''; } catch { return ''; } });
   const [aiKeyInput, setAiKeyInput] = useState('');
-  const [aiModel, setAiModel] = useState(() => { try { return localStorage.getItem('ferro-ai-model') || 'gemini-2.5-flash'; } catch { return 'gemini-2.5-flash'; } });
+  const [aiModel, setAiModel] = useState(() => { try { return localStorage.getItem('ferro-ai-model') || 'gemini-3.5-flash-lite'; } catch { return 'gemini-3.5-flash-lite'; } });
   const [aiModels, setAiModels] = useState([]);
   const [aiMsgs, setAiMsgs] = useState(() => { try { return JSON.parse(localStorage.getItem('ferro-ai-chat') || '[]').slice(-60); } catch { return []; } });
   const [aiBusy, setAiBusy] = useState(false);

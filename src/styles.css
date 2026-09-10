@@ -210,9 +210,11 @@ body::after {
 .side.collapsed button::before { display: none; }
 .side.collapsed:hover button::before { display: block; }
 .brand-swap .brand-full { object-position: center; }
-.side .pc-id, .side .ver { transition: opacity 0.2s ease, max-height 0.3s ease, padding 0.3s ease, margin 0.3s ease; max-height: 60px; overflow: hidden; }
-.side.collapsed .pc-id, .side.collapsed .ver { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0; border-width: 0; }
-.side.collapsed:hover .pc-id, .side.collapsed:hover .ver { opacity: 1; max-height: 60px; }
+.side .pc-id, .side .ver { transition: opacity 0.2s ease, max-height 0.3s ease, max-width 0.3s ease, padding 0.3s ease, margin 0.3s ease; max-height: 60px; max-width: 220px; overflow: hidden; }
+.side.collapsed .pc-id, .side.collapsed .ver { opacity: 0; max-height: 0; max-width: 0; padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0; border-width: 0; }
+.side.collapsed:hover .pc-id, .side.collapsed:hover .ver { opacity: 1; max-height: 60px; max-width: 220px; }
+.side.collapsed .player-chip .dot { display: none; }
+.side.collapsed:hover .player-chip .dot { display: block; }
 .side.collapsed .player-chip { justify-content: center; }
 .side .pin {
   display: flex; align-items: center; justify-content: center;

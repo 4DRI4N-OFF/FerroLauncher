@@ -314,6 +314,9 @@ export default function App() {
   const [loginFx, setLoginFx] = useState(0);
   const [flashFx, setFlashFx] = useState(0);
   const [exploding, setExploding] = useState(null);
+  const boomCtl = useRef({ raf: 0, kill: 0 });
+  // Limpia restos de explosiones anteriores (canvas huerfano con luz congelada).
+  useEffect(() => { try { document.getElementById('boom-fx')?.remove(); } catch {} }, []);
   const celebrateLogin = () => {
     setLoginFx((k) => k + 1);
     setFlashFx((k) => k + 1);
@@ -359,11 +362,16 @@ export default function App() {
     tick();
   };
   // Explosión de tarjeta: destello + metralla de brasas + humo sobre la tarjeta.
+  // A prueba de fallos: cualquier error limpia el canvas y un temporizador lo elimina si o si.
   const boomBurst = (x, y) => {
+    const ctl = boomCtl.current;
+    try { cancelAnimationFrame(ctl.raf || 0); } catch {}
+    clearTimeout(ctl.kill || 0);
     let cv = document.getElementById('boom-fx');
     if (!cv) { cv = document.createElement('canvas'); cv.id = 'boom-fx'; document.body.appendChild(cv); }
     cv.width = innerWidth; cv.height = innerHeight;
     const ctx = cv.getContext('2d');
+    if (!ctx) return;
     const cols = ['#fff7d6', '#ffd166', '#ffb62e', '#ff6e1e', '#ff3d00'];
     const shards = Array.from({ length: 70 }, () => {
       const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 9;
@@ -373,29 +381,36 @@ export default function App() {
     let flash = 1;
     let f = 0;
     const tick = () => {
-      ctx.clearRect(0, 0, cv.width, cv.height);
       let alive = false;
-      if (flash > 0) {
-        alive = true;
-        const fr = 30 + (1 - flash) * 130;
-        const g = ctx.createRadialGradient(x, y, 0, x, y, fr);
-        g.addColorStop(0, `rgba(255,240,200,${(flash * 0.9).toFixed(3)})`);
-        g.addColorStop(1, 'rgba(255,110,30,0)');
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, fr, 0, 7); ctx.fill();
-        flash -= 0.09;
-      }
-      for (const p of shards) {
-        p.vy += 0.3; p.vx *= 0.985; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life -= p.decay;
-        if (p.life > 0) { alive = true; ctx.save(); ctx.globalAlpha = Math.max(0, p.life); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s * 0.6); ctx.restore(); }
-      }
-      for (const p of smoke) {
-        p.x += p.vx; p.y += p.vy; p.r += 0.4; p.life -= p.decay;
-        if (p.life > 0) { alive = true; ctx.save(); ctx.globalAlpha = Math.max(0, p.life * 0.35); ctx.fillStyle = '#8a8a8a'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); ctx.restore(); }
-      }
-      if (alive && ++f < 240) requestAnimationFrame(tick);
-      else ctx.clearRect(0, 0, cv.width, cv.height);
+      try {
+        ctx.clearRect(0, 0, cv.width, cv.height);
+        if (flash > 0) {
+          alive = true;
+          const fr = 30 + (1 - flash) * 130;
+          const g = ctx.createRadialGradient(x, y, 0, x, y, fr);
+          g.addColorStop(0, `rgba(255,240,200,${(flash * 0.9).toFixed(3)})`);
+          g.addColorStop(1, 'rgba(255,110,30,0)');
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, fr, 0, 7); ctx.fill();
+          flash -= 0.09;
+        }
+        for (const p of shards) {
+          p.vy += 0.3; p.vx *= 0.985; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life -= p.decay;
+          if (p.life > 0) { alive = true; ctx.save(); ctx.globalAlpha = Math.max(0, p.life); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s * 0.6); ctx.restore(); }
+        }
+        for (const p of smoke) {
+          p.x += p.vx; p.y += p.vy; p.r += 0.4; p.life -= p.decay;
+          if (p.life > 0) { alive = true; ctx.save(); ctx.globalAlpha = Math.max(0, p.life * 0.35); ctx.fillStyle = '#8a8a8a'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); ctx.restore(); }
+        }
+      } catch { alive = false; }
+      if (alive && ++f < 200) ctl.raf = requestAnimationFrame(tick);
+      else { try { ctx.clearRect(0, 0, cv.width, cv.height); } catch {} }
     };
     tick();
+    // Interruptor final: pase lo que pase, el canvas desaparece a los 2.5 s.
+    ctl.kill = setTimeout(() => {
+      try { cancelAnimationFrame(ctl.raf || 0); } catch {}
+      try { document.getElementById('boom-fx')?.remove(); } catch {}
+    }, 2500);
   };
   // Borrar con explosión: la tarjeta tiembla, brilla y revienta; luego se borra de verdad.
   const explodeInstance = (name, cardEl) => {

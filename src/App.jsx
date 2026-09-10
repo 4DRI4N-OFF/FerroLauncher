@@ -1304,12 +1304,12 @@ export default function App() {
           <div className="card">
             <h2>{t('acct.title')}</h2>
             <p>{t('acct.desc')}</p>
-            <div className="row">
-              {idInfo.configured && <span className="pill green">✓ {t('acct.idOn')} {idInfo.masked}</span>}
-              <input value={clientId} onChange={(e)=>setClientId(e.target.value)} placeholder={idInfo.configured ? t('acct.replacePh') : t('acct.clientPh')} style={{minWidth:300}} />
-              <button className="ghost" onClick={async()=>{ if (!clientId.trim()) return; await window.ferro.setClientId({ clientId }); setLog((l)=>l+'[ferro] client ID guardado\n'); loadAuth();}}>{t('acct.save')}</button>
-              {idInfo.configured && <button className="ghost danger" onClick={async()=>{await window.ferro.setClientId({ clientId: '' }); setLog((l)=>l+'[ferro] override quitado\n'); loadAuth();}}>{t('acct.clear')}</button>}
-            </div>
+            {idInfo.configured
+              ? <div className="row"><span className="pill green">✓ {t('acct.idOn')} {idInfo.masked}</span></div>
+              : (<div className="row">
+                <input value={clientId} onChange={(e)=>setClientId(e.target.value)} placeholder={t('acct.clientPh')} style={{minWidth:300}} />
+                <button className="ghost" onClick={async()=>{ if (!clientId.trim()) return; await window.ferro.setClientId({ clientId }); setLog((l)=>l+'[ferro] client ID guardado\n'); loadAuth();}}>{t('acct.save')}</button>
+              </div>)}
             <h3>{t('acct.accounts')} ({accts.length})</h3>
             {accts.length===0 && <p style={{opacity:.6}}>{t('acct.noAccounts')}</p>}
             <div className="grid">

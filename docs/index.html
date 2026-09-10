@@ -20,87 +20,128 @@
 <meta name="twitter:description" content="Gratis y open-source. Vanilla, Fabric, Quilt, Forge y NeoForge en 1 clic." />
 <meta name="twitter:image" content="https://4dri4n-off.github.io/FerroLauncher/og.png" />
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"FerroLauncher","applicationCategory":"GameApplication","operatingSystem":"Windows 10/11","offers":{"@type":"Offer","price":"0"},"downloadUrl":"https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest","softwareVersion":"0.7.0","inLanguage":["es","en"],"license":"https://opensource.org/licenses/MIT"}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,300..700&family=Inter+Tight:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 <div id="loader"><img src="assets/brand.png" alt="FerroLauncher" /></div>
 <div class="progress" id="progress"></div>
-<div class="bg"><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div><div class="orb d"></div></div>
-<div class="grid-bg"></div>
-<div class="grain"></div>
-<div class="cursor" id="cursor"></div>
-<div class="announce reveal"><span data-es="🚀 FerroLauncher 1.0 — salida oficial muy pronto" data-en="🚀 FerroLauncher 1.0 — official release coming very soon">🚀 FerroLauncher 1.0 — salida oficial muy pronto</span><a href="https://discord.gg/vTujTm3hE" data-es="Avísame en Discord" data-en="Notify me on Discord">Avísame en Discord</a></div>
+<div class="mesh"><i class="a"></i><i class="b"></i><i class="c"></i></div>
+
 <header class="top" id="top">
-  <span class="logo-mini">⛏ FerroLauncher</span>
+  <a href="#" class="brandmark"><img src="assets/brand.png" alt="FerroLauncher" /><span>FerroLauncher</span></a>
   <nav>
     <a href="#features" data-es="Características" data-en="Features">Características</a>
-    <a href="#shots" data-es="La app" data-en="The app">La app</a>
+    <a href="#tour" data-es="La app" data-en="The app">La app</a>
     <a href="#download" data-es="Descargar" data-en="Download">Descargar</a>
     <a href="#faq" data-es="Preguntas" data-en="FAQ">Preguntas</a>
-    <button id="lang" class="mini">EN</button>
+    <a href="https://github.com/4DRI4N-OFF/FerroLauncher" target="_blank" rel="noopener"><i class="fab fa-github"></i> GitHub</a>
   </nav>
+  <div class="top-right">
+    <button id="lang" class="mini">EN</button>
+    <a href="#download" class="dl-pill"><i class="fas fa-download"></i> <span data-es="Descargar" data-en="Download">Descargar</span></a>
+  </div>
 </header>
 
 <section class="hero">
-  <div class="hero-eyebrow reveal"><span class="pulse-dot"></span><span data-es="v0.7.0 ya disponible" data-en="v0.7.0 out now">v0.7.0 ya disponible</span></div>
-  <img src="assets/brand.png" alt="FerroLauncher" class="brand" />
-  <h1 class="display" data-es="Juega Minecraft a tu manera" data-en="Play Minecraft your way">Juega Minecraft a tu manera</h1>
-  <p class="tag" data-es="Launcher gratis y open-source de Minecraft: Java Edition para Windows." data-en="Free, open-source Minecraft: Java Edition launcher for Windows.">Launcher gratis y open-source de Minecraft: Java Edition para Windows.</p>
-  <div class="chips">
-    <span>MIT</span><span>ES/EN</span><span>5 loaders</span><span>Auto-updater</span>
+  <div class="hero-grid">
+    <div class="hero-left">
+      <div class="badge reveal"><span class="pulse-dot"></span><span>MIT</span><span class="sep">·</span><span>ES/EN</span><span class="sep">·</span><span>Windows</span></div>
+      <div class="announce reveal"><span data-es="🚀 FerroLauncher 1.0 — salida oficial muy pronto" data-en="🚀 FerroLauncher 1.0 — official release coming very soon">🚀 FerroLauncher 1.0 — salida oficial muy pronto</span><a href="https://discord.gg/vTujTm3hE" data-es="Avísame en Discord" data-en="Notify me on Discord">Avísame en Discord</a></div>
+      <h1 class="reveal"><span data-es="Juega Minecraft" data-en="Play Minecraft">Juega Minecraft</span><br /><span class="serif" data-es="a tu manera." data-en="your way.">a tu manera.</span></h1>
+      <p class="tag reveal" data-es="Launcher gratis y open-source de Minecraft: Java Edition para Windows. Cinco loaders, mods en 1 clic y multicuenta Microsoft." data-en="Free, open-source Minecraft: Java Edition launcher for Windows. Five loaders, 1-click mods and Microsoft multi-account.">Launcher gratis y open-source de Minecraft: Java Edition para Windows. Cinco loaders, mods en 1 clic y multicuenta Microsoft.</p>
+      <div class="cta reveal">
+        <a class="btn-win" id="dl-setup" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest"><i class="fab fa-windows"></i><span><small data-es="Descargar para" data-en="Download for">Descargar para</small><b>Windows</b></span><i class="fas fa-arrow-down go"></i></a>
+        <a class="btn-dark" href="https://github.com/4DRI4N-OFF/FerroLauncher" target="_blank" rel="noopener"><i class="fab fa-github"></i><span><small data-es="Ver en" data-en="View on">Ver en</small><b>GitHub</b></span></a>
+      </div>
+      <div class="plats reveal"><span><i class="fab fa-windows"></i> Windows 10/11</span><span><i class="fas fa-box-open"></i> <span data-es="Portable" data-en="Portable">Portable</span></span><span><i class="fas fa-rotate"></i> Auto-updater</span></div>
+      <p class="ver reveal" id="ver">v0.7.0 · Windows 10/11 64-bit</p>
+    </div>
+    <div class="hero-right reveal">
+      <div class="mockwrap" id="mockwrap">
+        <div class="mock" id="mock">
+          <div class="mock-bar"><i></i><i></i><i></i><span class="mock-url"><i class="fas fa-lock"></i> FerroLauncher — v0.7.0</span></div>
+          <img src="shots/jugar.png" alt="FerroLauncher" onerror="this.closest('.mockwrap').style.display='none'" />
+          <span class="live-badge"><span class="pulse-dot"></span> v0.7.0</span>
+        </div>
+        <span class="chip c1"><i class="fas fa-shield-halved"></i> <span data-es="5 loaders" data-en="5 loaders">5 loaders</span></span>
+        <span class="chip c2"><i class="fas fa-bolt"></i> <span data-es="Mods en 1 clic" data-en="1-click mods">Mods en 1 clic</span></span>
+      </div>
+    </div>
   </div>
-  <div class="cta">
-    <a class="btn primary xl" id="dl-setup" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest" data-es="Descargar instalador" data-en="Download installer">Descargar instalador</a>
-    <a class="btn ghost xl" id="dl-portable" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest/download/FerroLauncher-portable.exe" data-es="Versión portable" data-en="Portable version">Versión portable</a>
-  </div>
-  <p class="ver" id="ver">v0.7.0 · Windows 10/11 64-bit</p>
-  <a class="scroll-cue" href="#features" aria-label="scroll"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></a>
+  <a class="scroll-cue" href="#features" aria-label="scroll"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6" /></svg></a>
 </section>
 
-<section class="mockwrap reveal" id="mockwrap">
-  <div class="mock" id="mock">
-    <div class="mock-bar"><i></i><i></i><i></i></div>
-    <div class="mock-body">
-      <div class="mock-side"><i class="on"></i><i></i><i></i><i></i><i></i></div>
-      <div class="mock-main">
-        <div class="mock-hero"><b>Mi instancia</b><span class="mock-pills"><i></i><i></i><i></i></span><em class="mock-play">▶ JUGAR</em></div>
-        <div class="mock-cards"><i></i><i></i><i></i></div>
+<div class="marquee">
+  <p class="marquee-kicker" data-es="Todo tu ecosistema Minecraft" data-en="Your whole Minecraft ecosystem">Todo tu ecosistema Minecraft</p>
+  <div class="marquee-track">
+    <span>Vanilla</span><span>Fabric</span><span>Quilt</span><span>Forge</span><span>NeoForge</span><span>Modrinth</span><span>CurseForge</span><span>Snapshots</span><span>Microsoft</span><span>Discord</span><span>ES/EN</span><span>MIT</span>
+    <span>Vanilla</span><span>Fabric</span><span>Quilt</span><span>Forge</span><span>NeoForge</span><span>Modrinth</span><span>CurseForge</span><span>Snapshots</span><span>Microsoft</span><span>Discord</span><span>ES/EN</span><span>MIT</span>
+  </div>
+</div>
+
+<section id="features">
+  <div class="sec-head reveal">
+    <div class="eyebrow"><i class="fas fa-star"></i> <span data-es="Características" data-en="Features">Características</span></div>
+    <h2><span data-es="Todo lo que un launcher" data-en="Everything a launcher">Todo lo que un launcher</span> <span class="serif" data-es="debe hacer." data-en="should do.">debe hacer.</span></h2>
+    <p data-es="Potencia seria sin complicaciones, y ni un solo anuncio." data-en="Serious power with no fuss, and not a single ad.">Potencia seria sin complicaciones, y ni un solo anuncio.</p>
+  </div>
+  <div class="bento">
+    <div class="feature-card span4 reveal">
+      <div class="fic" style="background:rgba(255,122,43,.14);color:var(--accent)"><i class="fas fa-layer-group"></i></div>
+      <h3 data-es="Todos los loaders" data-en="Every loader">Todos los loaders</h3>
+      <p data-es="Vanilla, Fabric, Quilt, Forge y NeoForge con instaladores oficiales, snapshots y Java automático." data-en="Vanilla, Fabric, Quilt, Forge and NeoForge with official installers, snapshots and automatic Java.">Vanilla, Fabric, Quilt, Forge y NeoForge con instaladores oficiales, snapshots y Java automático.</p>
+      <div class="chipset"><span>Vanilla</span><span>Fabric</span><span>Quilt</span><span>Forge</span><span>NeoForge</span><span>+ snapshots</span></div>
+    </div>
+    <div class="feature-card span2 reveal">
+      <div class="fic" style="background:rgba(52,211,153,.12);color:#34d399"><i class="fas fa-shield-halved"></i></div>
+      <h3 data-es="Limpio. Siempre." data-en="Clean. Always.">Limpio. Siempre.</h3>
+      <p data-es="Sin anuncios, sin rastreadores, sin telemetría. Código abierto de verdad." data-en="No ads, no trackers, no telemetry. Truly open source.">Sin anuncios, sin rastreadores, sin telemetría. Código abierto de verdad.</p>
+      <ul class="check"><li><i class="fas fa-check"></i><span data-es="Cero rastreadores" data-en="Zero trackers">Cero rastreadores</span></li><li><i class="fas fa-check"></i><span data-es="Cero anuncios" data-en="Zero ads">Cero anuncios</span></li><li><i class="fas fa-check"></i><span data-es="100 % open source" data-en="100% open source">100 % open source</span></li></ul>
+    </div>
+    <div class="feature-card span2 reveal">
+      <div class="fic" style="background:rgba(255,209,102,.13);color:#ffd166"><i class="fas fa-puzzle-piece"></i></div>
+      <h3 data-es="Mods en 1 clic" data-en="1-click mods">Mods en 1 clic</h3>
+      <p data-es="Mods, shaders, resource packs y modpacks desde Modrinth y CurseForge." data-en="Mods, shaders, resource packs and modpacks from Modrinth and CurseForge.">Mods, shaders, resource packs y modpacks desde Modrinth y CurseForge.</p>
+    </div>
+    <div class="feature-card span2 reveal">
+      <div class="fic" style="background:rgba(244,114,182,.12);color:#f9a8d4"><i class="fas fa-user"></i></div>
+      <h3 data-es="Cuentas y skins" data-en="Accounts & skins">Cuentas y skins</h3>
+      <p data-es="Offline, multicuenta Microsoft, skins, capas y anti-suplantación." data-en="Offline, Microsoft multi-account, skins, capes and anti-spoofing.">Offline, multicuenta Microsoft, skins, capas y anti-suplantación.</p>
+    </div>
+    <div class="feature-card span2 reveal">
+      <div class="fic" style="background:rgba(125,211,252,.12);color:#7dd3fc"><i class="fas fa-box-archive"></i></div>
+      <h3 data-es="Copias y respaldo" data-en="Backup & restore">Copias y respaldo</h3>
+      <p data-es="Backups por instancia, exportar/importar y copia total del perfil." data-en="Per-instance backups, export/import and full profile backup.">Backups por instancia, exportar/importar y copia total del perfil.</p>
+    </div>
+    <div class="feature-card span6 reveal">
+      <div class="trio">
+        <div><div class="fic" style="background:rgba(255,122,43,.14);color:var(--accent)"><i class="fas fa-server"></i></div><h3 data-es="Hecho para jugar" data-en="Built for playing">Hecho para jugar</h3><p data-es="Servidores con ping, doctor de crashes, JVM a medida y Discord RPC." data-en="Servers with ping, crash doctor, custom JVM and Discord RPC.">Servidores con ping, doctor de crashes, JVM a medida y Discord RPC.</p></div>
+        <div><div class="fic" style="background:rgba(255,209,102,.13);color:#ffd166"><i class="fas fa-wand-magic-sparkles"></i></div><h3 data-es="UI con vida" data-en="Alive UI">UI con vida</h3><p data-es="Intro cinematográfica, sidebar auto-colapsable, resortes y sonidos sintetizados." data-en="Cinematic intro, auto-collapsing sidebar, springs and synthesized sounds.">Intro cinematográfica, sidebar auto-colapsable, resortes y sonidos sintetizados.</p></div>
+        <div><div class="fic" style="background:rgba(255,255,255,.07);color:#fff"><i class="fas fa-language"></i></div><h3 data-es="Temas e idiomas" data-en="Themes & languages">Temas e idiomas</h3><p data-es="Cuatro temas, ES/EN automático y packs de sonido." data-en="Four themes, automatic ES/EN and sound packs.">Cuatro temas, ES/EN automático y packs de sonido.</p></div>
       </div>
     </div>
   </div>
 </section>
 
-<div class="ticker"><span>VANILLA · FABRIC · QUILT · FORGE · NEOFORGE · MODS · SHADERS · MODPACKS · BACKUPS · SKINS ·&nbsp;</span><span>VANILLA · FABRIC · QUILT · FORGE · NEOFORGE · MODS · SHADERS · MODPACKS · BACKUPS · SKINS ·&nbsp;</span></div>
-
-<section id="features">
-  <div class="eyebrow reveal">01 · <span data-es="Características" data-en="Features">Características</span></div>
-  <h2 class="sec-title reveal" data-es="Todo lo que un launcher debe hacer" data-en="Everything a launcher should do">Todo lo que un launcher debe hacer</h2>
-  <div class="grid bento">
-  <div class="card xl"><b><svg class="fi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5zM2 12l10 5 10-5M2 17l10 5 10-5"/></svg> <span data-es="Todos los loaders" data-en="Every loader">Todos los loaders</span></b><p data-es="Vanilla, Fabric, Quilt, Forge y NeoForge con instaladores oficiales, snapshots y Java automático." data-en="Vanilla, Fabric, Quilt, Forge and NeoForge with official installers, snapshots and automatic Java.">Vanilla, Fabric, Quilt, Forge y NeoForge con instaladores oficiales, snapshots y Java automático.</p></div>
-  <div class="card"><b><svg class="fi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8zM3 8l9 5 9-5M12 13v8"/></svg> <span data-es="Mods en 1 clic" data-en="1-click mods">Mods en 1 clic</span></b><p data-es="Mods, shaders, resource packs y modpacks desde Modrinth y CurseForge." data-en="Mods, shaders, resource packs and modpacks from Modrinth and CurseForge.">Mods, shaders, resource packs y modpacks desde Modrinth y CurseForge.</p></div>
-  <div class="card"><b><svg class="fi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg> <span data-es="Cuentas y skins" data-en="Accounts & skins">Cuentas y skins</span></b><p data-es="Offline, multicuenta Microsoft, skins, capas y anti-suplantación." data-en="Offline, Microsoft multi-account, skins, capes and anti-spoofing.">Offline, multicuenta Microsoft, skins, capas y anti-suplantación.</p></div>
-  <div class="card"><b><svg class="fi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg> <span data-es="Copias y respaldo" data-en="Backup & restore">Copias y respaldo</span></b><p data-es="Backups por instancia, exportar/importar y copia total del perfil." data-en="Per-instance backups, export/import and full profile backup.">Backups por instancia, exportar/importar y copia total del perfil.</p></div>
-  <div class="card"><b><svg class="fi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.2H22l-6 4.6 2.3 7.2-6.3-4.5-6.3 4.5L8 13.8 2 9.2h7.6z"/></svg> <span data-es="Hecho para jugar" data-en="Built for playing">Hecho para jugar</span></b><p data-es="Servidores con ping, doctor de crashes, JVM a medida, temas, ES/EN, sonidos y Discord RPC." data-en="Servers with ping, crash doctor, custom JVM, themes, ES/EN, sounds and Discord RPC.">Servidores con ping, doctor de crashes, JVM a medida, temas, ES/EN, sonidos y Discord RPC.</p></div>
-  <div class="card"><b><svg class="fi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg> <span data-es="UI con vida" data-en="Alive UI">UI con vida</span></b><p data-es="Intro cinematográfica, sidebar auto-colapsable, resortes, scroll con squash y sonidos sintetizados." data-en="Cinematic intro, auto-collapsing sidebar, springs, squash scrolling and synthesized sounds.">Intro cinematográfica, sidebar auto-colapsable, resortes, scroll con squash y sonidos sintetizados.</p></div>
+<section class="stats-inv">
+  <div class="stats-grid">
+    <div class="reveal"><b id="st-dl" style="color:var(--accent)">…</b><span data-es="Descargas" data-en="Downloads">Descargas</span></div>
+    <div class="reveal"><b id="st-stars" style="color:#b7791f">…</b><span>Stars</span></div>
+    <div class="reveal"><b>5</b><span data-es="Loaders" data-en="Loaders">Loaders</span></div>
+    <div class="reveal"><b>$0</b><span data-es="Gratis, para siempre" data-en="Free, forever">Gratis, para siempre</span></div>
   </div>
 </section>
 
-<section class="panel stats-band reveal" id="stats">
-  <div class="eyebrow">02 · <span data-es="En vivo" data-en="Live">En vivo</span></div>
-  <div class="stats-row big">
-    <div class="stat"><b id="st-ver">v0.7.0</b><span data-es="Última versión" data-en="Latest release">Última versión</span></div>
-    <div class="stat"><b id="st-dl">…</b><span data-es="Descargas" data-en="Downloads">Descargas</span></div>
-    <div class="stat"><b id="st-stars">…</b><span>Stars</span></div>
-    <div class="stat"><b id="st-issues">…</b><span data-es="Temas abiertos" data-en="Open issues">Temas abiertos</span></div>
+<section id="tour">
+  <div class="sec-head reveal">
+    <div class="eyebrow"><i class="fas fa-camera"></i> <span data-es="La app" data-en="The app">La app</span></div>
+    <h2><span data-es="Recorre" data-en="Tour">Recorre</span> <span class="serif" data-es="cada pestaña." data-en="every tab.">cada pestaña.</span></h2>
+    <p data-es="Una captura por categoría. Pulsa para ampliar." data-en="One screenshot per category. Click to enlarge.">Una captura por categoría. Pulsa para ampliar.</p>
   </div>
-  <h3 style="margin-top:22px" data-es="Cambios recientes" data-en="Recent changes">Cambios recientes</h3>
-  <div id="changelog"><p style="opacity:.6">…</p></div>
-</section>
-
-<section class="panel reveal" id="shots">
-  <div class="eyebrow">03 · <span data-es="La app" data-en="The app">La app</span></div>
-  <h2 data-es="Recorre cada pestaña" data-en="Tour every tab">Recorre cada pestaña</h2>
-  <p data-es="Una captura por categoría. Pulsa para ampliar." data-en="One screenshot per category. Click to enlarge.">Una captura por categoría. Pulsa para ampliar.</p>
   <div class="shots" id="shots-row">
     <a href="shots/jugar.png" data-lightbox><img src="shots/jugar.png" alt="Jugar" loading="lazy" onerror="this.closest('a').style.display='none'" /><span class="cap"><b>Jugar</b><i data-es="Entra en 1 clic con consola y progreso en vivo." data-en="Play in 1 click with live console and progress.">Entra en 1 clic con consola y progreso en vivo.</i></span></a>
     <a href="shots/versiones.png" data-lightbox><img src="shots/versiones.png" alt="Versiones" loading="lazy" onerror="this.closest('a').style.display='none'" /><span class="cap"><b data-es="Versiones" data-en="Versions">Versiones</b><i data-es="Todo Mojang: releases, snapshots y detalles." data-en="All of Mojang: releases, snapshots and details.">Todo Mojang: releases, snapshots y detalles.</i></span></a>
@@ -115,56 +156,70 @@
   <div class="lightbox" id="lightbox" hidden><img id="lightbox-img" alt="" /></div>
 </section>
 
-<section class="panel reveal" id="roadmap">
-  <div class="eyebrow">04 · <span data-es="Hoja de ruta" data-en="Roadmap">Hoja de ruta</span></div>
-  <h2 data-es="A dónde va esto" data-en="Where this is going">A dónde va esto</h2>
-  <div class="timeline">
-    <div class="tl done"><b>v0.1 – v0.7</b><p data-es="Núcleo completo: loaders, mods, cuentas premium, backups, updater y UI con vida." data-en="Full core: loaders, mods, premium accounts, backups, updater and alive UI.">Núcleo completo: loaders, mods, cuentas premium, backups, updater y UI con vida.</p></div>
-    <div class="tl now"><b data-es="Ahora" data-en="Now">Ahora</b><p data-es="v0.7 pulida y probada con la comunidad. La 1.0 oficial está al caer." data-en="v0.7 polished and tested with the community. The official 1.0 is around the corner.">v0.7 pulida y probada con la comunidad. La 1.0 oficial está al caer.</p></div>
-    <div class="tl next"><b>1.0</b><p data-es="Salida oficial: instalador firmado, modo offline total y más loaders." data-en="Official release: signed installer, full offline mode and more.">Salida oficial: instalador firmado, modo offline total y más loaders.</p></div>
+<section id="community">
+  <div class="sec-head reveal">
+    <div class="eyebrow"><i class="fas fa-users"></i> <span data-es="Comunidad" data-en="Community">Comunidad</span></div>
+    <h2><span data-es="Construyámoslo" data-en="Let's build it">Construyámoslo</span> <span class="serif" data-es="juntos." data-en="together.">juntos.</span></h2>
+    <p data-es="Reporta bugs, pide funciones o echa un cable. Todo pasa por GitHub y Discord." data-en="Report bugs, request features or lend a hand. Everything goes through GitHub and Discord.">Reporta bugs, pide funciones o echa un cable. Todo pasa por GitHub y Discord.</p>
   </div>
-</section>
-
-<section class="panel reveal" id="community">
-  <div class="eyebrow">05 · <span data-es="Comunidad" data-en="Community">Comunidad</span></div>
-  <h2 data-es="Construyámoslo juntos" data-en="Let's build it together">Construyámoslo juntos</h2>
-  <p data-es="Reporta bugs, pide funciones o echa un cable. Todo pasa por GitHub y Discord." data-en="Report bugs, request features or lend a hand. Everything goes through GitHub and Discord.">Reporta bugs, pide funciones o echa un cable. Todo pasa por GitHub y Discord.</p>
   <div class="team" id="team"></div>
   <p class="commit-line" id="commitline" hidden></p>
-  <div class="cta" style="justify-content:flex-start">
-    <a class="btn ghost" href="https://discord.gg/vTujTm3hE">Discord</a>
-    <a class="btn ghost" href="https://github.com/4DRI4N-OFF/FerroLauncher/issues">Issues</a>
-    <a class="btn ghost" href="https://www.youtube.com/@4dri4n-08">YouTube</a>
-    <a class="btn ghost" id="star-btn" href="https://github.com/4DRI4N-OFF/FerroLauncher">★ Star</a>
+  <p class="issues-line reveal"><span data-es="Temas abiertos:" data-en="Open issues:">Temas abiertos:</span> <b id="st-issues">…</b></p>
+  <div class="cta reveal">
+    <a class="btn-dark" href="https://discord.gg/vTujTm3hE"><i class="fab fa-discord"></i> Discord</a>
+    <a class="btn-dark" href="https://github.com/4DRI4N-OFF/FerroLauncher/issues"><i class="fas fa-bug"></i> Issues</a>
+    <a class="btn-dark" href="https://www.youtube.com/@4dri4n-08"><i class="fab fa-youtube"></i> YouTube</a>
+    <a class="btn-dark" id="star-btn" href="https://github.com/4DRI4N-OFF/FerroLauncher">★ Star</a>
+  </div>
+  <h3 class="mini-title reveal" data-es="Últimas versiones" data-en="Latest releases">Últimas versiones</h3>
+  <div id="changelog"><p style="opacity:.6">…</p></div>
+</section>
+
+<section id="roadmap">
+  <div class="sec-head reveal">
+    <div class="eyebrow"><i class="fas fa-route"></i> <span data-es="Hoja de ruta" data-en="Roadmap">Hoja de ruta</span></div>
+    <h2><span data-es="A dónde" data-en="Where this">A dónde</span> <span class="serif" data-es="va esto." data-en="is going.">va esto.</span></h2>
+  </div>
+  <div class="timeline">
+    <div class="tl done reveal"><b>v0.1 – v0.7</b><p data-es="Núcleo completo: loaders, mods, cuentas premium, backups, updater y UI con vida." data-en="Full core: loaders, mods, premium accounts, backups, updater and alive UI.">Núcleo completo: loaders, mods, cuentas premium, backups, updater y UI con vida.</p></div>
+    <div class="tl now reveal"><b data-es="Ahora" data-en="Now">Ahora</b><p data-es="v0.7 pulida y probada con la comunidad. La 1.0 oficial está al caer." data-en="v0.7 polished and tested with the community. The official 1.0 is around the corner.">v0.7 pulida y probada con la comunidad. La 1.0 oficial está al caer.</p></div>
+    <div class="tl next reveal"><b>1.0</b><p data-es="Salida oficial: instalador firmado, modo offline total y más loaders." data-en="Official release: signed installer, full offline mode and more.">Salida oficial: instalador firmado, modo offline total y más loaders.</p></div>
   </div>
 </section>
 
-<section id="download" class="panel reveal dl-hero">
-  <div class="eyebrow">06 · <span data-es="Descargar" data-en="Download">Descargar</span></div>
-  <h2 data-es="Empieza en 1 minuto" data-en="Start in 1 minute">Empieza en 1 minuto</h2>
-  <p data-es="Gratis y open-source (MIT). Elige instalador o portable, ambos de la última release de GitHub." data-en="Free and open-source (MIT). Pick the installer or the portable build, both from the latest GitHub release.">Gratis y open-source (MIT). Elige instalador o portable, ambos de la última release de GitHub.</p>
+<section id="download">
+  <div class="sec-head center reveal">
+    <div class="eyebrow"><i class="fas fa-download"></i> <span data-es="Descargar" data-en="Download">Descargar</span></div>
+    <h2><span data-es="Empieza" data-en="Start">Empieza</span> <span class="serif" data-es="en 1 minuto." data-en="in 1 minute.">en 1 minuto.</span></h2>
+    <p data-es="Gratis y open-source (MIT). Elige instalador o portable, ambos de la última release de GitHub." data-en="Free and open-source (MIT). Pick the installer or the portable build, both from the latest GitHub release.">Gratis y open-source (MIT). Elige instalador o portable, ambos de la última release de GitHub.</p>
+  </div>
   <div class="dl-grid">
-    <div class="dl-card">
-      <b data-es="Instalador" data-en="Installer">Instalador</b>
-      <p data-es="Asistente con accesos directos y auto-updater integrado." data-en="Wizard with shortcuts and built-in auto-updater.">Asistente con accesos directos y auto-updater integrado.</p>
-      <a class="btn primary xl" id="dl-setup" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest" data-es="Descargar instalador" data-en="Download installer">Descargar instalador</a>
-    </div>
-    <div class="dl-card">
-      <b data-es="Portable" data-en="Portable">Portable</b>
-      <p data-es="Sin instalación: descomprime y juega donde quieras." data-en="No install: unzip and play anywhere.">Sin instalación: descomprime y juega donde quieras.</p>
-      <a class="btn ghost xl" id="dl-portable" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest/download/FerroLauncher-portable.exe" data-es="Versión portable" data-en="Portable version">Versión portable</a>
-    </div>
+    <a class="dl-card reveal" id="dl-setup" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest"><span class="dl-ico"><i class="fas fa-file-arrow-down"></i></span><span><small data-es="Asistente con accesos directos" data-en="Wizard with shortcuts">Asistente con accesos directos</small><b data-es="Instalador" data-en="Installer">Instalador</b></span><i class="fas fa-arrow-right go"></i></a>
+    <a class="dl-card reveal" id="dl-portable" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest/download/FerroLauncher-portable.exe"><span class="dl-ico"><i class="fas fa-box-open"></i></span><span><small data-es="Sin instalación" data-en="No install">Sin instalación</small><b>Portable</b></span><i class="fas fa-arrow-right go"></i></a>
   </div>
-  <p class="req" data-es="Windows 10/11 64-bit · ~200 MB · Java incluido automáticamente" data-en="Windows 10/11 64-bit · ~200 MB · Java included automatically">Windows 10/11 64-bit · ~200 MB · Java incluido automáticamente</p>
+  <p class="req reveal" data-es="Windows 10/11 64-bit · ~200 MB · Java incluido automáticamente" data-en="Windows 10/11 64-bit · ~200 MB · Java included automatically">Windows 10/11 64-bit · ~200 MB · Java incluido automáticamente</p>
 </section>
 
-<section id="faq" class="panel reveal">
-  <div class="eyebrow">07 · <span data-es="Preguntas" data-en="FAQ">Preguntas</span></div>
-  <h2>FAQ</h2>
+<section id="faq">
+  <div class="sec-head reveal">
+    <div class="eyebrow"><i class="fas fa-circle-question"></i> <span data-es="Preguntas" data-en="FAQ">Preguntas</span></div>
+    <h2>FAQ</h2>
+  </div>
   <details><summary data-es="¿Windows SmartScreen avisa al instalar?" data-en="Does Windows SmartScreen warn on install?">¿Windows SmartScreen avisa al instalar?</summary><p data-es="Sí, porque el instalador no está firmado (cuesta dinero). Es seguro: el código es público. Pulsa Más información → Ejecutar de todas formas." data-en="Yes, because the installer is unsigned (certificates cost money). It's safe: the code is public. Click More info → Run anyway.">Sí, porque el instalador no está firmado (cuesta dinero). Es seguro: el código es público. Pulsa Más información → Ejecutar de todas formas.</p></details>
   <details><summary data-es="¿Necesito cuenta de Microsoft?" data-en="Do I need a Microsoft account?">¿Necesito cuenta de Microsoft?</summary><p data-es="No para jugar offline. Con cuenta (que tenga Minecraft Java) entras a servidores online con tu nombre real." data-en="Not for offline play. With an account owning Minecraft Java you join online servers with your real name.">No para jugar offline. Con cuenta (que tenga Minecraft Java) entras a servidores online con tu nombre real.</p></details>
   <details><summary data-es="¿Necesito tener Java instalado?" data-en="Do I need Java installed?">¿Necesito tener Java instalado?</summary><p data-es="No. El launcher detecta el Java que pide cada versión y descarga Temurin solo si falta." data-en="No. The launcher detects the Java each version needs and downloads Temurin only if missing.">No. El launcher detecta el Java que pide cada versión y descarga Temurin solo si falta.</p></details>
   <details><summary data-es="¿Es oficial de Mojang?" data-en="Is it official by Mojang?">¿Es oficial de Mojang?</summary><p data-es="No. Proyecto personal no comercial, sin afiliación. Los archivos del juego se descargan siempre de servidores oficiales." data-en="No. Non-commercial personal project, no affiliation. Game files always come from official servers.">No. Proyecto personal no comercial, sin afiliación. Los archivos del juego se descargan siempre de servidores oficiales.</p></details>
+</section>
+
+<section class="final-cta">
+  <div class="reveal">
+    <h2><span data-es="Deja de pelearte" data-en="Stop fighting">Deja de pelearte</span><br /><span class="serif" data-es="con tu launcher." data-en="with your launcher.">con tu launcher.</span></h2>
+    <p data-es="Gratis, open-source, sin letra pequeña. Descarga FerroLauncher y juega hoy mismo." data-en="Free, open-source, no fine print. Download FerroLauncher and play today.">Gratis, open-source, sin letra pequeña. Descarga FerroLauncher y juega hoy mismo.</p>
+    <div class="cta">
+      <a class="btn-win" href="#download"><i class="fas fa-download"></i><span><small data-es="Consigue FerroLauncher" data-en="Get FerroLauncher">Consigue FerroLauncher</small><b data-es="Elige tu descarga" data-en="Pick your download">Elige tu descarga</b></span></a>
+      <a class="btn-dark" href="https://github.com/4DRI4N-OFF/FerroLauncher" target="_blank" rel="noopener"><i class="fab fa-github"></i><span><small>Star</small><b>GitHub</b></span></a>
+    </div>
+  </div>
 </section>
 
 <footer>
@@ -178,6 +233,7 @@
   <p>NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT. · MIT · <a href="https://github.com/4DRI4N-OFF/FerroLauncher/issues">Issues</a></p>
 </footer>
 <button id="toTop" title="Top">↑</button>
+<div class="lightbox" id="lightbox" hidden><img id="lightbox-img" alt="" /></div>
 
 <script>
 const btn = document.getElementById('lang');
@@ -189,43 +245,24 @@ function setLang(l) {
 }
 btn.onclick = () => setLang(document.documentElement.lang === 'en' ? 'es' : 'en');
 setLang((() => { try { return localStorage.getItem('ferro-site-lang') || 'es'; } catch { return 'es'; } })());
-// Navbar + progreso + arriba + parallax del hero
+// Navbar + progreso + arriba
 const top = document.getElementById('top');
 const prog = document.getElementById('progress');
 const toTop = document.getElementById('toTop');
-const heroEl = document.querySelector('.hero');
-const mockEl = document.getElementById('mockwrap');
 let scrollTick = false;
 addEventListener('scroll', () => {
   top.classList.toggle('scrolled', scrollY > 24);
   const h = document.documentElement.scrollHeight - innerHeight;
   prog.style.width = (h > 0 ? (scrollY / h) * 100 : 0) + '%';
   toTop.classList.toggle('show', scrollY > 600);
-  if (!scrollTick) {
-    scrollTick = true;
-    requestAnimationFrame(() => {
-      scrollTick = false;
-      const y = Math.min(scrollY, innerHeight);
-      if (heroEl) heroEl.style.transform = `translateY(${y * 0.12}px)`;
-      if (mockEl) mockEl.style.transform = `translateY(${Math.max(0, y - 200) * 0.05}px)`;
-    });
-  }
 }, { passive: true });
 toTop.onclick = () => scrollTo({ top: 0, behavior: 'smooth' });
 // Loader fuera
 addEventListener('load', () => setTimeout(() => document.getElementById('loader').classList.add('done'), 350));
 setTimeout(() => document.getElementById('loader').classList.add('done'), 2500);
-// Cursor glow
-(function () {
-  const c = document.getElementById('cursor');
-  if (matchMedia('(pointer: coarse)').matches) return;
-  let x = -400, y = -400, tx = x, ty = y;
-  addEventListener('pointermove', (e) => { tx = e.clientX; ty = e.clientY; }, { passive: true });
-  (function follow() { x += (tx - x) * 0.12; y += (ty - y) * 0.12; c.style.transform = `translate(${x - 170}px, ${y - 170}px)`; requestAnimationFrame(follow); })();
-})();
-// Botones magnéticos: siguen al cursor con muelle
+// Botones magnéticos
 if (!matchMedia('(pointer: coarse)').matches) {
-  document.querySelectorAll('.btn.primary, .mock-play').forEach((b) => {
+  document.querySelectorAll('.btn-win').forEach((b) => {
     b.addEventListener('pointermove', (e) => {
       const r = b.getBoundingClientRect();
       const dx = (e.clientX - (r.left + r.width / 2)) / r.width;
@@ -259,9 +296,9 @@ function countUp(el, target) {
 }
 // Reveal on scroll
 const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: 0.12 });
-document.querySelectorAll('.grid .card, .panel, .ticker, .mockwrap').forEach((el) => { el.classList.add('reveal'); io.observe(el); });
+document.querySelectorAll('.reveal').forEach((el) => { io.observe(el); });
 // Spotlight que sigue el ratón en tarjetas
-document.querySelectorAll('.grid .card').forEach((card) => {
+document.querySelectorAll('.feature-card').forEach((card) => {
   card.addEventListener('pointermove', (e) => {
     const r = card.getBoundingClientRect();
     card.style.setProperty('--mx', (e.clientX - r.left) + 'px');

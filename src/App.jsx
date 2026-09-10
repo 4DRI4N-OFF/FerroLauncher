@@ -307,23 +307,6 @@ export default function App() {
   const introImgRef = useRef(null);
   const sideLogoRef = useRef(null);
   const overlayRef = useRef(null);
-  const skipRef = useRef(false);
-  const thxRef = useRef(null);
-  // Apaga el sample THX con fundido (o lo corta si falla)
-  const stopThx = () => {
-    try {
-      const a = thxRef.current; thxRef.current = null;
-      if (!a) return;
-      const step = () => {
-        try {
-          a.volume = Math.max(0, a.volume - 0.12);
-          if (a.volume <= 0) { try { a.pause(); } catch {} }
-          else setTimeout(step, 60);
-        } catch { try { a.pause(); } catch {} }
-      };
-      step();
-    } catch {}
-  };
   const pollRef = useRef(null);
   const [launchInstance, setLaunchInstance] = useState(() => { try { return localStorage.getItem('ferro-instance') || ''; } catch { return ''; } });
   useEffect(() => { try { localStorage.setItem('ferro-username', username); } catch {} }, [username]);
@@ -871,20 +854,7 @@ export default function App() {
       // Escala por dibujo visible (contain), no por caja: el mini es cuadrado.
       const glyph = (r) => Math.min(r.width, r.height);
       const s = glyph(baseTiny) > 0 ? glyph(rl) / glyph(baseTiny) : r2.width / r1.width;
-      let thxOk = false;
-      if (sfx.cfg && sfx.cfg.enabled) {
-        try {
-          const tr = await window.ferro.thx?.();
-          if (tr && tr.url) {
-            const a = new Audio(tr.url);
-            a.volume = Math.max(0, Math.min(1, sfx.cfg.volume ?? 0.5));
-            thxRef.current = a;
-            thxOk = true;
-            a.play().catch(() => {});
-          }
-        } catch {}
-      }
-      if (!thxOk) sfx.play('whoosh');
+      sfx.play('whoosh');
       const trailTimer = setInterval(() => {
         try {
           const rr = img.getBoundingClientRect();
@@ -940,7 +910,6 @@ export default function App() {
       try {
         if (ov) await ov.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 450, easing: 'ease-out', fill: 'forwards' }).finished;
       } catch {}
-      stopThx();
       unlock();
       setIntro(false);
     };
@@ -1759,7 +1728,7 @@ export default function App() {
         </div>
       </div>
       {intro && (
-      <div className="intro-overlay" ref={overlayRef} onClick={() => { skipRef.current = true; }}>
+      <div className="intro-overlay" ref={overlayRef}>
         <div ref={introImgRef} className="intro-logo">
             <img className="intro-full" src={brand} alt="" />
             <img className="intro-mini" src={flMark} alt="FL" />

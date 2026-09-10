@@ -428,23 +428,6 @@ ipcMain.handle('ferro:setDiscord', async (_, patch) => {
   } catch {}
   return r;
 });
-let thxCache = null;
-ipcMain.handle('ferro:thx', async () => {
-  try {
-    if (thxCache) return { url: thxCache };
-    const fs = require('fs');
-    const dir = app.getPath('music');
-    const files = fs.readdirSync(dir).filter((f) => /^thx deep note.*\.(mp3|wav|m4a|ogg|flac)$/i.test(f));
-    if (!files.length) return { url: null };
-    files.sort();
-    const buf = fs.readFileSync(require('path').join(dir, files[0]));
-    if (!buf.length || buf.length > 40 * 1024 * 1024) return { url: null };
-    const ext = files[0].split('.').pop().toLowerCase();
-    const mime = ext === 'wav' ? 'audio/wav' : ext === 'm4a' ? 'audio/mp4' : ext === 'ogg' ? 'audio/ogg' : ext === 'flac' ? 'audio/flac' : 'audio/mpeg';
-    thxCache = `data:${mime};base64,${buf.toString('base64')}`;
-    return { url: thxCache };
-  } catch { return { url: null }; }
-});
 ipcMain.handle('ferro:testWebhook', async () => {
   if (!readWebhook(getDirs().base)) throw new Error('Pega primero la URL del webhook (Ajustes → Discord)');
   const ok = await notify(getDirs().base, 'ok', 'FerroLauncher conectado', 'Webhook funcionando. Avisaré de partidas, crashes e instalaciones.');

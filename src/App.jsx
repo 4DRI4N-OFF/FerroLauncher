@@ -312,6 +312,22 @@ export default function App() {
   const overlayRef = useRef(null);
   const stageRef = useRef(null);
   const skipRef = useRef(false);
+  const thxRef = useRef(null);
+  // Apaga el sample THX con fundido (o lo corta si falla)
+  const stopThx = () => {
+    try {
+      const a = thxRef.current; thxRef.current = null;
+      if (!a) return;
+      const step = () => {
+        try {
+          a.volume = Math.max(0, a.volume - 0.12);
+          if (a.volume <= 0) { try { a.pause(); } catch {} }
+          else setTimeout(step, 60);
+        } catch { try { a.pause(); } catch {} }
+      };
+      step();
+    } catch {}
+  };
   const pollRef = useRef(null);
   const [launchInstance, setLaunchInstance] = useState(() => { try { return localStorage.getItem('ferro-instance') || ''; } catch { return ''; } });
   useEffect(() => { try { localStorage.setItem('ferro-username', username); } catch {} }, [username]);
@@ -867,8 +883,18 @@ export default function App() {
         const c3 = stage && stage.querySelector('.cine-3');
         const cfl = (ov || document).querySelector('.cine-flash');
         if (stage && c1 && c2 && c3 && cfl) {
-          // Riser THX mientras caen las mitades
-          sfx.play('riser');
+          // THX real si existe, si no el riser sintetizado
+          if (sfx.cfg && sfx.cfg.enabled) {
+            try {
+              const tr = await window.ferro.thx?.();
+              if (tr && tr.url) {
+                const a = new Audio(tr.url);
+                a.volume = Math.max(0, Math.min(1, sfx.cfg.volume ?? 0.5));
+                thxRef.current = a;
+                a.play().catch(() => { sfx.play('riser'); });
+              } else sfx.play('riser');
+            } catch { sfx.play('riser'); }
+          }
           // Paso 1+2: FERRO cae, LAUNCHER sube (solapados)
           const fall = c1.animate([
             { transform: 'translate(-50%,-130vh) scale(1)', opacity: 0 },
@@ -881,7 +907,7 @@ export default function App() {
             { transform: 'translate(-50%,0) scale(1)', opacity: 1 },
           ], { duration: 780, delay: 200, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'forwards' }).finished.catch(() => {});
           await Promise.all([fall, rise]);
-          if (skipRef.current) { unlock(); setIntro(false); return; }
+          if (skipRef.current) { stopThx(); unlock(); setIntro(false); return; }
           // Paso 3a: formacion — destello + fundido al completo (resuelve el riser)
           await Promise.all([
             cfl.animate([{ opacity: 0 }, { opacity: 0.9, offset: 0.45 }, { opacity: 0 }], { duration: 480, easing: 'ease-out', fill: 'forwards' }).finished.catch(() => {}),
@@ -889,9 +915,9 @@ export default function App() {
             c1.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 420, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {}),
             c2.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 420, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {}),
           ]);
-          if (skipRef.current) { unlock(); setIntro(false); return; }
-          // Paso 3b: explosion — golpe triple-forte, flashazo, metralla y sacudida
-          sfx.play('deepHit');
+          if (skipRef.current) { stopThx(); unlock(); setIntro(false); return; }
+          // Paso 3b: explosion — flashazo, metralla y sacudida (+ golpe solo sin sample)
+          if (!thxRef.current) sfx.play('deepHit');
           const sr = stage.getBoundingClientRect();
           const scx = sr.left + sr.width / 2, scy = sr.top + sr.height / 2;
           for (let k = 0; k < 18; k++) {
@@ -921,12 +947,12 @@ export default function App() {
             ], { duration: 450, easing: 'ease-out' });
           } catch {}
           await cfl.animate([{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 1, offset: 0.55 }, { opacity: 1 }], { duration: 700, easing: 'ease-out', fill: 'forwards' }).finished.catch(() => {});
-          if (skipRef.current) { unlock(); setIntro(false); return; }
+          if (skipRef.current) { stopThx(); unlock(); setIntro(false); return; }
           // El flash tapa el cambio: fuera escenario, dentro vuelo
           try { stage.style.display = 'none'; } catch {}
           try { img.style.opacity = '1'; } catch {}
           await cfl.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 450, easing: 'ease-out', fill: 'forwards' }).finished.catch(() => {});
-          if (skipRef.current) { unlock(); setIntro(false); return; }
+          if (skipRef.current) { stopThx(); unlock(); setIntro(false); return; }
         }
       } catch {}
       sfx.play('whoosh');
@@ -985,6 +1011,7 @@ export default function App() {
       try {
         if (ov) await ov.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 450, easing: 'ease-out', fill: 'forwards' }).finished;
       } catch {}
+      stopThx();
       unlock();
       setIntro(false);
     };

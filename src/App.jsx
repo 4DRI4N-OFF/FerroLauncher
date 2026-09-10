@@ -987,7 +987,8 @@ export default function App() {
       window.ferro.onShown(() => {
         fallback = setTimeout(fly, 2000); // por si settled no llega
       });
-      const t = setTimeout(fly, 9000); // salvavidas
+      const isReload = (() => { try { return performance.getEntriesByType('navigation')[0]?.type === 'reload'; } catch { return false; } })();
+      const t = setTimeout(fly, isReload ? 1500 : 9000); // salvavidas (rapido tras recargar)
       return () => { clearTimeout(t); clearTimeout(fallback); unlock(); };
     }
     const t = setTimeout(fly, 600); // fuera de Electron

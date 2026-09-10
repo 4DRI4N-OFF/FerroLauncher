@@ -33,7 +33,15 @@ function listInstances(instancesDir) {
 }
 
 function createInstance(instancesDir, name, versionId, opts = {}) {
-  const safe = name.replace(/[^\w\-. ]+/g, '_').trim() || 'Instancia';
+  const base = name.replace(/[^\w\-. ]+/g, '_').trim() || 'Instancia';
+  const taken = (s) => {
+    const d = path.join(instancesDir, s);
+    try {
+      return fs.existsSync(path.join(d, 'ferro.json')) || fs.readdirSync(d).length > 0;
+    } catch { return false; }
+  };
+  let safe = base, i = 2;
+  while (taken(safe)) safe = `${base} (${i++})`;
   const dir = path.join(instancesDir, safe);
   fs.mkdirSync(dir, { recursive: true });
   const type = ['fabric', 'quilt', 'forge', 'neoforge'].includes(opts.type) ? opts.type : 'vanilla';

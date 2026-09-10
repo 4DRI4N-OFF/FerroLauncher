@@ -826,9 +826,11 @@ export default function App() {
 
   const create = async () => {
     try {
-      await window.ferro.createInstance({ name: instanceName, versionId, type: instanceType, loaderVersion: instanceType === 'vanilla' ? undefined : loaderVersion });
-      setLog((l) => l + `[ferro] instancia creada: ${instanceName} (${versionId}${instanceType === 'vanilla' ? '' : ` + ${instanceType} ${loaderVersion}`})\n`);
-      pushToast('success', t('toast.instCreated', {n:instanceName}));
+      const r = await window.ferro.createInstance({ name: instanceName, versionId, type: instanceType, loaderVersion: instanceType === 'vanilla' ? undefined : loaderVersion });
+      setLog((l) => l + `[ferro] instancia creada: ${r.name} (${versionId}${instanceType === 'vanilla' ? '' : ` + ${instanceType} ${loaderVersion}`})\n`);
+      pushToast('success', t('toast.instCreated', {n:r.name}));
+      setInstanceName('');
+      setLaunchInstance(r.name);
       refresh();
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };

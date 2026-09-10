@@ -68,17 +68,18 @@ function initSpringScroll() {
       box.style.transformOrigin = org;
       const P = 'perspective(1100px)';
       try {
+        const ov = (parseFloat(y0) >= 0 ? -10 : 10).toFixed(0);
         box.animate([
           { transform: `${P} rotateX(${r0}deg) translateY(${y0}px) scale(1,${sy0})`, transformOrigin: org, offset: 0 },
-          { transform: `${P} rotateX(${r1}deg) translateY(0px) scale(1,1.12)`, transformOrigin: org, offset: 0.22 },
-          { transform: `${P} rotateX(${r2}deg) translateY(0px) scale(1,0.93)`, transformOrigin: org, offset: 0.42 },
-          { transform: `${P} rotateX(${r3}deg) translateY(0px) scale(1,1.05)`, transformOrigin: org, offset: 0.6 },
-          { transform: `${P} rotateX(0deg) translateY(0px) scale(1,0.98)`, transformOrigin: org, offset: 0.78 },
-          { transform: `${P} rotateX(0deg) translateY(0px) scale(1,1)`, transformOrigin: org, offset: 1 },
-        ], { duration: 900, easing: 'ease-out' });
+          { transform: `${P} rotateX(${r1}deg) translateY(${ov}px) scale(1,1.14)`, transformOrigin: org, offset: 0.18, easing: 'cubic-bezier(.3,1.1,.4,1)' },
+          { transform: `${P} rotateX(${r2}deg) translateY(0px) scale(1,0.92)`, transformOrigin: org, offset: 0.4, easing: 'ease-in-out' },
+          { transform: `${P} rotateX(${r3}deg) translateY(0px) scale(1,1.06)`, transformOrigin: org, offset: 0.6, easing: 'ease-in-out' },
+          { transform: `${P} rotateX(0deg) translateY(0px) scale(1,0.98)`, transformOrigin: org, offset: 0.8, easing: 'ease-in-out' },
+          { transform: `${P} rotateX(0deg) translateY(0px) scale(1,1)`, transformOrigin: org, offset: 1, easing: 'ease-out' },
+        ], { duration: 850 });
       } catch {}
-      s.back = setTimeout(done, 950);
-    }, 110);
+      s.back = setTimeout(done, 900);
+    }, 150);
   };
   document.addEventListener('wheel', onWheel, { passive: false, capture: true });
   return () => { try { document.removeEventListener('wheel', onWheel, { capture: true }); } catch {} };

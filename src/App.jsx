@@ -79,24 +79,11 @@ function initSpringScroll() {
       const p = s.pull, d = s.dir || 1; s.pull = 0; s.raw = 0;
       const done = () => { try { box.style.transform = ''; box.style.transformOrigin = ''; box.style.willChange = ''; } catch {} };
       if (Math.abs(p) < 8) { done(); return; }
-      // Al soltar: gelatina que oscila apagandose (estira, aplasta, asienta).
-      const kk = Math.min(1, Math.abs(p) / MAX);
-      const org = d < 0 ? '50% 0%' : '50% 100%';
-      const y0 = (-p).toFixed(1), sy0 = (1 - 0.16 * kk).toFixed(3);
+      // Al soltar: el mismo muelle de la sidebar (overshoot identico).
+      box.style.transformOrigin = d < 0 ? '50% 0%' : '50% 100%';
+      box.style.transition = 'transform .55s var(--spring)';
       box.style.transform = '';
-      box.style.transformOrigin = org;
-      try {
-        const ov = (parseFloat(y0) >= 0 ? -10 : 10).toFixed(0);
-        box.animate([
-          { transform: `translateY(${y0}px) scale(1,${sy0})`, transformOrigin: org, offset: 0 },
-          { transform: `translateY(${ov}px) scale(1,1.14)`, transformOrigin: org, offset: 0.18, easing: 'cubic-bezier(.3,1.1,.4,1)' },
-          { transform: 'translateY(0px) scale(1,0.92)', transformOrigin: org, offset: 0.4, easing: 'ease-in-out' },
-          { transform: 'translateY(0px) scale(1,1.06)', transformOrigin: org, offset: 0.6, easing: 'ease-in-out' },
-          { transform: 'translateY(0px) scale(1,0.98)', transformOrigin: org, offset: 0.8, easing: 'ease-in-out' },
-          { transform: 'translateY(0px) scale(1,1)', transformOrigin: org, offset: 1, easing: 'ease-out' },
-        ], { duration: 850 });
-      } catch {}
-      s.back = setTimeout(done, 900);
+      s.back = setTimeout(done, 600);
     }, 150);
   };
   document.addEventListener('wheel', onWheel, { passive: false, capture: true });

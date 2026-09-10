@@ -334,10 +334,14 @@ fetch('https://api.github.com/repos/4DRI4N-OFF/FerroLauncher/releases?per_page=3
       for (const a of (r.assets || [])) dl += a.download_count || 0;
       const d = document.createElement('div');
       d.className = 'rel';
-      const dt = new Date(r.published_at).toLocaleDateString();
-      d.innerHTML = `<b></b><span>${dt}</span><p></p>`;
-      d.querySelector('b').textContent = r.name || r.tag_name;
-      d.querySelector('p').textContent = (r.body || '').slice(0, 400);
+      const a = document.createElement('a');
+      a.href = r.html_url;
+      a.rel = 'noopener';
+      a.style.color = 'inherit';
+      a.textContent = r.tag_name;
+      const b = document.createElement('b');
+      b.appendChild(a);
+      d.appendChild(b);
       box.appendChild(d);
     }
     countUp(document.getElementById('st-dl'), dl);

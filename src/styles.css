@@ -764,6 +764,10 @@ pre {
 .boom-flash { position: absolute; width: 230px; height: 230px; transform: translate(-50%,-50%); border-radius: 50%; background: radial-gradient(circle, rgba(255,246,214,.95) 0%, rgba(255,182,46,.55) 35%, rgba(255,110,30,0) 70%); }
 .boom-shard { position: absolute; transform: translate(-50%,-50%); border-radius: 2px; box-shadow: 0 0 8px 2px rgba(255,140,30,.8); }
 .boom-smoke { position: absolute; transform: translate(-50%,-50%); border-radius: 50%; background: radial-gradient(circle, rgba(150,150,150,.5), rgba(150,150,150,0) 70%); }
+.ai-chat { display: flex; flex-direction: column; gap: 8px; max-height: 46vh; overflow: auto; padding: 4px 2px; }
+.ai-msg { max-width: 85%; padding: 9px 13px; border-radius: 14px; font-size: 13.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.ai-you { align-self: flex-end; background: linear-gradient(135deg, var(--gold), var(--amber) 60%, var(--ember)); color: #1a0d06; border-bottom-right-radius: 5px; font-weight: 500; }
+.ai-bot { align-self: flex-start; background: rgba(255,255,255,.07); border: 1px solid var(--stroke-soft); border-bottom-left-radius: 5px; }
 .card.exploding { animation: card-boom .76s ease-in forwards; pointer-events: none; }
 @keyframes card-boom {
   0% { transform: scale(1); opacity: 1; filter: none; }

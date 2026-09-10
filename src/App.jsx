@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import brand from './assets/brand.png';
 import flMark from './assets/fl.png';
 import { sfx } from './sfx.js';
+import { geminiChat, geminiModels, aiErrorKey } from './ai.js';
 import { STR, getLang } from './i18n.js';
 import { GithubIcon, DiscordIcon, YoutubeIcon, XIcon } from './brands.jsx';
 import Embers from './embers.jsx';
@@ -9,7 +10,7 @@ import {
   Play, Square, Layers, Package, LayoutGrid, Gift, User, Palette,
   Settings, Search, Plus, RefreshCw, FolderOpen, Copy, Pencil, Trash2,
   Download, Upload, Check, X, AlertTriangle, Info, Camera,
-  MessageCircle, ExternalLink, Server, Pin, PinOff,
+  MessageCircle, ExternalLink, Server, Pin, PinOff, Sparkles,
 } from 'lucide-react';
 
 // Resortes al fijar/soltar la sidebar: los botones entran en cascada con muelle.
@@ -515,10 +516,74 @@ export default function App() {
       refresh();
     }, 760);
   };
+  // --- Asistente IA ---
+  const aiSystem = () => {
+    const names = (instances || []).slice(0, 12).map((i) => `${i.name} (${i.versionId}${i.type !== 'vanilla' ? ' ' + i.type : ''})`).join(', ') || '—';
+    const base = lang === 'en'
+      ? 'You are the FerroLauncher assistant, a Minecraft Java launcher for Windows (Electron). Help with: Minecraft versions, loaders (Vanilla/Fabric/Quilt/Forge/NeoForge), Modrinth/CurseForge mods, shaders, Java and RAM, errors and crashes. Reply in English, short and direct, with concrete steps. If given console/log text, diagnose the likely cause.'
+      : 'Eres el asistente de FerroLauncher, un launcher de Minecraft Java para Windows (Electron). Ayudas con: versiones de Minecraft, loaders (Vanilla/Fabric/Quilt/Forge/NeoForge), mods de Modrinth/CurseForge, shaders, Java y RAM, errores y cuelgues. Responde en español, breve y directo, con pasos concretos. Si te pegan consola o log, diagnostica la causa probable.';
+    return `${base} Context: FerroLauncher v${appVer || '?'}, instances: ${names}.`;
+  };
+  const saveAiKey = async () => {
+    const k = aiKeyInput.trim();
+    if (!k) return;
+    setAiKey(k);
+    try { localStorage.setItem('ferro-ai-key', k); } catch {}
+    setAiKeyInput('');
+    pushToast('success', t('ai.keySaved'));
+    loadAiModels(k);
+  };
+  const loadAiModels = async (k) => {
+    const key = (k || aiKey || '').trim();
+    if (!key) { pushToast('error', t('ai.needKey')); return; }
+    try {
+      const ms = await geminiModels(key);
+      if (ms.length) {
+        setAiModels(ms);
+        if (!ms.some((m) => m.id === aiModel)) {
+          const pick = ms.find((m) => /flash/i.test(m.id)) || ms[0];
+          setAiModel(pick.id);
+          try { localStorage.setItem('ferro-ai-model', pick.id); } catch {}
+        }
+        pushToast('success', `${ms.length} ✓`);
+      } else pushToast('error', t('ai.errKey'));
+    } catch (e) { pushToast('error', t(aiErrorKey(e))); }
+  };
+  const sendAi = async () => {
+    const text = aiInput.trim();
+    if (!text || aiBusy) return;
+    if (!aiKey) { pushToast('error', t('ai.needKey')); return; }
+    const next = [...aiMsgs, { role: 'user', text }].slice(-60);
+    setAiMsgs(next);
+    setAiInput('');
+    setAiBusy(true);
+    try {
+      const reply = await geminiChat({ key: aiKey, model: aiModel, system: aiSystem(), history: next.slice(-12) });
+      setAiMsgs((m) => [...m, { role: 'ai', text: reply }].slice(-60));
+    } catch (e) {
+      setAiMsgs((m) => [...m, { role: 'ai', text: `⚠ ${t(aiErrorKey(e))}` }].slice(-60));
+    } finally { setAiBusy(false); }
+  };
+  const attachLog = () => {
+    const tail = String(log || '').slice(-4000);
+    setAiMsgs((m) => [...m, { role: 'user', text: `${t('ai.logAttached')}\n\`\`\`\n${tail}\n\`\`\`` }].slice(-60));
+  };
+  const clearAi = () => { setAiMsgs([]); try { localStorage.removeItem('ferro-ai-chat'); } catch {} };
   const askConfirm = (message, onOk) => setConfirmDlg({ message, onOk, input: false });
   const askRename = (current, onOk) => { setConfirmInput(current); setConfirmDlg({ message: t('inst.renamePrompt'), input: true, onOk: (v) => { if (v && v !== current) onOk(v); } }); };
   const [saving, setSaving] = useState(false);
   const [instFilter, setInstFilter] = useState('');
+  // Chat IA (Gemini, clave del usuario guardada solo en su PC)
+  const [aiKey, setAiKey] = useState(() => { try { return localStorage.getItem('ferro-ai-key') || ''; } catch { return ''; } });
+  const [aiKeyInput, setAiKeyInput] = useState('');
+  const [aiModel, setAiModel] = useState(() => { try { return localStorage.getItem('ferro-ai-model') || 'gemini-2.5-flash'; } catch { return 'gemini-2.5-flash'; } });
+  const [aiModels, setAiModels] = useState([]);
+  const [aiMsgs, setAiMsgs] = useState(() => { try { return JSON.parse(localStorage.getItem('ferro-ai-chat') || '[]').slice(-60); } catch { return []; } });
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiInput, setAiInput] = useState('');
+  const aiEndRef = useRef(null);
+  useEffect(() => { try { localStorage.setItem('ferro-ai-chat', JSON.stringify(aiMsgs.slice(-60))); } catch {} }, [aiMsgs]);
+  useEffect(() => { try { aiEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch {} }, [aiMsgs, aiBusy, tab]);
   const [launchProg, setLaunchProg] = useState(null);
   const [dragOn, setDragOn] = useState(false);
   const dragCount = useRef(0);
@@ -1167,6 +1232,7 @@ export default function App() {
         <button className={tab==='skin'?'active':''} onClick={()=>{setTab('skin'); loadSkin();}}><Palette size={16} /><span className="nav-label">{t('tab.skin')}</span></button>
         <button className={tab==='ajustes'?'active':''} onClick={()=>setTab('ajustes')}><Settings size={16} /><span className="nav-label">{t('tab.settings')}</span></button>
         <button className={tab==='servers'?'active':''} onClick={()=>{setTab('servers'); loadServers();}}><Server size={16} /><span className="nav-label">{t('tab.servers')}</span></button>
+        <button className={tab==='ia'?'active':''} onClick={()=>setTab('ia')}><Sparkles size={16} /><span className="nav-label">{t('ai.tab')}</span></button>
         <div className="player-chip" onClick={()=>setTab('cuenta')} title={t('tab.account')}>
           {playFace ? <img className="face" src={playFace} alt="" onError={()=>setPlayFace(null)} /> : <User size={18} />}
           <div className="pc-id"><b className={account ? 'premium-shine' : ''}>{account?.name || username || '—'}</b><span>{account ? t('play.online') : t('play.offline')}</span></div>
@@ -1567,6 +1633,43 @@ export default function App() {
             </div>
             {servers.length===0 && <p style={{opacity:.6}}>{t('srv.none')}</p>}
           </div>
+        )}
+        {tab==='ia' && (
+          <>
+          <div className="card">
+            <h2>{t('ai.title')}</h2>
+            <p style={{opacity:.7}}>{t('ai.desc')} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">{t('ai.keyHow')}</a></p>
+            <div className="row">
+              <input type="password" value={aiKeyInput} onChange={(e)=>setAiKeyInput(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveAiKey(); } }} placeholder={aiKey ? '••••••••' : t('ai.keyPh')} style={{flex:1, minWidth:180}} />
+              <button className="ghost" onClick={saveAiKey}>{t('ai.save')}</button>
+              {aiModels.length > 0 ? (
+                <select value={aiModel} onChange={(e)=>{ setAiModel(e.target.value); try { localStorage.setItem('ferro-ai-model', e.target.value); } catch {} }}>
+                  {aiModels.map((m)=><option key={m.id} value={m.id}>{m.label || m.id}</option>)}
+                </select>
+              ) : (
+                <input value={aiModel} onChange={(e)=>{ setAiModel(e.target.value); try { localStorage.setItem('ferro-ai-model', e.target.value); } catch {} }} placeholder="gemini-2.5-flash" style={{width:190}} />
+              )}
+              <button className="ghost" onClick={()=>loadAiModels()}>{t('ai.refreshModels')}</button>
+            </div>
+            <div style={{marginTop:8}}>{aiKey ? <span className="pill green">✓ {t('ai.keySaved')}</span> : <span className="pill">{t('ai.needKey')}</span>}</div>
+          </div>
+          <div className="card">
+            <div className="ai-chat">
+              {aiMsgs.length===0 && <div className="ai-msg ai-bot">{t('ai.hello')}</div>}
+              {aiMsgs.map((m,ix)=>(<div key={ix} className={`ai-msg ai-${m.role==='ai'?'bot':'you'}`}>{m.text}</div>))}
+              {aiBusy && <div className="ai-msg ai-bot"><span className="spinner" /> {t('ai.thinking')}</div>}
+              <div ref={aiEndRef} />
+            </div>
+            <div className="row" style={{marginTop:10}}>
+              <input value={aiInput} onChange={(e)=>setAiInput(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendAi(); } }} placeholder={t('ai.ph')} style={{flex:1}} />
+              <button className="primary" onClick={sendAi} disabled={aiBusy}>{t('ai.send')}</button>
+            </div>
+            <div className="row" style={{marginTop:8}}>
+              <button className="ghost" onClick={attachLog}><Upload size={14} /> {t('ai.attachLog')}</button>
+              <button className="ghost" onClick={clearAi}>{t('ai.clear')}</button>
+            </div>
+          </div>
+          </>
         )}
         {tab==='ajustes' && (
           <>

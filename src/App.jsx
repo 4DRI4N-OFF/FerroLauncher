@@ -605,11 +605,15 @@ export default function App() {
   const [aiInput, setAiInput] = useState('');
   const aiEndRef = useRef(null);
   const [islandOpen, setIslandOpen] = useState(false);
+  const [islandVisible, setIslandVisible] = useState(false);
+  const [islandFocus, setIslandFocus] = useState(0);
   useEffect(() => { try { localStorage.setItem('ferro-ai-chat', JSON.stringify(aiMsgs.slice(-60))); } catch {} }, [aiMsgs]);
   // Clave integrada (proceso principal): si existe, no se pide ni se muestra ninguna clave.
   const [aiBuiltIn, setAiBuiltIn] = useState(false);
   useEffect(() => { try { window.ferro?.aiHasKey?.()?.then?.((v) => { if (v) setAiBuiltIn(true); })?.catch?.(() => {}); } catch {} }, []);
   useEffect(() => { if (aiBuiltIn && aiModels.length === 0 && !aiBusy) loadAiModels(); }, [aiBuiltIn]);
+  // La isla solo se muestra al llamarla, al trabajar o al responder.
+  useEffect(() => { if (aiBusy || islandOpen) setIslandVisible(true); }, [aiBusy, islandOpen]);
   useEffect(() => { try { aiEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch {} }, [aiMsgs, aiBusy, tab, islandOpen]);
   const [launchProg, setLaunchProg] = useState(null);
   const [dragOn, setDragOn] = useState(false);
@@ -1171,8 +1175,9 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setIslandVisible(true); setIslandFocus((k) => k + 1); return; }
       if (e.key !== 'Escape') return;
-      if (islandOpen) setIslandOpen(false);
+      if (islandOpen) { setIslandOpen(false); setIslandVisible(false); }
       else if (galName) closeGallery();
       else if (settingsFor) closeModal();
       else if (confirmDlg) setConfirmDlg(null);
@@ -1805,6 +1810,7 @@ export default function App() {
         </div>
       )}
       {!intro && (<DynamicIsland open={islandOpen} setOpen={setIslandOpen} t={t}
+        visible={islandVisible} setVisible={setIslandVisible} focusSignal={islandFocus}
         aiMsgs={aiMsgs} aiBusy={aiBusy} aiInput={aiInput} setAiInput={setAiInput} sendAi={sendAi} aiEndRef={aiEndRef}
         aiBuiltIn={aiBuiltIn} aiKey={aiKey} aiKeyInput={aiKeyInput} setAiKeyInput={setAiKeyInput} saveAiKey={saveAiKey}
         aiModels={aiModels} aiModel={aiModel} setAiModel={setAiModel} loadAiModels={loadAiModels}

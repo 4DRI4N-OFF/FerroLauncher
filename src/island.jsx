@@ -1,13 +1,30 @@
+import { useEffect, useRef } from 'react';
 import { Sparkles, X } from 'lucide-react';
 
-// Isla minima: circulo con icono; al pasar el raton se estira el campo;
-// la respuesta sale en una burbuja debajo.
+// Isla discreta: escondida salvo hover arriba, Ctrl+K, trabajo o respuesta.
 export default function DynamicIsland(p) {
+  const inputRef = useRef(null);
+  useEffect(() => {
+    if (!p.focusSignal) return;
+    const t = setTimeout(() => { try { inputRef.current?.focus(); } catch {} }, 60);
+    return () => clearTimeout(t);
+  }, [p.focusSignal]);
   const lastAi = [...(p.aiMsgs || [])].reverse().find((m) => m.role === 'ai');
+  const maybeHide = (e) => {
+    try {
+      if (e?.relatedTarget?.closest?.('.island, .island-answer')) return;
+    } catch {}
+    if (!p.aiBusy && !p.open) p.setVisible(false);
+  };
   return (<>
-    <div className={`island${p.open ? ' open' : ''}${p.aiBusy ? ' busy' : ''}`}>
+    <div className="island-trigger" onMouseEnter={() => p.setVisible(true)} />
+    <div
+      className={`island${p.open ? ' open' : ''}${p.aiBusy ? ' busy' : ''}${p.visible ? '' : ' gone'}`}
+      onMouseLeave={maybeHide}
+    >
       <span className="island-ico"><Sparkles size={17} /></span>
       <input
+        ref={inputRef}
         className="island-field"
         value={p.aiInput}
         onChange={(e) => p.setAiInput(e.target.value)}
@@ -17,10 +34,10 @@ export default function DynamicIsland(p) {
       {p.aiBusy && <span className="is-dots"><i /><i /><i /></span>}
     </div>
     {p.open && (
-      <div className="island-answer">
+      <div className="island-answer" onMouseLeave={maybeHide}>
         <div className="island-answer-head">
           <span>{p.t('ai.title')}</span>
-          <button className="mini" onClick={() => p.setOpen(false)}><X size={13} /></button>
+          <button className="mini" onClick={() => { p.setOpen(false); p.setVisible(false); }}><X size={13} /></button>
         </div>
         {!p.aiBuiltIn && (
           <>

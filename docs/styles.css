@@ -206,6 +206,12 @@ footer a { color: var(--amber); }
 .shots a { display: block; border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,.1); transition: transform 0.3s var(--spring-soft), border-color 0.25s, box-shadow 0.3s; }
 .shots a:hover { transform: translateY(-4px) scale(1.02); border-color: rgba(255, 182, 46, 0.4); box-shadow: 0 16px 40px rgba(0,0,0,.5); }
 .shots img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: rgba(255,255,255,.04); }
+.shots .cap { display: block; padding: 10px 13px 12px; }
+.shots .cap b { font-size: 14px; }
+.shots .cap i { display: block; font-style: normal; font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+.announce { position: relative; z-index: 5; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 14px auto 0; padding: 9px 18px; max-width: max-content; font-size: 13.5px; font-weight: 700; color: #1c0d05; background: linear-gradient(135deg, var(--gold), var(--amber) 55%, var(--ember)); border-radius: 999px; box-shadow: 0 10px 30px rgba(255, 110, 30, 0.35), inset 0 1px 0 rgba(255,255,255,.5); }
+.announce a { color: #1c0d05; background: rgba(255,255,255,.35); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; text-decoration: none; }
+.announce a:hover { background: rgba(255,255,255,.55); }
 .lightbox { position: fixed; inset: 0; z-index: 50; background: rgba(3,2,1,.88); display: flex; align-items: center; justify-content: center; padding: 24px; cursor: zoom-out; }
 .lightbox[hidden] { display: none; }
 .lightbox img { max-width: min(1100px, 94vw); max-height: 88vh; border-radius: 16px; border: 1px solid rgba(255,255,255,.15); box-shadow: 0 30px 90px rgba(0,0,0,.7); }

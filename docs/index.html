@@ -29,6 +29,7 @@
 <div class="grid-bg"></div>
 <div class="grain"></div>
 <div class="cursor" id="cursor"></div>
+<div class="announce reveal"><span data-es="🚀 FerroLauncher 1.0 — salida oficial muy pronto" data-en="🚀 FerroLauncher 1.0 — official release coming very soon">🚀 FerroLauncher 1.0 — salida oficial muy pronto</span><a href="https://discord.gg/vTujTm3hE" data-es="Avísame en Discord" data-en="Notify me on Discord">Avísame en Discord</a></div>
 <header class="top" id="top">
   <span class="logo-mini">⛏ FerroLauncher</span>
   <nav>
@@ -52,7 +53,7 @@
     <a class="btn primary xl" id="dl-setup" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest" data-es="Descargar instalador" data-en="Download installer">Descargar instalador</a>
     <a class="btn ghost xl" id="dl-portable" href="https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest/download/FerroLauncher-portable.exe" data-es="Versión portable" data-en="Portable version">Versión portable</a>
   </div>
-  <p class="ver" id="ver">v0.6.0 · Windows 10/11 64-bit</p>
+  <p class="ver" id="ver">v0.7.0 · Windows 10/11 64-bit</p>
   <a class="scroll-cue" href="#features" aria-label="scroll"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg></a>
 </section>
 
@@ -98,12 +99,18 @@
 
 <section class="panel reveal" id="shots">
   <div class="eyebrow">03 · <span data-es="La app" data-en="The app">La app</span></div>
-  <h2 data-es="Hecha para manosearse" data-en="Made to be touched">Hecha para manosearse</h2>
-  <p data-es="Capturas reales del launcher. Pulsa para ampliar." data-en="Real launcher screenshots. Click to enlarge.">Capturas reales del launcher. Pulsa para ampliar.</p>
+  <h2 data-es="Recorre cada pestaña" data-en="Tour every tab">Recorre cada pestaña</h2>
+  <p data-es="Una captura por categoría. Pulsa para ampliar." data-en="One screenshot per category. Click to enlarge.">Una captura por categoría. Pulsa para ampliar.</p>
   <div class="shots" id="shots-row">
-    <a href="shots/jugar.png" data-lightbox><img src="shots/jugar.png" alt="Jugar" loading="lazy" onerror="this.closest('a').style.display='none'" /></a>
-    <a href="shots/instancias.png" data-lightbox><img src="shots/instancias.png" alt="Instancias" loading="lazy" onerror="this.closest('a').style.display='none'" /></a>
-    <a href="shots/contenido.png" data-lightbox><img src="shots/contenido.png" alt="Contenido" loading="lazy" onerror="this.closest('a').style.display='none'" /></a>
+    <a href="shots/jugar.png" data-lightbox><img src="shots/jugar.png" alt="Jugar" loading="lazy" onerror="this.closest('a').style.display='none'" /><span class="cap"><b>Jugar</b><i data-es="Entra en 1 clic con consola y progreso en vivo." data-en="Play in 1 click with live console and progress.">Entra en 1 clic con consola y progreso en vivo.</i></span></a>
+    <a href="shots/versiones.png" data-lightbox><img src="shots/versiones.png" alt="Versiones" loading="lazy" onerror="this.closest('a').style.display='none'" /><span class="cap"><b data-es="Versiones" data-en="Versions">Versiones</b><i data-es="Todo Mojang: releases, snapshots y detalles." data-en="All of Mojang: releases, snapshots and details.">Todo Mojang: releases, snapshots y detalles.</i></span></a>
+    <a href="shots/instancias.png" data-lightbox><img src="shots/instancias.png" alt="Instancias" loading="lazy" onerror="this.closest('a').style.display='none'" /><span class="cap"><b data-es="Instancias" data-en="Instances">Instancias</b><i data-es="Crea, duplica, exporta y diagnostica." data-en="Create, duplicate, export and diagnose.">Crea, duplica, exporta y diagnostica.</i></span></a>
+    <a href="shots/contenido.png" data-lightbox><img src="shots/contenido.png" alt="Contenido" loading="lazy" onerror="this.closest('a').style.display='none'" /><span class="cap"><b data-es="Contenido" data-en="Content">Contenido</b><i data-es="Mods, shaders y packs de Modrinth y CurseForge." data-en="Mods, shaders and packs from Modrinth and CurseForge.">Mods, shaders y packs de Modrinth y CurseForge.</i></span></a>
+    <a href="shots/modpacks.png" data-lightbox><img src="shots/modpacks.png" alt="Modpacks" loading="lazy" onerror="this.closest('a').style.display='none'" /><span class="cap"><b>Modpacks</b><i data-es="Modpacks enteros instalados en 1 clic." data-en="Full modpacks installed in 1 click.">Modpacks enteros instalados en 1 clic.</i></span></a>
+    <a href="shots/cuenta.png" data-lightbox><img src="shots/cuenta.png" alt="Cuenta" loading="lazy" onerror="this.closest('a').style.display='none'" /><span class="cap"><b data-es="Cuenta" data-en="Account">Cuenta</b><i data-es="Multicuenta Microsoft con sesión integrada." data-en="Microsoft multi-account with integrated sign-in.">Multicuenta Microsoft con sesión integrada.</i></span></a>
+    <a href="shots/skin.png" data-lightbox><img src="shots/skin.png" alt="Skin" loading="lazy" onerror="this.closest('a').style.display='none'" /><span class="cap"><b>Skin</b><i data-es="Mira y cambia tu skin y tu capa." data-en="View and change your skin and cape.">Mira y cambia tu skin y tu capa.</i></span></a>
+    <a href="shots/ajustes.png" data-lightbox><img src="shots/ajustes.png" alt="Ajustes" loading="lazy" onerror="this.closest('a').style.display='none'" /><span class="cap"><b data-es="Ajustes" data-en="Settings">Ajustes</b><i data-es="Java, RAM, JVM, sonido, temas, Discord y updates." data-en="Java, RAM, JVM, sound, themes, Discord and updates.">Java, RAM, JVM, sonido, temas, Discord y updates.</i></span></a>
+    <a href="shots/servidores.png" data-lightbox><img src="shots/servidores.png" alt="Servidores" loading="lazy" onerror="this.closest('a').style.display='none'" /><span class="cap"><b data-es="Servidores" data-en="Servers">Servidores</b><i data-es="Favoritos con ping real y juego directo." data-en="Favorites with real ping and direct play.">Favoritos con ping real y juego directo.</i></span></a>
   </div>
   <div class="lightbox" id="lightbox" hidden><img id="lightbox-img" alt="" /></div>
 </section>
@@ -112,9 +119,9 @@
   <div class="eyebrow">04 · <span data-es="Hoja de ruta" data-en="Roadmap">Hoja de ruta</span></div>
   <h2 data-es="A dónde va esto" data-en="Where this is going">A dónde va esto</h2>
   <div class="timeline">
-    <div class="tl done"><b>v0.1 – v0.5</b><p data-es="Núcleo completo: loaders, mods, cuentas premium, backups, updater." data-en="Full core: loaders, mods, premium accounts, backups, updater.">Núcleo completo: loaders, mods, cuentas premium, backups, updater.</p></div>
-    <div class="tl now"><b data-es="Ahora" data-en="Now">Ahora</b><p data-es="v0.6 con login premium, servidores, doctor de crashes y web. Probando con la comunidad." data-en="v0.6 with premium login, servers, crash doctor and website. Testing with the community.">v0.6 con login premium, servidores, doctor de crashes y web. Probando con la comunidad.</p></div>
-    <div class="tl next"><b data-es="Siguiente" data-en="Next">Siguiente</b><p data-es="Firma del instalador, modo offline total y más loaders." data-en="Installer signing, full offline mode and more loaders.">Firma del instalador, modo offline total y más loaders.</p></div>
+    <div class="tl done"><b>v0.1 – v0.7</b><p data-es="Núcleo completo: loaders, mods, cuentas premium, backups, updater y UI con vida." data-en="Full core: loaders, mods, premium accounts, backups, updater and alive UI.">Núcleo completo: loaders, mods, cuentas premium, backups, updater y UI con vida.</p></div>
+    <div class="tl now"><b data-es="Ahora" data-en="Now">Ahora</b><p data-es="v0.7 pulida y probada con la comunidad. La 1.0 oficial está al caer." data-en="v0.7 polished and tested with the community. The official 1.0 is around the corner.">v0.7 pulida y probada con la comunidad. La 1.0 oficial está al caer.</p></div>
+    <div class="tl next"><b>1.0</b><p data-es="Salida oficial: instalador firmado, modo offline total y más loaders." data-en="Official release: signed installer, full offline mode and more.">Salida oficial: instalador firmado, modo offline total y más loaders.</p></div>
   </div>
 </section>
 

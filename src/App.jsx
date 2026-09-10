@@ -36,8 +36,14 @@ function initSpringScroll() {
       n = n.parentElement;
     }
     if (can) return;
-    if (!box && t.closest) box = t.closest('.main, .modal-body, .log');
-    if (!box) return;
+    // Rebota el contenido interior, nunca el panel: el marco queda fijo.
+    let target = t.closest ? t.closest('.bounce, .modal-body, .log') : null;
+    if (!target) {
+      const scroller = t.closest ? t.closest('.main') : null;
+      if (scroller && scroller.querySelector) { try { target = scroller.querySelector(':scope > .bounce'); } catch {} }
+    }
+    if (!target) return;
+    box = target;
     e.preventDefault();
     let s = state.get(box);
     if (!s) { s = { raw: 0, pull: 0, timer: 0, back: 0, dir: 1 }; state.set(box, s); }
@@ -1154,6 +1160,7 @@ export default function App() {
         <button className={`pin${sidePinned ? ' on' : ''}`} onClick={()=>{ if (!sidePinned) setSideOpen(true); setSidePinned(!sidePinned); }} title="Pin">{sidePinned ? <PinOff size={14} /> : <Pin size={14} />}</button>
       </div>
       <div className="main" key={tab}>
+        <div className="bounce">
         {tab==='jugar' && (<>
           <div className={`card hero hero-${(() => { const s = instances.find((i)=>i.name===launchInstance); return s ? s.type : 'vanilla'; })()}`}>
             {heroBg && <img className="hero-bg" src={heroBg} alt="" />}
@@ -1625,6 +1632,7 @@ export default function App() {
           </div>
           </>
         )}
+        </div>
       </div>
       {intro && (
         <div className="intro-overlay" ref={overlayRef}>

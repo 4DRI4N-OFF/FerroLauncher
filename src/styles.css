@@ -259,8 +259,8 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
 .intro-stage img { position: absolute; left: 50%; mix-blend-mode: screen; pointer-events: none; }
 .cine-1 { top: -6%; width: 96%; transform: translateX(-50%); opacity: 0; }
 .cine-2 { bottom: -6%; width: 96%; transform: translateX(-50%); opacity: 0; }
-.cine-3 { left: 0; transform: none; width: 100%; height: 100%; opacity: 0; }
-.cine-flash { position: absolute; inset: -18%; background: radial-gradient(circle, rgba(255,242,208,.95), rgba(255,180,60,.55) 45%, transparent 70%); opacity: 0; pointer-events: none; }
+.intro-stage img.cine-3 { left: 0; transform: none; width: 100%; height: 100%; opacity: 0; }
+.cine-flash { position: fixed; inset: 0; background: radial-gradient(circle at 50% 45%, rgba(255,242,208,.95), rgba(255,180,60,.55) 40%, transparent 72%); opacity: 0; pointer-events: none; z-index: 101; }
 .cine-shard { position: fixed; border-radius: 50%; background: radial-gradient(circle, #fff3d6, rgba(255,140,30,0) 70%); pointer-events: none; z-index: 101; }
 .intro-trail { position: fixed; border-radius: 50%; background: radial-gradient(circle, #ffd166, rgba(255,110,30,0) 70%); pointer-events: none; z-index: 101; }
 .intro-ring { position: fixed; width: 120px; height: 120px; border-radius: 50%; border: 2px solid rgba(255,182,46,.8); box-shadow: 0 0 24px rgba(255,182,46,.5), inset 0 0 24px rgba(255,182,46,.3); pointer-events: none; z-index: 101; }

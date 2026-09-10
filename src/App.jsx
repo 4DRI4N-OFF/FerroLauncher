@@ -865,7 +865,7 @@ export default function App() {
         const c1 = stage && stage.querySelector('.cine-1');
         const c2 = stage && stage.querySelector('.cine-2');
         const c3 = stage && stage.querySelector('.cine-3');
-        const cfl = stage && stage.querySelector('.cine-flash');
+        const cfl = (ov || document).querySelector('.cine-flash');
         if (stage && c1 && c2 && c3 && cfl) {
           // Paso 1+2: FERRO cae, LAUNCHER sube (solapados)
           const fall = c1.animate([
@@ -893,7 +893,7 @@ export default function App() {
           sfx.play('boom');
           const sr = stage.getBoundingClientRect();
           const scx = sr.left + sr.width / 2, scy = sr.top + sr.height / 2;
-          for (let k = 0; k < 26; k++) {
+          for (let k = 0; k < 18; k++) {
             try {
               const p = document.createElement('div');
               p.className = 'cine-shard';
@@ -1807,8 +1807,8 @@ export default function App() {
           <img className="cine-1" src={intro1} alt="" />
           <img className="cine-2" src={intro2} alt="" />
           <img className="cine-3" src={intro3} alt="" />
-          <div className="cine-flash" />
         </div>
+        <div className="cine-flash" />
         <div ref={introImgRef} className="intro-logo" style={{ opacity: 0, position: 'absolute', inset: 0, margin: 'auto' }}>
             <img className="intro-full" src={brand} alt="" />
             <img className="intro-mini" src={flMark} alt="FL" />

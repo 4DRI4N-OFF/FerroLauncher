@@ -364,8 +364,9 @@ ipcMain.handle('ferro:setDiscord', async (_, patch) => {
   return { ...auth.setDiscord(getDirs().base, patch || {}), webhook: d };
 });
 ipcMain.handle('ferro:testWebhook', async () => {
+  if (!readWebhook(getDirs().base)) throw new Error('Pega primero la URL del webhook (Ajustes → Discord)');
   const ok = await notify(getDirs().base, 'ok', 'FerroLauncher conectado', 'Webhook funcionando. Avisaré de partidas, crashes e instalaciones.');
-  if (!ok) throw new Error('No se pudo enviar (URL inválida o sin conexión)');
+  if (!ok) throw new Error('Discord rechazó el envío (URL inválida o sin conexión)');
   return true;
 });
 ipcMain.handle('ferro:openUrl', async (_, { url }) => {

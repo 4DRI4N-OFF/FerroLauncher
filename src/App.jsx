@@ -534,6 +534,21 @@ export default function App() {
     loadAiModels(k);
   };
   const loadAiModels = async (k) => {
+    if (aiBuiltIn && window.ferro?.aiModels) {
+      try {
+        const ms = await window.ferro.aiModels();
+        if (ms.length) {
+          setAiModels(ms);
+          if (!ms.some((m) => m.id === aiModel)) {
+            const pick = ms.find((m) => /flash/i.test(m.id)) || ms[0];
+            setAiModel(pick.id);
+            try { localStorage.setItem('ferro-ai-model', pick.id); } catch {}
+          }
+          pushToast('success', `${ms.length} ✓`);
+        } else pushToast('error', t('ai.errOther'));
+      } catch (e) { pushToast('error', t(aiErrorKey(e))); }
+      return;
+    }
     const key = (k || aiKey || '').trim();
     if (!key) { pushToast('error', t('ai.needKey')); return; }
     try {
@@ -552,13 +567,15 @@ export default function App() {
   const sendAi = async () => {
     const text = aiInput.trim();
     if (!text || aiBusy) return;
-    if (!aiKey) { pushToast('error', t('ai.needKey')); return; }
+    if (!aiBuiltIn && !aiKey) { pushToast('error', t('ai.needKey')); return; }
     const next = [...aiMsgs, { role: 'user', text }].slice(-60);
     setAiMsgs(next);
     setAiInput('');
     setAiBusy(true);
     try {
-      const reply = await geminiChat({ key: aiKey, model: aiModel, system: aiSystem(), history: next.slice(-12) });
+      const reply = (aiBuiltIn && window.ferro?.aiChat)
+        ? await window.ferro.aiChat({ model: aiModel, system: aiSystem(), history: next.slice(-12) })
+        : await geminiChat({ key: aiKey, model: aiModel, system: aiSystem(), history: next.slice(-12) });
       setAiMsgs((m) => [...m, { role: 'ai', text: reply }].slice(-60));
     } catch (e) {
       setAiMsgs((m) => [...m, { role: 'ai', text: `⚠ ${t(aiErrorKey(e))}` }].slice(-60));
@@ -583,6 +600,10 @@ export default function App() {
   const [aiInput, setAiInput] = useState('');
   const aiEndRef = useRef(null);
   useEffect(() => { try { localStorage.setItem('ferro-ai-chat', JSON.stringify(aiMsgs.slice(-60))); } catch {} }, [aiMsgs]);
+  // Clave integrada (proceso principal): si existe, no se pide ni se muestra ninguna clave.
+  const [aiBuiltIn, setAiBuiltIn] = useState(false);
+  useEffect(() => { try { window.ferro?.aiHasKey?.()?.then?.((v) => { if (v) setAiBuiltIn(true); })?.catch?.(() => {}); } catch {} }, []);
+  useEffect(() => { if (tab === 'ia' && aiBuiltIn && aiModels.length === 0 && !aiBusy) loadAiModels(); }, [tab, aiBuiltIn]);
   useEffect(() => { try { aiEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch {} }, [aiMsgs, aiBusy, tab]);
   const [launchProg, setLaunchProg] = useState(null);
   const [dragOn, setDragOn] = useState(false);
@@ -1639,9 +1660,13 @@ export default function App() {
           <div className="card">
             <h2>{t('ai.title')}</h2>
             <p style={{opacity:.7}}>{t('ai.desc')} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">{t('ai.keyHow')}</a></p>
+            {!aiBuiltIn && (
             <div className="row">
               <input type="password" value={aiKeyInput} onChange={(e)=>setAiKeyInput(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveAiKey(); } }} placeholder={aiKey ? '••••••••' : t('ai.keyPh')} style={{flex:1, minWidth:180}} />
               <button className="ghost" onClick={saveAiKey}>{t('ai.save')}</button>
+            </div>
+            )}
+            <div className="row" style={{marginTop:8}}>
               {aiModels.length > 0 ? (
                 <select value={aiModel} onChange={(e)=>{ setAiModel(e.target.value); try { localStorage.setItem('ferro-ai-model', e.target.value); } catch {} }}>
                   {aiModels.map((m)=><option key={m.id} value={m.id}>{m.label || m.id}</option>)}
@@ -1651,7 +1676,7 @@ export default function App() {
               )}
               <button className="ghost" onClick={()=>loadAiModels()}>{t('ai.refreshModels')}</button>
             </div>
-            <div style={{marginTop:8}}>{aiKey ? <span className="pill green">✓ {t('ai.keySaved')}</span> : <span className="pill">{t('ai.needKey')}</span>}</div>
+            <div style={{marginTop:8}}>{aiBuiltIn ? <span className="pill green">✓ {t('ai.builtin')}</span> : aiKey ? <span className="pill green">✓ {t('ai.keySaved')}</span> : <span className="pill">{t('ai.needKey')}</span>}</div>
           </div>
           <div className="card">
             <div className="ai-chat">

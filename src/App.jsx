@@ -6,11 +6,12 @@ import { geminiChat, geminiModels, aiErrorKey } from './ai.js';
 import { STR, getLang } from './i18n.js';
 import { GithubIcon, DiscordIcon, YoutubeIcon, XIcon } from './brands.jsx';
 import Embers from './embers.jsx';
+import DynamicIsland from './island.jsx';
 import {
   Play, Square, Layers, Package, LayoutGrid, Gift, User, Palette,
   Settings, Search, Plus, RefreshCw, FolderOpen, Copy, Pencil, Trash2,
   Download, Upload, Check, X, AlertTriangle, Info, Camera,
-  MessageCircle, ExternalLink, Server, Pin, PinOff, Sparkles,
+  MessageCircle, ExternalLink, Server, Pin, PinOff,
 } from 'lucide-react';
 
 // Resortes al fijar/soltar la sidebar: los botones entran en cascada con muelle.
@@ -599,12 +600,13 @@ export default function App() {
   const [aiBusy, setAiBusy] = useState(false);
   const [aiInput, setAiInput] = useState('');
   const aiEndRef = useRef(null);
+  const [islandOpen, setIslandOpen] = useState(false);
   useEffect(() => { try { localStorage.setItem('ferro-ai-chat', JSON.stringify(aiMsgs.slice(-60))); } catch {} }, [aiMsgs]);
   // Clave integrada (proceso principal): si existe, no se pide ni se muestra ninguna clave.
   const [aiBuiltIn, setAiBuiltIn] = useState(false);
   useEffect(() => { try { window.ferro?.aiHasKey?.()?.then?.((v) => { if (v) setAiBuiltIn(true); })?.catch?.(() => {}); } catch {} }, []);
-  useEffect(() => { if (tab === 'ia' && aiBuiltIn && aiModels.length === 0 && !aiBusy) loadAiModels(); }, [tab, aiBuiltIn]);
-  useEffect(() => { try { aiEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch {} }, [aiMsgs, aiBusy, tab]);
+  useEffect(() => { if (islandOpen && aiBuiltIn && aiModels.length === 0 && !aiBusy) loadAiModels(); }, [islandOpen, aiBuiltIn]);
+  useEffect(() => { try { aiEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); } catch {} }, [aiMsgs, aiBusy, tab, islandOpen]);
   const [launchProg, setLaunchProg] = useState(null);
   const [dragOn, setDragOn] = useState(false);
   const dragCount = useRef(0);
@@ -1149,7 +1151,8 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== 'Escape') return;
-      if (galName) closeGallery();
+      if (islandOpen) setIslandOpen(false);
+      else if (galName) closeGallery();
       else if (settingsFor) closeModal();
       else if (confirmDlg) setConfirmDlg(null);
       else if (dragOn) { dragCount.current = 0; setDragOn(false); }
@@ -1157,7 +1160,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [galName, settingsFor, confirmDlg, dragOn, tourIdx]);
+  }, [galName, settingsFor, confirmDlg, dragOn, tourIdx, islandOpen]);
 
   const confirmGo = () => { const v = confirmDlg.input ? confirmInput : true; const f = confirmDlg.onOk; setConfirmDlg(null); f(v); };
 
@@ -1253,7 +1256,6 @@ export default function App() {
         <button className={tab==='skin'?'active':''} onClick={()=>{setTab('skin'); loadSkin();}}><Palette size={16} /><span className="nav-label">{t('tab.skin')}</span></button>
         <button className={tab==='ajustes'?'active':''} onClick={()=>setTab('ajustes')}><Settings size={16} /><span className="nav-label">{t('tab.settings')}</span></button>
         <button className={tab==='servers'?'active':''} onClick={()=>{setTab('servers'); loadServers();}}><Server size={16} /><span className="nav-label">{t('tab.servers')}</span></button>
-        <button className={tab==='ia'?'active':''} onClick={()=>setTab('ia')}><Sparkles size={16} /><span className="nav-label">{t('ai.tab')}</span></button>
         <div className="player-chip" onClick={()=>setTab('cuenta')} title={t('tab.account')}>
           {playFace ? <img className="face" src={playFace} alt="" onError={()=>setPlayFace(null)} /> : <User size={18} />}
           <div className="pc-id"><b className={account ? 'premium-shine' : ''}>{account?.name || username || '—'}</b><span>{account ? t('play.online') : t('play.offline')}</span></div>
@@ -1655,47 +1657,6 @@ export default function App() {
             {servers.length===0 && <p style={{opacity:.6}}>{t('srv.none')}</p>}
           </div>
         )}
-        {tab==='ia' && (
-          <>
-          <div className="card">
-            <h2>{t('ai.title')}</h2>
-            <p style={{opacity:.7}}>{t('ai.desc')} <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">{t('ai.keyHow')}</a></p>
-            {!aiBuiltIn && (
-            <div className="row">
-              <input type="password" value={aiKeyInput} onChange={(e)=>setAiKeyInput(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter'){ e.preventDefault(); saveAiKey(); } }} placeholder={aiKey ? '••••••••' : t('ai.keyPh')} style={{flex:1, minWidth:180}} />
-              <button className="ghost" onClick={saveAiKey}>{t('ai.save')}</button>
-            </div>
-            )}
-            <div className="row" style={{marginTop:8}}>
-              {aiModels.length > 0 ? (
-                <select value={aiModel} onChange={(e)=>{ setAiModel(e.target.value); try { localStorage.setItem('ferro-ai-model', e.target.value); } catch {} }}>
-                  {aiModels.map((m)=><option key={m.id} value={m.id}>{m.label || m.id}</option>)}
-                </select>
-              ) : (
-                <input value={aiModel} onChange={(e)=>{ setAiModel(e.target.value); try { localStorage.setItem('ferro-ai-model', e.target.value); } catch {} }} placeholder="gemini-2.5-flash" style={{width:190}} />
-              )}
-              <button className="ghost" onClick={()=>loadAiModels()}>{t('ai.refreshModels')}</button>
-            </div>
-            <div style={{marginTop:8}}>{aiBuiltIn ? <span className="pill green">✓ {t('ai.builtin')}</span> : aiKey ? <span className="pill green">✓ {t('ai.keySaved')}</span> : <span className="pill">{t('ai.needKey')}</span>}</div>
-          </div>
-          <div className="card">
-            <div className="ai-chat">
-              {aiMsgs.length===0 && <div className="ai-msg ai-bot">{t('ai.hello')}</div>}
-              {aiMsgs.map((m,ix)=>(<div key={ix} className={`ai-msg ai-${m.role==='ai'?'bot':'you'}`}>{m.text}</div>))}
-              {aiBusy && <div className="ai-msg ai-bot"><span className="spinner" /> {t('ai.thinking')}</div>}
-              <div ref={aiEndRef} />
-            </div>
-            <div className="row" style={{marginTop:10}}>
-              <input value={aiInput} onChange={(e)=>setAiInput(e.target.value)} onKeyDown={(e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendAi(); } }} placeholder={t('ai.ph')} style={{flex:1}} />
-              <button className="primary" onClick={sendAi} disabled={aiBusy}>{t('ai.send')}</button>
-            </div>
-            <div className="row" style={{marginTop:8}}>
-              <button className="ghost" onClick={attachLog}><Upload size={14} /> {t('ai.attachLog')}</button>
-              <button className="ghost" onClick={clearAi}>{t('ai.clear')}</button>
-            </div>
-          </div>
-          </>
-        )}
         {tab==='ajustes' && (
           <>
           <div className="card" data-tour="settings">
@@ -1819,6 +1780,11 @@ export default function App() {
           <div className="scare-warn">{t('scare.warn')}</div>
         </div>
       )}
+      <DynamicIsland open={islandOpen} setOpen={setIslandOpen} t={t}
+        aiMsgs={aiMsgs} aiBusy={aiBusy} aiInput={aiInput} setAiInput={setAiInput} sendAi={sendAi} aiEndRef={aiEndRef}
+        aiBuiltIn={aiBuiltIn} aiKey={aiKey} aiKeyInput={aiKeyInput} setAiKeyInput={setAiKeyInput} saveAiKey={saveAiKey}
+        aiModels={aiModels} aiModel={aiModel} setAiModel={setAiModel} loadAiModels={loadAiModels}
+        attachLog={attachLog} clearAi={clearAi} />
       <div className="toasts">
         {toasts.map((t)=>(
           <div key={t.id} className={`toast ${t.type}`}>

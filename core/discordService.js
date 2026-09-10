@@ -1,6 +1,8 @@
 let client = null;
 let clientIdUsed = null;
 
+const APP_URL = 'https://github.com/4DRI4N-OFF/FerroLauncher/releases/latest';
+
 async function connect(clientId, onLog) {
   if (!clientId) return null;
   if (client && clientIdUsed === clientId) return client;
@@ -19,17 +21,44 @@ async function connect(clientId, onLog) {
   }
 }
 
-async function setPlaying(clientId, { version, instance, loader, username }, onLog) {
+function isConnected() {
+  return !!(client && clientIdUsed);
+}
+
+function base(version) {
+  return {
+    largeImageKey: 'logo',
+    largeImageText: version ? `FerroLauncher v${version}` : 'FerroLauncher',
+    buttons: [{ label: 'Descargar FerroLauncher', url: APP_URL }],
+  };
+}
+
+// Reposo: visible con solo abrir el launcher.
+async function setIdle(clientId, { username, count, version, startedAt }, onLog) {
+  const c = await connect(clientId, onLog);
+  if (!c) return;
+  const n = Number(count) || 0;
+  try {
+    await c.setActivity({
+      ...base(version),
+      details: 'En el launcher',
+      state: `${username || 'offline'} · ${n} instancia${n === 1 ? '' : 's'}`,
+      startTimestamp: startedAt || Date.now(),
+    });
+  } catch (e) {
+    onLog && onLog(`[ferro] discord: ${e.message?.slice(0, 80)}\n`);
+  }
+}
+
+async function setPlaying(clientId, { version, instance, loader, username, appVer }, onLog) {
   const c = await connect(clientId, onLog);
   if (!c) return;
   try {
     await c.setActivity({
+      ...base(appVer),
       details: `Minecraft ${version}`,
       state: `${instance}${loader && loader !== 'vanilla' ? ` · ${loader}` : ''} — ${username}`,
       startTimestamp: Date.now(),
-      largeImageKey: 'logo',
-      largeImageText: 'FerroLauncher',
-      instance: false,
     });
   } catch (e) {
     onLog && onLog(`[ferro] discord: ${e.message?.slice(0, 80)}\n`);
@@ -46,4 +75,4 @@ function disconnect() {
   clientIdUsed = null;
 }
 
-module.exports = { connect, setPlaying, clear, disconnect };
+module.exports = { connect, isConnected, setIdle, setPlaying, clear, disconnect };

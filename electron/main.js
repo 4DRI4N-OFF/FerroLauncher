@@ -87,6 +87,25 @@ function fmtPlay(totalSecs) {
   return `${(m / 60).toFixed(m < 600 ? 1 : 0)} h`;
 }
 
+const bootT0 = Date.now();
+function idleInfo() {
+  const d = getDirs();
+  let username = '';
+  try { username = auth.loadAccount(d.base)?.name || ''; } catch {}
+  let count = 0;
+  try { const l = listInstances(d.instances); count = Array.isArray(l) ? l.length : 0; } catch {}
+  return { username, count, version: app.getVersion(), startedAt: bootT0 };
+}
+// Reposo: estado visible con solo abrir el launcher; se repara solo cada minuto.
+function refreshIdlePresence() {
+  try {
+    if (activeChild) return;
+    const dc = auth.getDiscord(getDirs().base);
+    if (!dc.enabled || !dc.clientId) return;
+    if (discord.isConnected()) return;
+    discord.setIdle(dc.clientId, idleInfo());
+  } catch {}
+}
 function getDirs() {
   if (!D) {
     const base = getDataDir(app);
@@ -205,8 +224,11 @@ app.whenReady().then(() => {
   createSplash();
   createWindow();
   initUpdater();
+  setTimeout(refreshIdlePresence, 5000);
+  setInterval(refreshIdlePresence, 60000);
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
+app.on('before-quit', () => { try { discord.clear(); } catch {} });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 
 // Auto-update desde GitHub Releases (solo en builds empaquetados)
@@ -361,7 +383,12 @@ ipcMain.handle('ferro:clientId', async () => auth.getClientIdPublic(getDirs().ba
 ipcMain.handle('ferro:discord', async () => ({ ...auth.getDiscord(getDirs().base), webhook: readWebhook(getDirs().base) }));
 ipcMain.handle('ferro:setDiscord', async (_, patch) => {
   const d = writeWebhook(getDirs().base, patch || {});
-  return { ...auth.setDiscord(getDirs().base, patch || {}), webhook: d };
+  const r = { ...auth.setDiscord(getDirs().base, patch || {}), webhook: d };
+  try {
+    if (r.enabled && r.clientId) discord.setIdle(r.clientId, idleInfo());
+    else { discord.clear(); discord.disconnect(); }
+  } catch {}
+  return r;
 });
 ipcMain.handle('ferro:testWebhook', async () => {
   if (!readWebhook(getDirs().base)) throw new Error('Pega primero la URL del webhook (Ajustes → Discord)');
@@ -880,7 +907,7 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
   try {
     const dc = auth.getDiscord(d.base);
     if (dc.enabled && dc.clientId) {
-      discord.setPlaying(dc.clientId, { version: details.id, instance: inst.name, loader: inst.type, username: (authArg && authArg.username) || username || 'Ferro' }, send);
+      discord.setPlaying(dc.clientId, { version: details.id, instance: inst.name, loader: inst.type, username: (authArg && authArg.username) || username || 'Ferro', appVer: app.getVersion() }, send);
     }
   } catch {}
   activeChild.on('close', () => {
@@ -890,7 +917,11 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
       if (total) send(`[ferro] sesión de ${Math.floor(secs / 60)} min (total ${fmtPlay(total)})\n`);
     }
     activeChild = null; activeInstance = null; activeT0 = null;
-    try { discord.clear(); } catch {}
+    try {
+      const dc2 = auth.getDiscord(d.base);
+      if (dc2.enabled && dc2.clientId) discord.setIdle(dc2.clientId, idleInfo());
+      else discord.clear();
+    } catch {}
   });
   activeChild.on('close', (code) => {
     lastExit = { instance: inst.name, code };

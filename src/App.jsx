@@ -1804,11 +1804,11 @@ export default function App() {
           <div className="scare-warn">{t('scare.warn')}</div>
         </div>
       )}
-      <DynamicIsland open={islandOpen} setOpen={setIslandOpen} t={t}
+      {!intro && (<DynamicIsland open={islandOpen} setOpen={setIslandOpen} t={t}
         aiMsgs={aiMsgs} aiBusy={aiBusy} aiInput={aiInput} setAiInput={setAiInput} sendAi={sendAi} aiEndRef={aiEndRef}
         aiBuiltIn={aiBuiltIn} aiKey={aiKey} aiKeyInput={aiKeyInput} setAiKeyInput={setAiKeyInput} saveAiKey={saveAiKey}
         aiModels={aiModels} aiModel={aiModel} setAiModel={setAiModel} loadAiModels={loadAiModels}
-        attachLog={attachLog} clearAi={clearAi} />
+        attachLog={attachLog} clearAi={clearAi} />)}
       <div className="toasts">
         {toasts.map((t)=>(
           <div key={t.id} className={`toast ${t.type}`}>

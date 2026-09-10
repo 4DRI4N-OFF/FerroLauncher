@@ -1261,6 +1261,9 @@ export default function App() {
                 const L = lang === 'en' ? d.en : d.es;
                 return <div key={d.id} className={'ach' + (u ? '' : ' locked')} title={u ? `${u.inst} · ${new Date(u.ts).toLocaleDateString()}` : t('ach.locked')}><span className="em">{d.icon}</span><div><b>{L[0]}</b><small>{L[1]}</small></div></div>;
               })}
+              {Object.entries(ach.unlocked || {}).filter(([k]) => !(ach.defs || []).some((d) => k === d.id || k.endsWith(':' + d.id))).map(([k, v]) => (
+                <div key={k} className="ach" title={`${v.inst || '?'} · ${v.ts ? new Date(v.ts).toLocaleDateString() : ''}`}><span className="em">🏆</span><div><b>{v.name || k}</b><small>{v.inst || ''}</small></div></div>
+              ))}
             </div>
           </div>
           <div className="card">

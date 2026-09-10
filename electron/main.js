@@ -78,6 +78,44 @@ let splash = null;
 let D = null;
 let activeChild = null;
 let achTimer = null;
+const bridgeOffsets = new Map();
+// Puente: lee eventos del mod (join/leave/adv/death) solo desde donde lo dejo.
+function drainBridge(d, inst, send) {
+  try {
+    const fs = require('fs');
+    const p = require('path').join(inst.path, 'config', 'ferrobridge.jsonl');
+    let st = null;
+    try { st = fs.statSync(p); } catch { return; }
+    const seen = bridgeOffsets.get(inst.path);
+    if (seen === undefined || st.size < seen) { bridgeOffsets.set(inst.path, st.size); return; }
+    if (st.size === seen) return;
+    if (st.size - seen > 1048576) { bridgeOffsets.set(inst.path, st.size); return; }
+    const fd = fs.openSync(p, 'r');
+    const buf = Buffer.alloc(st.size - seen);
+    fs.readSync(fd, buf, 0, buf.length, seen);
+    fs.closeSync(fd);
+    bridgeOffsets.set(inst.path, st.size);
+    for (const line of buf.toString('utf8').split('\n')) {
+      if (!line.trim()) continue;
+      let ev = null;
+      try { ev = JSON.parse(line); } catch { continue; }
+      if (!ev || !ev.t) continue;
+      if (ev.t === 'adv') {
+        const got = ach.unlockLive(d.base, inst.name, String(ev.a || ''), String(ev.b || ''));
+        if (got) {
+          send(`[ferro] ¡Logro desbloqueado! 🏆 ${got.name} @${inst.name}\n`);
+          notify(d.base, 'ok', `🏆 ${got.name}`, `${inst.name} · servidor`);
+        }
+      } else if (ev.t === 'death') {
+        send(`[ferro] ☠ muerte en ${inst.name}\n`);
+      } else if (ev.t === 'join') {
+        send(`[ferro] ${inst.name} conectado${ev.a ? ' a ' + ev.a : ''}\n`);
+      } else if (ev.t === 'leave') {
+        send(`[ferro] ${inst.name} desconectado\n`);
+      }
+    }
+  } catch {}
+}
 let activeInstance = null;
 let activeT0 = null;
 let lastExit = null;
@@ -905,7 +943,8 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
   try {
     const achUser = (authArg && authArg.username) || username || 'Ferro';
     const achUuid = (authArg && ach.normUuid(authArg.uuid)) || ach.offlineUuid(achUser);
-    const achInst = inst, achD = d;
+    const achInst = inst, achD = d, achDetails = details;
+    let pollN = 0;
     const pollAch = () => {
       try {
         const fresh = ach.checkNew(achD.base, achInst.path, achInst.name, achUser, achUuid);
@@ -913,6 +952,21 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
           const nm = (f.es && f.es[0]) || f.id;
           send(`[ferro] ¡Logro desbloqueado! ${f.icon} ${nm} @${achInst.name}\n`);
           notify(achD.base, 'ok', `🏆 ${nm}`, `${achInst.name} · FerroLauncher`);
+        }
+        drainBridge(achD, achInst, send);
+        pollN++;
+        if (pollN % 6 === 0) {
+          let st = null;
+          try { st = JSON.parse(require('fs').readFileSync(require('path').join(achInst.path, 'config', 'ferrobridge-status.json'), 'utf8')); } catch {}
+          if (st && st.ts && Date.now() - st.ts < 90000) {
+            try {
+              const dc = auth.getDiscord(achD.base);
+              if (dc.enabled && dc.clientId) {
+                const where = st.server || (st.dim ? String(st.dim).split(':').pop() : '');
+                discord.setPlaying(dc.clientId, { version: achDetails.id, instance: achInst.name, loader: achInst.type, username: achUser, appVer: app.getVersion(), extra: where, startedAt: activeT0 }, null);
+              }
+            } catch {}
+          }
         }
       } catch {}
     };

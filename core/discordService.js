@@ -50,15 +50,15 @@ async function setIdle(clientId, { username, count, version, startedAt }, onLog)
   }
 }
 
-async function setPlaying(clientId, { version, instance, loader, username, appVer }, onLog) {
+async function setPlaying(clientId, { version, instance, loader, username, appVer, extra, startedAt }, onLog) {
   const c = await connect(clientId, onLog);
   if (!c) return;
   try {
     await c.setActivity({
       ...base(appVer),
       details: `Minecraft ${version}`,
-      state: `${instance}${loader && loader !== 'vanilla' ? ` · ${loader}` : ''} — ${username}`,
-      startTimestamp: Date.now(),
+      state: `${instance}${loader && loader !== 'vanilla' ? ` · ${loader}` : ''} — ${username}${extra ? ` · ${extra}` : ''}`,
+      startTimestamp: startedAt || Date.now(),
     });
   } catch (e) {
     onLog && onLog(`[ferro] discord: ${e.message?.slice(0, 80)}\n`);

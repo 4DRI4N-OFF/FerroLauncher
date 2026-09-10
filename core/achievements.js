@@ -124,6 +124,18 @@ function isUnlocked(def, prog) {
   if (def.stats && def.stats.some(([cat, key, min]) => statVal(prog.stats, cat, key) >= min)) return true;
   return false;
 }
+// Logro en vivo (puente): avances de servidor/mod que no estan en DEFS.
+// Si coincide con uno base, enciende ese.
+function unlockLive(baseDir, instanceName, advId, advName) {
+  const store = readStore(baseDir);
+  const hit = DEFS.find((d) => d.adv && d.adv.includes(advId));
+  const key = `${instanceName}:${hit ? hit.id : advId}`;
+  if (store[key]) return null;
+  const entry = { ts: Date.now(), inst: instanceName, name: String(advName || advId) };
+  store[key] = entry;
+  try { fs.writeFileSync(storePath(baseDir), JSON.stringify(store, null, 2)); } catch {}
+  return entry;
+}
 // Revisa y devuelve los recién desbloqueados (persistiendo).
 function checkNew(baseDir, instanceDir, instanceName, username, uuid) {
   const id = normUuid(uuid) || offlineUuid(username);
@@ -156,4 +168,4 @@ function list(baseDir) {
   };
 }
 
-module.exports = { DEFS, normUuid, offlineUuid, readProgress, checkNew, list };
+module.exports = { DEFS, normUuid, offlineUuid, readProgress, checkNew, unlockLive, list };

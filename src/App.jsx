@@ -951,7 +951,10 @@ export default function App() {
         ], { duration: 900, delay: 300, easing: 'ease-out', fill: 'forwards' }).finished);
         await Promise.all(jobs);
       } catch {}
-      // Corte seco al logo real: sin fundido que delate 1px de diferencia
+      // Fundido del fondo: la overlay se disuelve sobre la app en vez de cortarse.
+      try {
+        if (ov) await ov.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 450, easing: 'ease-out', fill: 'forwards' }).finished;
+      } catch {}
       unlock();
       setIntro(false);
     };

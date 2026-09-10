@@ -867,6 +867,8 @@ export default function App() {
         const c3 = stage && stage.querySelector('.cine-3');
         const cfl = (ov || document).querySelector('.cine-flash');
         if (stage && c1 && c2 && c3 && cfl) {
+          // Riser THX mientras caen las mitades
+          sfx.play('riser');
           // Paso 1+2: FERRO cae, LAUNCHER sube (solapados)
           const fall = c1.animate([
             { transform: 'translate(-50%,-130vh) scale(1)', opacity: 0 },
@@ -880,8 +882,7 @@ export default function App() {
           ], { duration: 780, delay: 200, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'forwards' }).finished.catch(() => {});
           await Promise.all([fall, rise]);
           if (skipRef.current) { unlock(); setIntro(false); return; }
-          // Paso 3a: formacion — destello + fundido al completo
-          sfx.play('chime');
+          // Paso 3a: formacion — destello + fundido al completo (resuelve el riser)
           await Promise.all([
             cfl.animate([{ opacity: 0 }, { opacity: 0.9, offset: 0.45 }, { opacity: 0 }], { duration: 480, easing: 'ease-out', fill: 'forwards' }).finished.catch(() => {}),
             c3.animate([{ opacity: 0, transform: 'scale(.94)' }, { opacity: 1, transform: 'scale(1.02)', offset: 0.55 }, { opacity: 1, transform: 'scale(1)' }], { duration: 560, easing: 'ease-out', fill: 'forwards' }).finished.catch(() => {}),
@@ -889,8 +890,8 @@ export default function App() {
             c2.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 420, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {}),
           ]);
           if (skipRef.current) { unlock(); setIntro(false); return; }
-          // Paso 3b: explosion — flashazo, metralla y sacudida
-          sfx.play('boom');
+          // Paso 3b: explosion — golpe triple-forte, flashazo, metralla y sacudida
+          sfx.play('deepHit');
           const sr = stage.getBoundingClientRect();
           const scx = sr.left + sr.width / 2, scy = sr.top + sr.height / 2;
           for (let k = 0; k < 18; k++) {

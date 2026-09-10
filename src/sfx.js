@@ -171,6 +171,23 @@ const cristal = {
     partial({ f: 1319, t: 0.8, type: 'sine', v: 0.3, master: m, wet: 0.8 });
     partial({ f: 1760, t: 1.0, type: 'sine', v: 0.2, delay: 0.08, master: m, wet: 0.8 });
   },
+  // Subida THX: racimo de voces ascendentes + lecho de aire + grave
+  riser: (m) => {
+    [196, 220, 247, 262, 294, 330, 370, 415].forEach((f, i) => {
+      partial({ f, f2: f * 1.5, t: 0.95, type: i % 2 ? 'triangle' : 'sine', v: 0.16, delay: i * 0.03, master: m, wet: 0.7, attack: 0.09 });
+    });
+    noise({ t: 0.9, bp: 900, v: 0.22, q: 1.2, master: m, wet: 0.6, attack: 0.15 });
+    partial({ f: 55, f2: 110, t: 1.0, type: 'sine', v: 0.4, master: m, wet: 0.3, attack: 0.1 });
+  },
+  // Golpe triple-forte: sub + acorde + crash + brillo
+  deepHit: (m) => {
+    partial({ f: 58, f2: 30, t: 1.1, type: 'sine', v: 0.9, master: m, wet: 0.25, attack: 0.005 });
+    [147, 185, 220, 294, 370, 440].forEach((f) => {
+      partial({ f, t: 1.2, type: 'sine', v: 0.22, master: m, wet: 0.7, attack: 0.005 });
+    });
+    noise({ t: 0.4, hp: 400, v: 0.55, master: m, wet: 0.35, attack: 0.003 });
+    partial({ f: 2500, f2: 1800, t: 0.35, type: 'triangle', v: 0.15, master: m, wet: 0.6 });
+  },
 };
 
 const asmr = {
@@ -215,6 +232,21 @@ const asmr = {
   chime: (m) => {
     partial({ f: 1568, t: 0.8, type: 'sine', v: 0.15, master: m, wet: 0.85, attack: 0.01 });
     partial({ f: 2093, t: 0.9, type: 'sine', v: 0.12, delay: 0.1, master: m, wet: 0.85, attack: 0.01 });
+  },
+  // Subida suave: voces aireadas ascendentes
+  riser: (m) => {
+    [180, 226, 269, 320].forEach((f, i) => {
+      partial({ f, f2: f * 1.4, t: 0.9, type: 'sine', v: 0.14, delay: i * 0.05, master: m, wet: 0.8, attack: 0.12 });
+    });
+    noise({ t: 0.9, bp: 700, v: 0.2, q: 1.5, master: m, wet: 0.7, attack: 0.2 });
+  },
+  // Llegada honda: golpe grave + acorde + aire
+  deepHit: (m) => {
+    keyHit(m, { f: 70, bright: 0.3, deep: true });
+    [147, 220, 294].forEach((f, i) => {
+      partial({ f, t: 1.1, type: 'sine', v: 0.16, delay: i * 0.02, master: m, wet: 0.75, attack: 0.008 });
+    });
+    noise({ t: 0.35, lp: 900, v: 0.4, master: m, wet: 0.5, attack: 0.005 });
   },
 };
 

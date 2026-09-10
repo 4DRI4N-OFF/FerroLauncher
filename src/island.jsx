@@ -10,21 +10,35 @@ export default function DynamicIsland(p) {
     const t = setTimeout(() => { try { inputRef.current?.focus(); } catch {} }, 60);
     return () => clearTimeout(t);
   }, [p.focusSignal]);
-  // Los ojitos siguen al raton (ref directa al nodo vivo, sin throttle).
+  // Los ojitos viajan por el circulo apuntando al raton (angulo + inclinacion).
   useEffect(() => {
+    const reset = () => {
+      try {
+        const el = islandRef.current;
+        if (!el) return;
+        el.style.setProperty('--ex', '0px');
+        el.style.setProperty('--ey', '0px');
+        el.style.setProperty('--er', '0deg');
+      } catch {}
+    };
     const onMove = (e) => {
       try {
         const el = islandRef.current;
         if (!el) return;
         const r = el.getBoundingClientRect();
-        const dx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / 160));
-        const dy = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / 160));
-        el.style.setProperty('--ex', (dx * 5).toFixed(1) + 'px');
-        el.style.setProperty('--ey', (dy * 4).toFixed(1) + 'px');
+        const dx = e.clientX - (r.left + r.width / 2);
+        const dy = e.clientY - (r.top + r.height / 2);
+        const len = Math.hypot(dx, dy) || 1;
+        const f = Math.min(1, len / 250);
+        const nx = dx / len, ny = dy / len;
+        el.style.setProperty('--ex', (nx * 9 * f).toFixed(1) + 'px');
+        el.style.setProperty('--ey', (ny * 8 * f).toFixed(1) + 'px');
+        el.style.setProperty('--er', (nx * 18 * f).toFixed(1) + 'deg');
       } catch {}
     };
     window.addEventListener('mousemove', onMove);
-    return () => window.removeEventListener('mousemove', onMove);
+    document.addEventListener('mouseleave', reset);
+    return () => { window.removeEventListener('mousemove', onMove); document.removeEventListener('mouseleave', reset); };
   }, []);
   const lastAi = [...(p.aiMsgs || [])].reverse().find((m) => m.role === 'ai');
   const maybeHide = (e) => {

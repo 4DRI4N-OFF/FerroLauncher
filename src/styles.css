@@ -215,7 +215,8 @@ body::after {
 .side.collapsed:hover .pc-id, .side.collapsed:hover .ver { opacity: 1; max-height: 60px; max-width: 220px; }
 .side.collapsed .player-chip .dot { display: none; }
 .side.collapsed:hover .player-chip .dot { display: block; }
-.side.collapsed .player-chip { justify-content: center; }
+.side.collapsed .player-chip { justify-content: center; gap: 0; }
+.side.collapsed:hover .player-chip { gap: 10px; }
 .side .pin {
   display: flex; align-items: center; justify-content: center;
   background: transparent; border: 1px solid transparent;

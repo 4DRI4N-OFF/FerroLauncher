@@ -10,35 +10,39 @@ export default function DynamicIsland(p) {
     const t = setTimeout(() => { try { inputRef.current?.focus(); } catch {} }, 60);
     return () => clearTimeout(t);
   }, [p.focusSignal]);
-  // Los ojitos viajan por el circulo apuntando al raton (angulo + inclinacion).
+  // Ojitos: vector normalizado hacia el cursor con radio fijo (rAF, sin layout-thrash).
   useEffect(() => {
-    const reset = () => {
+    let raf = 0;
+    const R = 8;
+    const set = (x, y) => {
       try {
         const el = islandRef.current;
         if (!el) return;
-        el.style.setProperty('--ex', '0px');
-        el.style.setProperty('--ey', '0px');
-        el.style.setProperty('--er', '0deg');
+        el.style.setProperty('--ex', x.toFixed(1) + 'px');
+        el.style.setProperty('--ey', y.toFixed(1) + 'px');
       } catch {}
     };
     const onMove = (e) => {
-      try {
-        const el = islandRef.current;
-        if (!el) return;
-        const r = el.getBoundingClientRect();
-        const dx = e.clientX - (r.left + r.width / 2);
-        const dy = e.clientY - (r.top + r.height / 2);
-        const len = Math.hypot(dx, dy) || 1;
-        const f = Math.min(1, len / 250);
-        const nx = dx / len, ny = dy / len;
-        el.style.setProperty('--ex', (nx * 9 * f).toFixed(1) + 'px');
-        el.style.setProperty('--ey', (ny * 8 * f).toFixed(1) + 'px');
-        el.style.setProperty('--er', (nx * 18 * f).toFixed(1) + 'deg');
-      } catch {}
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        try {
+          const el = islandRef.current;
+          if (!el) return;
+          const r = el.getBoundingClientRect();
+          const dx = e.clientX - (r.left + r.width / 2);
+          const dy = e.clientY - (r.top + r.height / 2);
+          const len = Math.hypot(dx, dy);
+          if (len < 1) { set(0, 0); return; }
+          const f = Math.min(1, len / 220);
+          set((dx / len) * R * f, (dy / len) * R * f);
+        } catch {}
+      });
     };
+    const onLeave = () => { if (raf) cancelAnimationFrame(raf); raf = 0; set(0, 0); };
     window.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseleave', reset);
-    return () => { window.removeEventListener('mousemove', onMove); document.removeEventListener('mouseleave', reset); };
+    document.addEventListener('mouseleave', onLeave);
+    return () => { window.removeEventListener('mousemove', onMove); document.removeEventListener('mouseleave', onLeave); if (raf) cancelAnimationFrame(raf); };
   }, []);
   const lastAi = [...(p.aiMsgs || [])].reverse().find((m) => m.role === 'ai');
   const maybeHide = (e) => {

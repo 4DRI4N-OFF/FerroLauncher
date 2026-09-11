@@ -96,6 +96,17 @@ h1 { font-size: clamp(44px, 7vw, 88px); font-weight: 800; letter-spacing: -0.02e
 .dl-card .go { margin-left: auto; color: var(--muted); font-size: 14px; font-style: normal; }
 .req { text-align: center; font-size: 13px; color: var(--muted); }
 
+/* Novedades */
+#feat { position: relative; z-index: 3; max-width: 920px; margin: 0 auto; padding: 30px 20px 10px; text-align: center; }
+#feat h2 { font-size: clamp(26px, 4vw, 40px); margin: 0 0 6px; }
+#feat .sub { color: var(--muted); margin: 0 0 18px; }
+.feat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; text-align: left; }
+.feat { display: flex; gap: 12px; align-items: flex-start; background: rgba(24,15,12,.6); border: 1px solid rgba(255,255,255,.12); border-radius: 16px; padding: 14px 16px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transition: transform .25s var(--spring-soft), border-color .25s; }
+.feat:hover { transform: translateY(-3px); border-color: rgba(255,182,46,.45); }
+.feat .fi { font-size: 22px; flex-shrink: 0; }
+.feat b { display: block; font-size: 15px; }
+.feat small { color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+
 /* Pie */
 footer { position: relative; z-index: 3; text-align: center; padding: 30px 20px 44px; font-size: 13px; color: var(--muted); line-height: 1.9; }
 footer a { color: var(--amber); }

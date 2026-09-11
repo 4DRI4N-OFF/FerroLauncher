@@ -52,6 +52,22 @@ const fmtSize = (b) => {
   return b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : `${Math.max(1, Math.round(b / 1048576))} MB`;
 };
 
+// Instalados persistentes (por instancia+origen+tipo): sobreviven a pestañas y reinicios
+const loadInstalledIds = (instanceName, scope) => {
+  try {
+    const all = JSON.parse(localStorage.getItem('ferro-installed') || '{}');
+    return all[`${instanceName}::${scope}`] || [];
+  } catch { return []; }
+};
+const rememberInstalled = (instanceName, scope, id) => {
+  try {
+    const all = JSON.parse(localStorage.getItem('ferro-installed') || '{}');
+    const k = `${instanceName}::${scope}`;
+    all[k] = [...new Set([...(all[k] || []), id])];
+    localStorage.setItem('ferro-installed', JSON.stringify(all));
+  } catch {}
+};
+
 // Resortes al fijar/soltar la sidebar: los botones entran en cascada con muelle.
 function springNav() {
   try {
@@ -735,6 +751,9 @@ export default function App() {
   };
 
   useEffect(() => { if (tab === 'mods' && modsFor) loadMods(modsFor); }, [modsFor]);
+  useEffect(() => {
+    if (tab === 'mods' && modsFor) setInstalledIds(loadInstalledIds(modsFor, `${source}:${kind}`));
+  }, [tab, modsFor, kind, source]);
   useEffect(() => { if (dpFor) loadWorlds(dpFor); }, [dpFor]);
   useEffect(() => { if (dpFor && dpWorld) loadDpList(dpFor, dpWorld); else setDpList([]); }, [dpFor, dpWorld]);
 
@@ -758,7 +777,6 @@ export default function App() {
       const r = await window.ferro.modSearch({ query: q, mcVersion: ver, loader, sort: q ? (over.sort || fSort) : 'downloads', kind: k, offset: (p - 1) * 24 });
       setModHits(r.hits || r);
       setModTotal(r.total || (r.hits || r).length);
-      setInstalledIds([]);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
     finally { setSearching(false); }
   };
@@ -771,6 +789,7 @@ export default function App() {
       const r = await window.ferro.modInstall({ instanceName: modsFor, projectId, kind });
       setLog((l) => l + `[ferro] instalado ${r.file}\n`);
       pushToast('success', `${title} ${t('toast.installed')}`);
+      rememberInstalled(modsFor, `mr:${kind}`, projectId);
       setInstalledIds((s) => [...s, projectId]);
       await loadMods(modsFor);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -788,7 +807,6 @@ export default function App() {
       const r = await window.ferro.cfSearch({ query: modQuery, mcVersion: fVersion, kind: ck, sort: fSort });
       setCfHits(r.hits || []);
       setCfTotal(r.total || 0);
-      setInstalledIds([]);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
     finally { setSearching(false); }
   };
@@ -799,7 +817,6 @@ export default function App() {
       const r = await window.ferro.cfTrending();
       setCfHits(r.hits || []);
       setCfTotal(r.total || 0);
-      setInstalledIds([]);
       setLog((l) => l + `[ferro] tendencias CF: ${r.hits?.length || 0}\n`);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
     finally { setSearching(false); }
@@ -825,6 +842,8 @@ export default function App() {
       const r = await window.ferro.cfInstall({ instanceName: modsFor, modId: m.id, fileId: f.id, kind: kind === 'resourcepack' ? 'resourcepack' : 'mod' });
       setLog((l) => l + `[ferro] instalado ${r.file}\n`);
       pushToast('success', `${m.title} ${t('toast.installed')}`);
+      rememberInstalled(modsFor, `cf:${kind}`, m.id);
+      setInstalledIds((s) => [...s, m.id]);
       await loadMods(modsFor);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
     finally { setCfBusy(null); }
@@ -1653,14 +1672,14 @@ export default function App() {
           <div className="card">
             <h2>{t('mods.title')}</h2>
             <div className="row" data-tour="mods-search">
-              <select value={source} onChange={(e)=>{setSource(e.target.value); setModHits([]); setCfHits([]); setInstalledIds([]); setModPage(1); if(e.target.value==='cf') loadCfKey(); else doSearch(1);}} title="Fuente">
+              <select value={source} onChange={(e)=>{setSource(e.target.value); setModHits([]); setCfHits([]); setModPage(1); if(e.target.value==='cf') loadCfKey(); else doSearch(1);}} title="Fuente">
                 <option value="mr">Modrinth</option>
                 <option value="cf">CurseForge</option>
               </select>
               <select value={modsFor} onChange={(e)=>{setModsFor(e.target.value); setUpdMap({}); setUpdMsg(''); setRpOn(null); setShaderCur(null); loadMods(e.target.value);}}>
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' '+i.type})</option>)}
               </select>
-              <select value={kind} onChange={(e)=>{setKind(e.target.value); setModHits([]); setInstalledIds([]); setUpdMap({}); setUpdMsg(''); setRpOn(null); setShaderCur(null); loadMods(modsFor, e.target.value); if(source==='mr') doSearch(1, {kind:e.target.value});}} title="Tipo">
+              <select value={kind} onChange={(e)=>{setKind(e.target.value); setModHits([]); setUpdMap({}); setUpdMsg(''); setRpOn(null); setShaderCur(null); loadMods(modsFor, e.target.value); if(source==='mr') doSearch(1, {kind:e.target.value});}} title="Tipo">
                 <option value="mod">{t('mods.tMods')}</option>
                 <option value="shader">{t('mods.tShaders')}</option>
                 <option value="resourcepack">{t('mods.tRp')}</option>

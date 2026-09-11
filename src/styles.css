@@ -338,6 +338,19 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
   transform: translateX(2px);
 }
 .side button svg, button.primary svg, button.ghost svg, .pill svg { vertical-align: -3px; flex-shrink: 0; }
+/* Grupo plegable de la sidebar */
+.nav-group { display: flex; flex-direction: column; gap: 4px; }
+.side .sub { padding: 6px 13px 6px 40px; font-size: 12.5px; font-weight: 500; background: transparent; border-color: transparent; }
+.side .sub::before { left: 24px; top: 50%; height: 1.5px; width: 10px; transform: translateY(-50%); border-radius: 2px; background: rgba(255, 255, 255, 0.18); }
+.side .sub:hover { background: transparent; }
+.side .sub:hover::before { background: var(--amber); }
+.side .sub.active { background: rgba(255, 182, 46, 0.1); color: var(--amber); }
+.side .sub.active::before { background: var(--amber); box-shadow: 0 0 8px var(--glow); }
+.chev { margin-left: auto; transition: transform .25s var(--spring-soft); opacity: .7; flex-shrink: 0; }
+.chev.open { transform: rotate(180deg); }
+.side.collapsed .nav-group .sub, .side.collapsed .chev { display: none; }
+.side.collapsed:hover .nav-group .sub { display: flex; }
+.side.collapsed:hover .chev { display: block; }
 .side button.active {
   color: #1a0d06;
   background: linear-gradient(135deg, var(--gold), var(--amber) 50%, var(--ember));

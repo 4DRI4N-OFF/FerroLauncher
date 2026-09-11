@@ -309,6 +309,48 @@ ipcMain.handle('ferro:loaders', async (_, { mcVersion, type }) => {
   if (type === 'neoforge') return (await listNeoForge(mcVersion)).map((v) => ({ loader: v, stable: true }));
   return loaderApi(type).list(mcVersion);
 });
+// Compara versiones por tramos numéricos (sufijos ignorados)
+function cmpVer(a, b) {
+  const pa = String(a).split(/[^0-9]+/).filter(Boolean).map(Number);
+  const pb = String(b).split(/[^0-9]+/).filter(Boolean).map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d < 0 ? -1 : 1;
+  }
+  return 0;
+}
+async function latestLoaderFor(inst) {
+  if (!inst || inst.type === 'vanilla') return null;
+  if (inst.type === 'forge') {
+    const l = await listForge(inst.versionId);
+    return l[0]?.version || null;
+  }
+  if (inst.type === 'neoforge') {
+    const l = await listNeoForge(inst.versionId);
+    return l[0] || null;
+  }
+  const l = await loaderApi(inst.type).list(inst.versionId);
+  return l[0]?.loader || null;
+}
+ipcMain.handle('ferro:loaderCheck', async (_, { instanceName }) => {
+  const d = getDirs();
+  const inst = findInstance(d, instanceName);
+  if (!inst || inst.type === 'vanilla') return { current: null, latest: null, outdated: false };
+  const latest = await latestLoaderFor(inst);
+  const cur = inst.loaderVersion || null;
+  return { current: cur, latest, outdated: !!latest && (!cur || cmpVer(latest, cur) > 0) };
+});
+ipcMain.handle('ferro:loaderUpdate', async (_, { instanceName }) => {
+  const d = getDirs();
+  const inst = findInstance(d, instanceName);
+  if (!inst || inst.type === 'vanilla') throw new Error('Es vanilla: no tiene loader');
+  const latest = await latestLoaderFor(inst);
+  if (!latest) throw new Error('Sin versiones de loader para este MC');
+  const cur = inst.loaderVersion || null;
+  if (cur && cmpVer(latest, cur) <= 0) return { updated: false, current: cur, latest };
+  updateInstanceSettings(d.instances, instanceName, { loaderVersion: latest });
+  return { updated: true, previous: cur, latest };
+});
 
 ipcMain.handle('ferro:modSearch', async (_, { query, mcVersion, loader, sort, kind, offset }) => searchMods(query || '', mcVersion, ['quilt', 'forge', 'neoforge'].includes(loader) ? loader : 'fabric', { sort, kind: ['shader', 'resourcepack', 'datapack'].includes(kind) ? kind : 'mod', offset: Math.max(0, Number(offset) || 0) }));
 ipcMain.handle('ferro:mods', async (_, { instanceName, kind, world }) => listMods(findInstance(getDirs(), instanceName).path, kind, world));
@@ -666,21 +708,6 @@ ipcMain.handle('ferro:openCrashes', async (_, { instanceName }) => {
   return true;
 });
 ipcMain.handle('ferro:shots', async (_, { instanceName }) => gallery.listShots(findInstance(getDirs(), instanceName).path));
-ipcMain.handle('ferro:heroBg', async () => {
-  const hit = gallery.heroShot(getDirs().instances);
-  if (!hit || hit.size > 8 * 1048576) return null;
-  return {
-    instanceName: hit.instance, file: hit.file,
-    dataUrl: 'data:image/png;base64,' + require('fs').readFileSync(hit.path).toString('base64'),
-  };
-});ipcMain.handle('ferro:bgShotList', async () => gallery.recentShots(getDirs().instances, 6));
-ipcMain.handle('ferro:bgShots', async () => {
-  const list = gallery.recentShots(getDirs().instances, 6);
-  return list.map((s) => ({
-    instance: s.instance, file: s.file,
-    dataUrl: 'data:image/png;base64,' + require('fs').readFileSync(s.path).toString('base64'),
-  }));
-});
 ipcMain.handle('ferro:shotThumb', async (_, { instanceName, file }) => {
   const list = gallery.listShots(findInstance(getDirs(), instanceName).path);
   const hit = list.find((s) => s.file === path.basename(file));
@@ -696,12 +723,6 @@ ipcMain.handle('ferro:shotView', async (_, { instanceName, file }) => {
   return true;
 });
 ipcMain.handle('ferro:shotDelete', async (_, { instanceName, file }) => gallery.deleteShot(findInstance(getDirs(), instanceName).path, file));
-ipcMain.handle('ferro:openShots', async (_, { instanceName }) => {
-  const dir = gallery.shotsDir(findInstance(getDirs(), instanceName).path);
-  require('fs').mkdirSync(dir, { recursive: true });
-  await shell.openPath(dir);
-  return true;
-});
 ipcMain.handle('ferro:wallpaper', async () => {
   const base = getDirs().base;
   const fs = require('fs');
@@ -739,7 +760,6 @@ ipcMain.handle('ferro:stop', async () => {
 ipcMain.handle('ferro:status', async () => ({ running: !!activeChild && activeChild.exitCode === null && !activeChild.killed, instance: activeInstance }));
 
 // Rendimiento: presets JVM + RAM sugerida
-ipcMain.handle('ferro:jvmPresets', async () => ({ labels: perf.LABELS, suggested: perf.suggestRam() }));
 ipcMain.handle('ferro:ramSuggest', async () => perf.suggestRam());
 
 // Doctor de crashes: diagnostica + aplica arreglos seguros
@@ -847,7 +867,6 @@ ipcMain.handle('ferro:importPrism', async (_, { from, instPath, asName }) => {
 ipcMain.handle('ferro:servers', async () => srv.listServers(getDirs().base));
 ipcMain.handle('ferro:serverAdd', async (_, data) => srv.addServer(getDirs().base, data || {}));
 ipcMain.handle('ferro:serverRemove', async (_, { host, port }) => srv.removeServer(getDirs().base, host, port));
-ipcMain.handle('ferro:friends', async () => friends.listFriends(getDirs().base));
 ipcMain.handle('ferro:friendAdd', async (_, data) => friends.addFriend(getDirs().base, data || {}));
 ipcMain.handle('ferro:friendRemove', async (_, data) => friends.removeFriend(getDirs().base, data || {}));
 ipcMain.handle('ferro:friendsPresence', async () => friends.presence(getDirs().base));

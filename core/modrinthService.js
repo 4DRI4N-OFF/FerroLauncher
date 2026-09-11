@@ -77,11 +77,11 @@ function listMods(instanceDir, kind = 'mod', world) {
   const exts = kind === 'mod' ? ['.jar'] : ['.zip'];
   return fs.readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isFile() && exts.some((x) => e.name.endsWith(x) && !e.name.endsWith(x + '.disabled')))
-    .map((e) => ({ file: e.name, path: path.join(dir, e.name), size: fs.statSync(path.join(dir, e.name)).size }))
+    .map((e) => { const st = fs.statSync(path.join(dir, e.name)); return { file: e.name, path: path.join(dir, e.name), size: st.size, mtime: st.mtimeMs }; })
     .concat(
       fs.readdirSync(dir, { withFileTypes: true })
         .filter((e) => e.isFile() && e.name.endsWith('.disabled'))
-        .map((e) => ({ file: e.name, path: path.join(dir, e.name), size: 0, disabled: true }))
+        .map((e) => { const st = fs.statSync(path.join(dir, e.name)); return { file: e.name, path: path.join(dir, e.name), size: st.size, mtime: st.mtimeMs, disabled: true }; })
     );
 }
 

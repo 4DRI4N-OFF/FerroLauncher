@@ -72,6 +72,15 @@ function updateInstanceSettings(instancesDir, name, patch) {
   }
   if (patch.pinned !== undefined) s.pinned = !!patch.pinned;
   cfg.settings = s;
+  // El loader vive a nivel raíz (ahí lo lee el arranque). Si cambia, el perfil
+  // Forge/NeoForge cacheado queda invalidado y se regenera al jugar.
+  if (patch.loaderVersion !== undefined) {
+    const v = String(patch.loaderVersion).slice(0, 40) || null;
+    if (v !== cfg.loaderVersion) {
+      cfg.loaderVersion = v;
+      delete cfg.forgeProfileId;
+    }
+  }
   fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
   return withSettings({ name, path: dir, ...cfg });
 }

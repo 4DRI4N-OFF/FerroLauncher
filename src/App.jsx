@@ -10,7 +10,7 @@ import {
   Play, Square, Layers, Package, LayoutGrid, Gift, User, Users, Palette,
   Settings, Search, Plus, RefreshCw, FolderOpen, Copy, Pencil, Trash2,
   Download, Upload, Check, X, AlertTriangle, Info, Camera,
-  MessageCircle, ExternalLink, Server, Pin, PinOff, Database, Newspaper, Menu, Star,
+  ExternalLink, Server, Pin, PinOff, Database, Newspaper, Menu, Star, ChevronDown,
 } from 'lucide-react';
 
 // Paginador reutilizable (se muestra arriba y abajo de las listas)
@@ -188,7 +188,15 @@ function MorphModal({ origin, closing, onClose, title, children }) {
 }
 
 export default function App() {
-  const [tab, setTab] = useState('jugar');
+  const [tab, setTab] = useState(() => {
+    try {
+      const v = localStorage.getItem('ferro-tab');
+      const ok = ['jugar', 'versiones', 'instancias', 'mods', 'packs', 'datapacks', 'noticias', 'servers', 'amigos', 'cuenta', 'skin', 'ajustes'];
+      if (ok.includes(v)) return v;
+    } catch {}
+    return 'jugar';
+  });
+  useEffect(() => { try { localStorage.setItem('ferro-tab', tab); } catch {} }, [tab]);
   const [sideOpen, setSideOpen] = useState(false);
   const [sidePinned, setSidePinned] = useState(() => { try { return localStorage.getItem('ferro-sidepin') === '1'; } catch { return false; } });
   const sideBig = sideOpen || sidePinned;
@@ -240,10 +248,12 @@ export default function App() {
   const [wp, setWp] = useState(null);
   const [szMap, setSzMap] = useState({});
   const [szLoading, setSzLoading] = useState(false);
+  const [ldState, setLdState] = useState({});
   const [newsList, setNewsList] = useState([]);
   const [newsLoading, setNewsLoading] = useState(false);
   const [dpPage, setDpPage] = useState(1);
   const [dpSearching, setDpSearching] = useState(false);
+  const [contentOpen, setContentOpen] = useState(true);
   const [searching, setSearching] = useState(false);
   const [installingId, setInstallingId] = useState(null);
   const [installedIds, setInstalledIds] = useState([]);
@@ -297,7 +307,7 @@ export default function App() {
   const [dcOn, setDcOn] = useState(true);
   const [dcHook, setDcHook] = useState('');
   const [social, setSocial] = useState({ github: '', discord: '', youtube: '' });
-  useEffect(() => { window.ferro.social?.().then(setSocial).catch(()=>{}); }, []);
+  useEffect(() => { window.ferro?.social?.().then(setSocial).catch(()=>{}); }, []);
   const [toasts, setToasts] = useState([]);
   const [flashKey, setFlashKey] = useState(0);
   const [scare, setScare] = useState(null);
@@ -356,6 +366,8 @@ export default function App() {
   const [instModal, setInstModal] = useState(null);
   const [instOrigin, setInstOrigin] = useState(null);
   const [instClosing, setInstClosing] = useState(false);
+  const [imFilter, setImFilter] = useState('');
+  const [imSort, setImSort] = useState('name');
   const [createOpen, setCreateOpen] = useState(false);
   const [createOrigin, setCreateOrigin] = useState(null);
   const [createClosing, setCreateClosing] = useState(false);
@@ -424,7 +436,7 @@ export default function App() {
     if (account) { setPlayFace(`https://visage.surgeplay.com/face/64/${account.uuid.replace(/-/g, '')}`); return; }
     const t = setTimeout(async () => {
       try {
-        const s = await window.ferro.skin({ name });
+        const s = await window.ferro?.skin({ name });
         setPlayFace(s?.renders ? s.renders.face : null);
       } catch { setPlayFace(null); }
     }, 600);
@@ -439,17 +451,24 @@ export default function App() {
     setNameState({ status: 'checking', suggestions: [] });
     const t = setTimeout(async () => {
       try {
-        const r = await window.ferro.nameCheck({ name });
+        const r = await window.ferro?.nameCheck({ name });
         if (!r.valid) { setNameState({ status: 'invalid', suggestions: [] }); return; }
         if (r.unknown) { setNameState({ status: 'unknown', suggestions: [] }); return; }
         if (!r.premium) { setNameState({ status: 'free', suggestions: [] }); return; }
-        const sug = await window.ferro.nameSuggest({ base: name }).catch(() => []);
+        const sug = await window.ferro?.nameSuggest({ base: name }).catch(() => []);
         setNameState({ status: 'taken', suggestions: sug });
       } catch { setNameState({ status: 'unknown', suggestions: [] }); }
     }, 600);
     return () => clearTimeout(t);
   }, [username, account]);
   const [running, setRunning] = useState(false);
+  // Aviso al cerrar con el juego en marcha (aquí sí existe `running`)
+  useEffect(() => {
+    if (!running) return;
+    const guard = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', guard);
+    return () => window.removeEventListener('beforeunload', guard);
+  }, [running]);
   const [logLevel, setLogLevel] = useState('todo');
   const [logSearch, setLogSearch] = useState('');
   const [autoScroll, setAutoScroll] = useState(true);
@@ -582,7 +601,7 @@ export default function App() {
       boomBurst(r);
     } catch {}
     setTimeout(async () => {
-      try { await window.ferro.deleteInstance({ instanceName: name }); } catch {}
+      try { await window.ferro?.deleteInstance({ instanceName: name }); } catch {}
       setExploding(null);
       refresh();
     }, 760);
@@ -598,7 +617,7 @@ export default function App() {
 
   const refresh = async () => {
     try {
-      const vers = await window.ferro.versions();
+      const vers = await window.ferro?.versions();
       setVersions(vers);
       // Predeterminada: la última release del manifiesto (vale para futuras versiones)
       const latest = vers[0]?.id;
@@ -607,7 +626,7 @@ export default function App() {
         if (!touchedVer.current.filter) setFVersion(latest);
         if (!touchedVer.current.pack) setPackMc(latest);
       }
-      const inst = await window.ferro.instances();
+      const inst = await window.ferro?.instances();
       inst.sort((a, b) => ((b.settings?.pinned ? 1 : 0) - (a.settings?.pinned ? 1 : 0)));
       setInstances(inst);
       // Saneado global: ninguna referencia puede apuntar a una instancia que ya no existe
@@ -625,13 +644,13 @@ export default function App() {
       if (galName && !names.includes(galName)) closeGallery();
       if (instModal === 'mods' && modsFor && !names.includes(modsFor)) closeInstalled();
       if (instModal === 'datapacks' && dpFor && !names.includes(dpFor)) closeInstalled();
-      setJava(await window.ferro.java());
-      try { setAbCfg(await window.ferro.autoBackupGet()); } catch {}
+      setJava(await window.ferro?.java());
+      try { setAbCfg(await window.ferro?.autoBackupGet()); } catch {}
       try {
-        const r = await window.ferro.autoBackupRun();
+        const r = await window.ferro?.autoBackupRun();
         if (r?.due) setLog((l) => l + `[ferro] ${t('ab.done', { n: (r.done || []).length })}\n`);
       } catch {}
-      try { setAccount(await window.ferro.authStatus()); } catch {}
+      try { setAccount(await window.ferro?.authStatus()); } catch {}
     } catch (e) {
       setLog((l) => l + `[error] ${e.message}\n`);
     }
@@ -640,7 +659,7 @@ export default function App() {
   const loadVers = async (k) => {
     try {
       setVerKind(k);
-      setVersions(await window.ferro.versions({ kind: k }));
+      setVersions(await window.ferro?.versions({ kind: k }));
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -648,13 +667,13 @@ export default function App() {
     if (!name) return;
     const kk = k || kind;
     try {
-      setMods(await window.ferro.mods({ instanceName: name, kind: kk }));
+      setMods(await window.ferro?.mods({ instanceName: name, kind: kk }));
       if (kk === 'resourcepack') {
-        try { const r = await window.ferro.rp({ instanceName: name }); setRpOn(r.enabled); }
+        try { const r = await window.ferro?.rp({ instanceName: name }); setRpOn(r.enabled); }
         catch { setRpOn(null); }
       }
       if (kk === 'shader') {
-        try { setShaderCur(await window.ferro.shader({ instanceName: name })); }
+        try { setShaderCur(await window.ferro?.shader({ instanceName: name })); }
         catch { setShaderCur(null); }
       }
     }
@@ -664,7 +683,7 @@ export default function App() {
   const loadWorlds = async (name) => {
     if (!name) return;
     try {
-      const w = await window.ferro.worlds({ instanceName: name });
+      const w = await window.ferro?.worlds({ instanceName: name });
       setDpWorlds(w);
       setDpWorld((cur) => (w.includes(cur) ? cur : (w[0] || '')));
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -672,7 +691,7 @@ export default function App() {
 
   const loadDpList = async (name, world) => {
     if (!name || !world) { setDpList([]); return; }
-    try { setDpList(await window.ferro.mods({ instanceName: name, kind: 'datapack', world })); }
+    try { setDpList(await window.ferro?.mods({ instanceName: name, kind: 'datapack', world })); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -684,7 +703,7 @@ export default function App() {
     setDpPage(p);
     setDpSearching(true);
     try {
-      const r = await window.ferro.modSearch({ query: q, mcVersion: inst.versionId, loader: 'fabric', sort: q ? 'relevance' : 'downloads', kind: 'datapack', offset: (p - 1) * 24 });
+      const r = await window.ferro?.modSearch({ query: q, mcVersion: inst.versionId, loader: 'fabric', sort: q ? 'relevance' : 'downloads', kind: 'datapack', offset: (p - 1) * 24 });
       setDpHits(r.hits || []);
       setDpTotal(r.total || 0);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -694,7 +713,7 @@ export default function App() {
   const dpInstall = async (m) => {
     if (!dpFor || !dpWorld) { setLog((l) => l + `[error] ${t('dp.needWorld')}\n`); return; }
     try {
-      await window.ferro.modInstall({ instanceName: dpFor, projectId: m.id, kind: 'datapack', world: dpWorld });
+      await window.ferro?.modInstall({ instanceName: dpFor, projectId: m.id, kind: 'datapack', world: dpWorld });
       setDpHits((h) => h.filter((x) => x.id !== m.id));
       await loadDpList(dpFor, dpWorld);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -702,15 +721,25 @@ export default function App() {
 
   const dpToggle = async (f) => {
     try {
-      await window.ferro.modToggle({ instanceName: dpFor, file: f.file, disable: !f.disabled, kind: 'datapack', world: dpWorld });
+      await window.ferro?.modToggle({ instanceName: dpFor, file: f.file, disable: !f.disabled, kind: 'datapack', world: dpWorld });
       await loadDpList(dpFor, dpWorld);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
   const dpRemove = async (f) => {
     try {
-      await window.ferro.modRemove({ instanceName: dpFor, file: f.file, kind: 'datapack', world: dpWorld });
+      await window.ferro?.modRemove({ instanceName: dpFor, file: f.file, kind: 'datapack', world: dpWorld });
       await loadDpList(dpFor, dpWorld);
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const bulkToggle = async (disable) => {
+    try {
+      for (const m of mods) {
+        if (!!m.disabled === !!disable) continue;
+        await window.ferro?.modToggle({ instanceName: modsFor, file: m.file, disable, kind });
+      }
+      await loadMods(modsFor);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -719,7 +748,7 @@ export default function App() {
     setCheckingUpd(true);
     setUpdMsg('');
     try {
-      const list = await window.ferro.modUpdates({ instanceName: modsFor });
+      const list = await window.ferro?.modUpdates({ instanceName: modsFor });
       const map = {};
       for (const u of list) map[u.file] = u;
       setUpdMap(map);
@@ -731,7 +760,7 @@ export default function App() {
   const doModUpdate = async (u) => {
     try {
       setLog((l) => l + `[ferro] actualizando ${u.title || u.file}...\n`);
-      await window.ferro.modUpdate({ instanceName: modsFor, file: u.file, projectId: u.projectId });
+      await window.ferro?.modUpdate({ instanceName: modsFor, file: u.file, projectId: u.projectId });
       setUpdMap((m) => { const n = { ...m }; delete n[u.file]; return n; });
       loadMods(modsFor);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -739,14 +768,14 @@ export default function App() {
 
   const loadBackups = async (name) => {
     if (!name) return;
-    try { setBkList(await window.ferro.backups({ instanceName: name })); }
+    try { setBkList(await window.ferro?.backups({ instanceName: name })); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
   const loadCrashes = async (name) => {
     if (!name) return;
     setCrOpen(null);
-    try { setCrList(await window.ferro.crashes({ instanceName: name })); }
+    try { setCrList(await window.ferro?.crashes({ instanceName: name })); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -774,7 +803,7 @@ export default function App() {
     setModPage(p);
     setSearching(true);
     try {
-      const r = await window.ferro.modSearch({ query: q, mcVersion: ver, loader, sort: q ? (over.sort || fSort) : 'downloads', kind: k, offset: (p - 1) * 24 });
+      const r = await window.ferro?.modSearch({ query: q, mcVersion: ver, loader, sort: q ? (over.sort || fSort) : 'downloads', kind: k, offset: (p - 1) * 24 });
       setModHits(r.hits || r);
       setModTotal(r.total || (r.hits || r).length);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -786,7 +815,7 @@ export default function App() {
     setInstallingId(projectId);
     try {
       setLog((l) => l + `[ferro] instalando ${title} en ${modsFor}...\n`);
-      const r = await window.ferro.modInstall({ instanceName: modsFor, projectId, kind });
+      const r = await window.ferro?.modInstall({ instanceName: modsFor, projectId, kind });
       setLog((l) => l + `[ferro] instalado ${r.file}\n`);
       pushToast('success', `${title} ${t('toast.installed')}`);
       rememberInstalled(modsFor, `mr:${kind}`, projectId);
@@ -797,14 +826,14 @@ export default function App() {
   };
 
   const loadCfKey = async () => {
-    try { setCfKeySet(await window.ferro.cfKey()); } catch {}
+    try { setCfKeySet(await window.ferro?.cfKey()); } catch {}
   };
 
   const doCfSearch = async () => {
     setSearching(true);
     try {
       const ck = kind === 'shader' ? 'mod' : kind;
-      const r = await window.ferro.cfSearch({ query: modQuery, mcVersion: fVersion, kind: ck, sort: fSort });
+      const r = await window.ferro?.cfSearch({ query: modQuery, mcVersion: fVersion, kind: ck, sort: fSort });
       setCfHits(r.hits || []);
       setCfTotal(r.total || 0);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -814,7 +843,7 @@ export default function App() {
   const doCfTrending = async () => {
     setSearching(true);
     try {
-      const r = await window.ferro.cfTrending();
+      const r = await window.ferro?.cfTrending();
       setCfHits(r.hits || []);
       setCfTotal(r.total || 0);
       setLog((l) => l + `[ferro] tendencias CF: ${r.hits?.length || 0}\n`);
@@ -829,7 +858,7 @@ export default function App() {
     }
     try {
       const inst = instances.find((i) => i.name === modsFor);
-      const vers = await window.ferro.cfFiles({ modId, mcVersion: fVersion, loader: inst?.type === 'vanilla' ? undefined : inst?.type });
+      const vers = await window.ferro?.cfFiles({ modId, mcVersion: fVersion, loader: inst?.type === 'vanilla' ? undefined : inst?.type });
       setCfFiles((p) => ({ ...p, [modId]: vers }));
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
@@ -839,7 +868,7 @@ export default function App() {
     setCfBusy(f.id);
     try {
       setLog((l) => l + `[ferro] instalando ${f.name} en ${modsFor}...\n`);
-      const r = await window.ferro.cfInstall({ instanceName: modsFor, modId: m.id, fileId: f.id, kind: kind === 'resourcepack' ? 'resourcepack' : 'mod' });
+      const r = await window.ferro?.cfInstall({ instanceName: modsFor, modId: m.id, fileId: f.id, kind: kind === 'resourcepack' ? 'resourcepack' : 'mod' });
       setLog((l) => l + `[ferro] instalado ${r.file}\n`);
       pushToast('success', `${m.title} ${t('toast.installed')}`);
       rememberInstalled(modsFor, `cf:${kind}`, m.id);
@@ -854,7 +883,7 @@ export default function App() {
     const q = String(over.query !== undefined ? over.query : packQuery).trim();
     setPackPage(p);
     try {
-      const r = await window.ferro.packSearch({ query: q, mcVersion: over.mcVersion || packMc, loader: (over.loader !== undefined ? over.loader : packLoader) || undefined, sort: q ? (over.sort || packSort) : 'downloads', offset: (p - 1) * 24 });
+      const r = await window.ferro?.packSearch({ query: q, mcVersion: over.mcVersion || packMc, loader: (over.loader !== undefined ? over.loader : packLoader) || undefined, sort: q ? (over.sort || packSort) : 'downloads', offset: (p - 1) * 24 });
       setPackHits(r.hits || r);
       setPackTotal(r.total || (r.hits || r).length);
       setPackVers({});
@@ -868,7 +897,7 @@ export default function App() {
       return;
     }
     try {
-      const vers = await window.ferro.packVersions({ projectId, mcVersion: packMc, loader: packLoader || undefined });
+      const vers = await window.ferro?.packVersions({ projectId, mcVersion: packMc, loader: packLoader || undefined });
       setPackVers((p) => ({ ...p, [projectId]: vers }));
     }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -879,7 +908,7 @@ export default function App() {
     setPackBusy(v.id);
     try {
       setTab('jugar');
-      const r = await window.ferro.packInstall({ name: `${pack.title} ${v.number}`, projectId: pack.id, packVersionId: v.id, mcVersion: packMc });
+      const r = await window.ferro?.packInstall({ name: `${pack.title} ${v.number}`, projectId: pack.id, packVersionId: v.id, mcVersion: packMc });
       setLog((l) => l + `[ferro] instancia ${r.name} creada desde modpack\n`);
       pushToast('success', `${t('toast.packDone')}: ${r.name}`);
       await refresh();
@@ -890,7 +919,7 @@ export default function App() {
 
   const doCfPackSearch = async () => {
     try {
-      const r = await window.ferro.cfSearch({ query: packQuery, mcVersion: packMc, kind: 'modpack', sort: packSort });
+      const r = await window.ferro?.cfSearch({ query: packQuery, mcVersion: packMc, kind: 'modpack', sort: packSort });
       setPackHits(r.hits || []);
       setPackTotal(r.total || 0);
       setPackVers({});
@@ -903,7 +932,7 @@ export default function App() {
       return;
     }
     try {
-      const vers = await window.ferro.cfFiles({ modId, mcVersion: packMc });
+      const vers = await window.ferro?.cfFiles({ modId, mcVersion: packMc });
       setCfPackVers((p) => ({ ...p, [modId]: vers }));
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
@@ -913,7 +942,7 @@ export default function App() {
     setCfPackBusy(f.id);
     try {
       setTab('jugar');
-      const r = await window.ferro.cfPackInstall({ name: pack.title, modId: pack.id, fileId: f.id });
+      const r = await window.ferro?.cfPackInstall({ name: pack.title, modId: pack.id, fileId: f.id });
       setLog((l) => l + `[ferro] instancia ${r.name} creada desde modpack\n`);
       pushToast('success', `${t('toast.packDone')}: ${r.name}`);
       await refresh();
@@ -924,12 +953,12 @@ export default function App() {
 
   const loadAuth = async () => {
     try {
-      const ci = await window.ferro.clientId().catch(() => null);
+      const ci = await window.ferro?.clientId().catch(() => null);
       setIdInfo(ci || { masked: '', configured: false });
       setClientId('');
-      setAccount(await window.ferro.authStatus());
-      setAccts(await window.ferro.accounts());
-      const dc = await window.ferro.discord().catch(()=>({clientId:'',enabled:true}));
+      setAccount(await window.ferro?.authStatus());
+      setAccts(await window.ferro?.accounts());
+      const dc = await window.ferro?.discord().catch(()=>({clientId:'',enabled:true}));
       setDcId(dc.clientId || ''); setDcOn(dc.enabled !== false); setDcHook(dc.webhook || '');
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
@@ -937,7 +966,7 @@ export default function App() {
   const stopPoll = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
 
   const loadSkin = async (name) => {
-    try { setSkinInfo(await window.ferro.skin({ name: name ?? skinName ?? username ?? 'Ferro' })); }
+    try { setSkinInfo(await window.ferro?.skin({ name: name ?? skinName ?? username ?? 'Ferro' })); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -945,7 +974,7 @@ export default function App() {
     if (skinBusy) return;
     setSkinBusy(true);
     try {
-      const r = await window.ferro.skinApply({ variant: skinVariant, url: skinUrl });
+      const r = await window.ferro?.skinApply({ variant: skinVariant, url: skinUrl });
       setSkinInfo({ online: true, ...r });
       setLog((l) => l + `[ferro] skin actualizada (${skinVariant})\n`);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -954,7 +983,7 @@ export default function App() {
 
   const resetSkin = async () => {
     try {
-      await window.ferro.skinReset();
+      await window.ferro?.skinReset();
       setLog((l) => l + '[ferro] skin restablecida\n');
       loadSkin();
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -1045,8 +1074,8 @@ export default function App() {
     if (window.ferro?.onShown) {
       let fallback;
       // El vuelo arranca cuando la ventana deja de crecer (medidas ya estables)
-      window.ferro.onSettled?.(() => fly());
-      window.ferro.onShown(() => {
+      window.ferro?.onSettled?.(() => fly());
+      window.ferro?.onShown(() => {
         fallback = setTimeout(fly, 2000); // por si settled no llega
       });
       const isReload = (() => { try { return performance.getEntriesByType('navigation')[0]?.type === 'reload'; } catch { return false; } })();
@@ -1058,7 +1087,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    window.ferro.onAuthResult?.((err, data) => {
+    window.ferro?.onAuthResult?.((err, data) => {
       setBrowserWaiting(false);
       if (err) setLog((l) => l + `[error] ${err.error || err}\n`);
       else {
@@ -1068,25 +1097,25 @@ export default function App() {
         celebrateLogin();
       }
     });
-    window.ferro.onUpdate?.((d) => setUpd(d));
-    window.ferro.appVersion?.().then(setAppVer).catch(()=>{});
+    window.ferro?.onUpdate?.((d) => setUpd(d));
+    window.ferro?.appVersion?.().then(setAppVer).catch(()=>{});
   }, []);
 
   const doBrowserAuth = async () => {
     try {
       setBrowserWaiting(true);
-      await window.ferro.authWindow();
+      await window.ferro?.authWindow();
       setLog((l) => l + '[ferro] completa el login en la ventana de Microsoft…\n');
     } catch (e) { setBrowserWaiting(false); setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
   const cancelBrowserAuth = async () => {
     setBrowserWaiting(false);
-    try { await window.ferro.authWindowCancel(); } catch {}
+    try { await window.ferro?.authWindowCancel(); } catch {}
   };
 
   const doAuthPollOnce = async (s) => {
-    const r = await window.ferro.authPoll({ deviceCode: (s || authStep)?.deviceCode });
+    const r = await window.ferro?.authPoll({ deviceCode: (s || authStep)?.deviceCode });
     setPollCount((c) => c + 1);
     if (r.status === 'done') {
       stopPoll(); setAuthStep(null);
@@ -1102,8 +1131,8 @@ export default function App() {
 
   const doAuthStart = async () => {
     try {
-      if (clientId.trim()) await window.ferro.setClientId({ clientId });
-      const s = await window.ferro.authStart();
+      if (clientId.trim()) await window.ferro?.setClientId({ clientId });
+      const s = await window.ferro?.authStart();
       setAuthStep(s);
       setPollCount(0);
       setLog((l) => l + `[ferro] autoriza con el código ${s.userCode} en ${s.verificationUri}\n`);
@@ -1117,18 +1146,18 @@ export default function App() {
 
   const doLogout = async () => {
     stopPoll(); setAuthStep(null);
-    await window.ferro.authLogout();
+    await window.ferro?.authLogout();
     setAccount(null);
     setLog((l) => l + '[ferro] sesión cerrada\n');
   };
 
   useEffect(() => {
-    window.ferro.onLog((t) => {
+    window.ferro?.onLog((t) => {
       setLog((l) => l + t);
       if (/proceso terminado|error al arrancar/i.test(t)) setRunning(false);
     });
     refresh();
-    window.ferro.status?.().then((s) => setRunning(!!s?.running)).catch(()=>{});
+    window.ferro?.status?.().then((s) => setRunning(!!s?.running)).catch(()=>{});
   }, []);
 
   // Tilt 3D en tarjetas al pasar el ratón
@@ -1170,7 +1199,7 @@ export default function App() {
 
   useEffect(() => {
     if (instanceType === 'vanilla') return;
-    window.ferro.loaders({ mcVersion: versionId, type: instanceType }).then((l) => {
+    window.ferro?.loaders({ mcVersion: versionId, type: instanceType }).then((l) => {
       setLoaders(l);
       if (l[0]) setLoaderVersion(l[0].loader);
     }).catch((e) => setLog((x) => x + `[error ${instanceType}] ${e.message}\n`));
@@ -1178,7 +1207,7 @@ export default function App() {
 
   const create = async () => {
     try {
-      const r = await window.ferro.createInstance({ name: instanceName, versionId, type: instanceType, loaderVersion: instanceType === 'vanilla' ? undefined : loaderVersion });
+      const r = await window.ferro?.createInstance({ name: instanceName, versionId, type: instanceType, loaderVersion: instanceType === 'vanilla' ? undefined : loaderVersion });
       setLog((l) => l + `[ferro] instancia creada: ${r.name} (${versionId}${instanceType === 'vanilla' ? '' : ` + ${instanceType} ${loaderVersion}`})\n`);
       pushToast('success', t('toast.instCreated', {n:r.name}));
       setInstanceName('');
@@ -1196,39 +1225,38 @@ export default function App() {
       setLaunchInstance(target);
       if (abCfg?.mode === 'beforePlay') {
         setLog((l) => l + `[ferro] ${t('ab.backing')} ${target}...\n`);
-        await window.ferro.autoBackupOnce({ instanceName: target });
+        await window.ferro?.autoBackupOnce({ instanceName: target });
       }
       setLog((l) => l + `[ferro] lanzando ${target} como ${account?.name || username}...\n`);
       setRunning(true);
       setLaunchProg(null);
-      await window.ferro.launch({ instanceName: target, username, ...(srv ? { serverHost: srv.host, serverPort: srv.port } : {}) });
-      const s = await window.ferro.status().catch(() => null);
+      await window.ferro?.launch({ instanceName: target, username, ...(srv ? { serverHost: srv.host, serverPort: srv.port } : {}) });
+      const s = await window.ferro?.status().catch(() => null);
       setRunning(!!s?.running);
       if (!s?.running) setLog((l) => l + `[error] ${t('play.diedFast')}\n`);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); setRunning(false); }
   };
 
   const stop = async () => {
-    try { await window.ferro.stop(); }
+    try { await window.ferro?.stop(); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
   const loadServers = async () => {
     try {
-      const list = await window.ferro.servers();
+      const list = await window.ferro?.servers();
       setServers(list);
       list.forEach((s) => pingServer(s));
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
-  const loadSizes = async (list) => {
-    const arr = list || instances;
+  const loadSizes = async (list) => {    const arr = list || instances;
     if (!arr.length) return;
     setSzLoading(true);
     try {
       const out = {};
       for (const i of arr) {
-        try { const r = await window.ferro.instSize({ instanceName: i.name }); out[i.name] = fmtSize(r.bytes); } catch {}
+        try { const r = await window.ferro?.instSize({ instanceName: i.name }); out[i.name] = fmtSize(r.bytes); } catch {}
       }
       setSzMap((m) => ({ ...m, ...out }));
     } finally { setSzLoading(false); }
@@ -1236,17 +1264,44 @@ export default function App() {
 
   const cleanInstance = async (name) => {
     try {
-      const r = await window.ferro.instClean({ instanceName: name });
+      const r = await window.ferro?.instClean({ instanceName: name });
       setLog((l) => l + `[ferro] ${t('sz.freed', { n: name, m: fmtSize(r.freed), c: r.removed })}\n`);
       setSzMap((m) => { const n = { ...m }; delete n[name]; return n; });
-      try { const s = await window.ferro.instSize({ instanceName: name }); setSzMap((m) => ({ ...m, [name]: fmtSize(s.bytes) })); } catch {}
+      try { const s = await window.ferro?.instSize({ instanceName: name }); setSzMap((m) => ({ ...m, [name]: fmtSize(s.bytes) })); } catch {}
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const loadLoaderStates = async (list) => {
+    const arr = (list || instances).filter((i) => i.type !== 'vanilla');
+    if (!arr.length) return;
+    setLdState((m) => { const n = { ...m }; arr.forEach((i) => { n[i.name] = { checking: true }; }); return n; });
+    for (const i of arr) {
+      try {
+        const r = await window.ferro?.loaderCheck({ instanceName: i.name });
+        setLdState((m) => ({ ...m, [i.name]: { checking: false, outdated: !!r.outdated, latest: r.latest } }));
+      } catch {
+        setLdState((m) => ({ ...m, [i.name]: { checking: false, outdated: false } }));
+      }
+    }
+  };
+
+  const updateLoader = async (name) => {
+    setLdState((m) => ({ ...m, [name]: { ...(m[name] || {}), checking: true } }));
+    try {
+      const r = await window.ferro?.loaderUpdate({ instanceName: name });
+      setLog((l) => l + `[ferro] loader ${name}: ${r.updated ? `${r.previous || '?'} → ${r.latest}` : `${t('ld.uptodate')} (${r.latest})`}\n`);
+      setLdState((m) => ({ ...m, [name]: { checking: false, outdated: false, latest: r.latest } }));
+      refresh();
+    } catch (e) {
+      setLog((l) => l + `[error] ${e.message}\n`);
+      setLdState((m) => ({ ...m, [name]: { checking: false, outdated: true } }));
+    }
   };
 
   const pingServer = async (s) => {
     const key = `${s.host}:${s.port}`;
     try {
-      const r = await window.ferro.serverPing({ host: s.host, port: s.port });
+      const r = await window.ferro?.serverPing({ host: s.host, port: s.port });
       setSrvPing((m) => ({ ...m, [key]: r }));
     } catch { setSrvPing((m) => ({ ...m, [key]: { online: false } })); }
   };
@@ -1254,7 +1309,7 @@ export default function App() {
   const addServer = async () => {
     if (!srvHost.trim()) return;
     try {
-      setServers(await window.ferro.serverAdd({ name: srvName.trim() || srvHost.trim(), host: srvHost.trim(), port: srvPort }));
+      setServers(await window.ferro?.serverAdd({ name: srvName.trim() || srvHost.trim(), host: srvHost.trim(), port: srvPort }));
       setSrvName(''); setSrvHost(''); setSrvPort('25565');
       setLog((l) => l + `[ferro] ${t('srv.added')}\n`);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -1267,7 +1322,7 @@ export default function App() {
   };
 
   const loadFriends = async () => {
-    try { setFriends(await window.ferro.friendsPresence()); }
+    try { setFriends(await window.ferro?.friendsPresence()); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -1279,7 +1334,7 @@ export default function App() {
       return;
     }
     try {
-      await window.ferro.friendAdd({ name: friendName.trim() });
+      await window.ferro?.friendAdd({ name: friendName.trim() });
       setFriendName('');
       await loadFriends();
       setLog((l) => l + `[ferro] ${t('fr.added')}\n`);
@@ -1287,7 +1342,7 @@ export default function App() {
   };
 
   const removeFriend = async (name) => {
-    try { setFriends(await window.ferro.friendRemove({ name })); }
+    try { setFriends(await window.ferro?.friendRemove({ name })); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -1300,14 +1355,14 @@ export default function App() {
   const scanEssential = async () => {
     const name = essInst || launchInstance || (instances[0] && instances[0].name);
     if (!name) return;
-    try { setEssJars(await window.ferro.essentialScan({ instanceName: name })); }
+    try { setEssJars(await window.ferro?.essentialScan({ instanceName: name })); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
   const loadNews = async () => {
     setNewsLoading(true);
     try {
-      const r = await window.ferro.news();
+      const r = await window.ferro?.news();
       setNewsList(r.entries || []);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
     finally { setNewsLoading(false); }
@@ -1374,8 +1429,8 @@ export default function App() {
   useEffect(() => { if (!running) setLaunchProg(null); }, [running]);
 
   useEffect(() => {
-    window.ferro.onProgress?.((d) => setLaunchProg(d));
-    window.ferro.wallpaper?.().then((r) => { setWp(r?.dataUrl || null); }).catch(() => {});
+    window.ferro?.onProgress?.((d) => setLaunchProg(d));
+    window.ferro?.wallpaper?.().then((r) => { setWp(r?.dataUrl || null); }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -1387,7 +1442,7 @@ export default function App() {
       const files = [...(e.dataTransfer?.files || [])].map((f) => f.path).filter(Boolean);
       if (!files.length) return;
       try {
-        const r = await window.ferro.importDrop({ paths: files, instanceName: modsFor });
+        const r = await window.ferro?.importDrop({ paths: files, instanceName: modsFor });
         for (const x of r || []) setLog((l) => l + `[ferro] drop ${x.kind}: ${x.name || x.file || ''}${x.error ? ` (${x.error})` : ''}\n`);
         refresh();
       } catch (err) { setLog((l) => l + `[error] ${err.message}\n`); }
@@ -1509,10 +1564,10 @@ export default function App() {
     setGalName(name);
     setGalShots([]);
     try {
-      const list = await window.ferro.shots({ instanceName: name });
+      const list = await window.ferro?.shots({ instanceName: name });
       setGalShots(list.map((s) => ({ ...s, thumb: null })));
       for (const s of list) {
-        window.ferro.shotThumb({ instanceName: name, file: s.file })
+        window.ferro?.shotThumb({ instanceName: name, file: s.file })
           .then((t) => setGalShots((g) => g.map((x) => (x.file === s.file ? { ...x, thumb: t.dataUrl } : x))))
           .catch(() => {});
       }
@@ -1525,7 +1580,7 @@ export default function App() {
     if (!settingsFor || saving) return;
     setSaving(true);
     try {
-      await window.ferro.updateSettings({ instanceName: settingsFor, patch: { ramMb: sRam, width: sW, height: sH, javaMode: sJavaMode, javaPath: sJavaPath, jvmPreset: sJvm } });
+      await window.ferro?.updateSettings({ instanceName: settingsFor, patch: { ramMb: sRam, width: sW, height: sH, javaMode: sJavaMode, javaPath: sJavaPath, jvmPreset: sJvm } });
       setLog((l) => l + `[ferro] ajustes guardados en ${settingsFor}\n`);
       refresh();
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -1548,8 +1603,15 @@ export default function App() {
         </div>
         <button className={tab==='jugar'?'active':''} onClick={()=>setTab('jugar')}><Play size={16} /><span className="nav-label">{t('tab.play')}</span></button>
         <button className={tab==='versiones'?'active':''} onClick={()=>setTab('versiones')}><Layers size={16} /><span className="nav-label">{t('tab.versions')}</span></button>
-        <button className={tab==='instancias'?'active':''} onClick={()=>{setTab('instancias'); loadSizes();}}><Package size={16} /><span className="nav-label">{t('tab.instances')}</span></button>
-        <button className={tab==='mods'?'active':''} onClick={()=>{setTab('mods'); if(modsFor) loadMods(modsFor); if(source==='mr' && modHits.length===0 && !searching) doSearch(1);}}><LayoutGrid size={16} /><span className="nav-label">{t('tab.content')}</span></button>
+        <button className={tab==='instancias'?'active':''} onClick={()=>{setTab('instancias'); loadSizes(); loadLoaderStates();}}><Package size={16} /><span className="nav-label">{t('tab.instances')}</span></button>
+        <div className="nav-group">
+          <button className={tab==='mods'?'active':''} onClick={()=>{if(!contentOpen){setTab('mods'); setKind('mod'); if(modsFor) loadMods(modsFor, 'mod'); if(source==='mr' && modHits.length===0 && !searching) doSearch(1, {kind:'mod'}); setContentOpen(true);} else setContentOpen(false);}}><LayoutGrid size={16} /><span className="nav-label">{t('tab.content')}</span><ChevronDown size={14} className={'chev' + (contentOpen ? ' open' : '')} /></button>
+          {contentOpen && (<>
+            <button className={'sub' + (tab==='mods' && kind==='mod' ? ' active' : '')} onClick={()=>{setTab('mods'); setKind('mod'); if(modsFor) loadMods(modsFor, 'mod'); if(source==='mr') doSearch(1, {kind:'mod'});}}><span className="nav-label">{t('mods.tMods')}</span></button>
+            <button className={'sub' + (tab==='mods' && kind==='shader' ? ' active' : '')} onClick={()=>{setTab('mods'); setKind('shader'); if(modsFor) loadMods(modsFor, 'shader'); if(source==='mr') doSearch(1, {kind:'shader'});}}><span className="nav-label">{t('mods.tShaders')}</span></button>
+            <button className={'sub' + (tab==='mods' && kind==='resourcepack' ? ' active' : '')} onClick={()=>{setTab('mods'); setKind('resourcepack'); if(modsFor) loadMods(modsFor, 'resourcepack'); if(source==='mr') doSearch(1, {kind:'resourcepack'});}}><span className="nav-label">{t('mods.tRp')}</span></button>
+          </>)}
+        </div>
         <button className={tab==='packs'?'active':''} onClick={()=>{setTab('packs'); if(packSrc==='mr' && packHits.length===0) doPackSearch(1);}}><Gift size={16} /><span className="nav-label">{t('tab.packs')}</span></button>
         <button className={tab==='datapacks'?'active':''} onClick={()=>{setTab('datapacks'); if(dpHits.length===0 && !dpSearching) dpSearch(1);}}><Database size={16} /><span className="nav-label">{t('tab.datapacks')}</span></button>
         <button className={tab==='noticias'?'active':''} onClick={()=>{setTab('noticias'); loadNews();}}><Newspaper size={16} /><span className="nav-label">{t('tab.news')}</span></button>
@@ -1654,23 +1716,23 @@ export default function App() {
               <input value={instFilter} onChange={(e)=>setInstFilter(e.target.value)} placeholder={t('inst.filterPh')} />
             </div>
             <div className="grid">
-              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className={"card" + (exploding === i.name ? " exploding" : "")}><div className="card-title" title={i.name} onDoubleClick={()=>play(i.name)} style={{cursor:'pointer'}}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}</span>{szMap[i.name] ? <span className="pill">{szMap[i.name]}</span> : (szLoading && <span className="pill"><span className="spinner" /></span>)}<span className={`pill l-${i.type}`}>{i.type==='vanilla' ? 'vanilla' : `${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}{fmtPlay(i.playSecs) ? ` · ${fmtPlay(i.playSecs)}` : ''}</span> : <span className="pill">{t('inst.neverPlayed')}</span>}</div><div className="actions"><button className="ghost" onClick={async()=>{await window.ferro.updateSettings({instanceName:i.name, patch:{pinned:!i.settings?.pinned}}); refresh();}} title={t('inst.fav')}>{i.settings?.pinned ? <Star size={14} fill="currentColor" /> : <Star size={14} />}</button><DotsMenu><button className="ghost" onClick={(e)=>editSettings(i.name, e)}><Settings size={14} /> {t('inst.settings')}</button><button className="ghost" onClick={(e)=>openGallery(i.name, e)}><Camera size={14} /> {t('inst.shots')}</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}><Upload size={14} /> {t('inst.export')}</button><button className="ghost" onClick={async()=>{await window.ferro.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> {t('inst.folder')}</button><button className="ghost" onClick={()=>askConfirm(t('sz.cleanAsk', {n:i.name}), ()=>cleanInstance(i.name))}><Trash2 size={14} /> {t('sz.clean')}</button><button className="ghost" onClick={async()=>{await window.ferro.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> {t('inst.duplicate')}</button><button className="ghost" onClick={()=>askRename(i.name, async (n)=>{await window.ferro.renameInstance({instanceName:i.name, newName:n}); refresh();})}><Pencil size={14} /> {t('inst.rename')}</button><button className="ghost danger" onClick={(e)=>{ const card = e.currentTarget.closest('.card'); askConfirm(t('inst.delConfirm', {n:i.name}), ()=>explodeInstance(i.name, card)); }}><Trash2 size={14} /> {t('inst.delete')}</button></DotsMenu></div>
+              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className={"card" + (exploding === i.name ? " exploding" : "")}><div className="card-title" title={i.name} onDoubleClick={()=>play(i.name)} style={{cursor:'pointer'}}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}</span>{szMap[i.name] ? <span className="pill">{szMap[i.name]}</span> : (szLoading && <span className="pill"><span className="spinner" /></span>)}<span className={`pill l-${i.type}`}>{i.type==='vanilla' ? 'vanilla' : `${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}{fmtPlay(i.playSecs) ? ` · ${fmtPlay(i.playSecs)}` : ''}</span> : <span className="pill">{t('inst.neverPlayed')}</span>}</div><div className="actions"><button className="ghost" onClick={async()=>{await window.ferro?.updateSettings({instanceName:i.name, patch:{pinned:!i.settings?.pinned}}); refresh();}} title={t('inst.fav')}>{i.settings?.pinned ? <Star size={14} fill="currentColor" /> : <Star size={14} />}</button>{ldState[i.name]?.checking && <span className="pill" title={t('ld.checking')}><span className="spinner" /></span>}{ldState[i.name]?.outdated && !ldState[i.name]?.checking && <button className="mini hot" onClick={()=>updateLoader(i.name)} title={`${t('ld.update')}: ${ldState[i.name]?.latest || ''}`}><RefreshCw size={12} /> {t('ld.update')}</button>}<DotsMenu><button className="ghost" onClick={(e)=>editSettings(i.name, e)}><Settings size={14} /> {t('inst.settings')}</button><button className="ghost" onClick={(e)=>openGallery(i.name, e)}><Camera size={14} /> {t('inst.shots')}</button><button className="ghost" onClick={async()=>{await window.ferro?.exportInstance({instanceName:i.name});}}><Upload size={14} /> {t('inst.export')}</button><button className="ghost" onClick={async()=>{await window.ferro?.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> {t('inst.folder')}</button><button className="ghost" onClick={()=>askConfirm(t('sz.cleanAsk', {n:i.name}), ()=>cleanInstance(i.name))}><Trash2 size={14} /> {t('sz.clean')}</button><button className="ghost" onClick={async()=>{await window.ferro?.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> {t('inst.duplicate')}</button><button className="ghost" onClick={()=>askRename(i.name, async (n)=>{await window.ferro?.renameInstance({instanceName:i.name, newName:n}); refresh();})}><Pencil size={14} /> {t('inst.rename')}</button><button className="ghost danger" onClick={(e)=>{ const card = e.currentTarget.closest('.card'); askConfirm(t('inst.delConfirm', {n:i.name}), ()=>explodeInstance(i.name, card)); }}><Trash2 size={14} /> {t('inst.delete')}</button></DotsMenu></div>
 </div>)}
             </div>
             <div className="row" style={{marginTop:12}}>
-              <button className="primary" onClick={async()=>{const n=await window.ferro.importInstance(); if(n){setLog((l)=>l+`[ferro] importada ${n}\n`); refresh();}}}><Upload size={14} /> {t('inst.import')}</button>
-              <button className="ghost" onClick={async()=>{try{setImpScan(await window.ferro.importScan());}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}><Download size={14} /> {t('inst.importOther')}</button>
+              <button className="primary" onClick={async()=>{const n=await window.ferro?.importInstance(); if(n){setLog((l)=>l+`[ferro] importada ${n}\n`); refresh();}}}><Upload size={14} /> {t('inst.import')}</button>
+              <button className="ghost" onClick={async()=>{try{setImpScan(await window.ferro?.importScan());}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}><Download size={14} /> {t('inst.importOther')}</button>
             </div>
             {impScan && (<div className="card" style={{marginTop:8}}>
-              {impScan.vanilla && (<><div className="subhead"><span>Vanilla ({impScan.vanilla.versions?.length||0})</span></div><div className="sublist">{(impScan.vanilla.versions||[]).slice(0,12).map((v)=><div key={v.id} className="subrow"><span className="grow">{v.id}</span><button className="mini" onClick={async()=>{try{const r=await window.ferro.importVanilla({versionId:v.id}); setLog((l)=>l+`[ferro] ${t('inst.imported')}: ${r.name}\n`); refresh();}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('inst.import')}</button></div>)}</div></>)}
-              {['prism','multimc'].map((k)=>(impScan[k] && <div key={k}><div className="subhead"><span style={{textTransform:'capitalize'}}>{k} ({impScan[k].instances?.length||0})</span></div><div className="sublist">{(impScan[k].instances||[]).map((i)=><div key={i.name} className="subrow"><span className="grow" title={i.path}>{i.name} · {i.mc||'?'} {i.loader?`+ ${i.loader.type}`:''}</span><button className="mini" onClick={async()=>{try{const r=await window.ferro.importPrism({from:k, instPath:i.name}); setLog((l)=>l+`[ferro] ${t('inst.imported')}: ${r.name}\n`); refresh();}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('inst.import')}</button></div>)}</div></div>))}
+              {impScan.vanilla && (<><div className="subhead"><span>Vanilla ({impScan.vanilla.versions?.length||0})</span></div><div className="sublist">{(impScan.vanilla.versions||[]).slice(0,12).map((v)=><div key={v.id} className="subrow"><span className="grow">{v.id}</span><button className="mini" onClick={async()=>{try{const r=await window.ferro?.importVanilla({versionId:v.id}); setLog((l)=>l+`[ferro] ${t('inst.imported')}: ${r.name}\n`); refresh();}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('inst.import')}</button></div>)}</div></>)}
+              {['prism','multimc'].map((k)=>(impScan[k] && <div key={k}><div className="subhead"><span style={{textTransform:'capitalize'}}>{k} ({impScan[k].instances?.length||0})</span></div><div className="sublist">{(impScan[k].instances||[]).map((i)=><div key={i.name} className="subrow"><span className="grow" title={i.path}>{i.name} · {i.mc||'?'} {i.loader?`+ ${i.loader.type}`:''}</span><button className="mini" onClick={async()=>{try{const r=await window.ferro?.importPrism({from:k, instPath:i.name}); setLog((l)=>l+`[ferro] ${t('inst.imported')}: ${r.name}\n`); refresh();}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('inst.import')}</button></div>)}</div></div>))}
               {!impScan.vanilla && !impScan.prism && !impScan.multimc && <p style={{opacity:.6}}>{t('inst.impNone')}</p>}
             </div>)}
           </div>
         )}
         {tab==='mods' && (
           <div className="card">
-            <h2>{t('mods.title')}</h2>
+            <h2>{kind==='shader' ? t('mods.tShaders') : kind==='resourcepack' ? t('mods.tRp') : t('mods.title')}</h2>
             <div className="row" data-tour="mods-search">
               <select value={source} onChange={(e)=>{setSource(e.target.value); setModHits([]); setCfHits([]); setModPage(1); if(e.target.value==='cf') loadCfKey(); else doSearch(1);}} title="Fuente">
                 <option value="mr">Modrinth</option>
@@ -1678,11 +1740,6 @@ export default function App() {
               </select>
               <select value={modsFor} onChange={(e)=>{setModsFor(e.target.value); setUpdMap({}); setUpdMsg(''); setRpOn(null); setShaderCur(null); loadMods(e.target.value);}}>
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' '+i.type})</option>)}
-              </select>
-              <select value={kind} onChange={(e)=>{setKind(e.target.value); setModHits([]); setUpdMap({}); setUpdMsg(''); setRpOn(null); setShaderCur(null); loadMods(modsFor, e.target.value); if(source==='mr') doSearch(1, {kind:e.target.value});}} title="Tipo">
-                <option value="mod">{t('mods.tMods')}</option>
-                <option value="shader">{t('mods.tShaders')}</option>
-                <option value="resourcepack">{t('mods.tRp')}</option>
               </select>
               <input value={modQuery} onChange={(e)=>setModQuery(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter') doSearch(1);}} placeholder={`Buscar ${kindName}...`} />
               <select value={fVersion} onChange={(e)=>{touchedVer.current.filter=true; setFVersion(e.target.value); if(source==='mr') doSearch(1, {mcVersion:e.target.value});}} title="Versión de Minecraft">
@@ -1710,7 +1767,7 @@ export default function App() {
             {source==='cf' && (
             <div className="row" style={{marginTop:8}}>
               <input value={cfKeyInput} onChange={(e)=>setCfKeyInput(e.target.value)} type="password" placeholder="CurseForge API key…" style={{minWidth:260}} />
-              <button className="mini" onClick={async()=>{await window.ferro.cfSetKey({key:cfKeyInput}); setCfKeyInput(''); loadCfKey(); setLog((l)=>l+'[ferro] CurseForge key guardada\n');}}>{t('acct.save')}</button>
+              <button className="mini" onClick={async()=>{await window.ferro?.cfSetKey({key:cfKeyInput}); setCfKeyInput(''); loadCfKey(); setLog((l)=>l+'[ferro] CurseForge key guardada\n');}}>{t('acct.save')}</button>
               {cfKeySet ? <span className="pill green">key {cfKeySet}</span> : <span className="pill">console.curseforge.com → API Keys</span>}
             </div>
             )}
@@ -1812,7 +1869,7 @@ export default function App() {
                   <div className="mod-head"><b>{n.title}</b></div>
                   <div className="meta"><span className="pill">{n.category}</span>{n.date && <span className="pill">{n.date}</span>}</div>
                   <div className="desc">{n.text?.slice(0,140)}</div>
-                  <div className="actions"><button className="mini hot" onClick={()=>window.ferro.openUrl({url:n.url})}><ExternalLink size={12} /> {t('nw.read')}</button></div>
+                  <div className="actions"><button className="mini hot" onClick={()=>window.ferro?.openUrl({url:n.url})}><ExternalLink size={12} /> {t('nw.read')}</button></div>
                 </div>))}
             </div>
             {!newsLoading && newsList.length===0 && <p style={{opacity:.6}}>{t('nw.none')}</p>}
@@ -1890,14 +1947,14 @@ export default function App() {
               ? <div className="row"><span className="pill green">✓ {t('acct.idOn')} {idInfo.masked}</span></div>
               : (<div className="row">
                 <input value={clientId} onChange={(e)=>setClientId(e.target.value)} placeholder={t('acct.clientPh')} style={{minWidth:300}} />
-                <button className="ghost" onClick={async()=>{ if (!clientId.trim()) return; await window.ferro.setClientId({ clientId }); setLog((l)=>l+'[ferro] client ID guardado\n'); loadAuth();}}>{t('acct.save')}</button>
+                <button className="ghost" onClick={async()=>{ if (!clientId.trim()) return; await window.ferro?.setClientId({ clientId }); setLog((l)=>l+'[ferro] client ID guardado\n'); loadAuth();}}>{t('acct.save')}</button>
               </div>)}
             <h3>{t('acct.accounts')} ({accts.length})</h3>
             {accts.length===0 && <p style={{opacity:.6}}>{t('acct.noAccounts')}</p>}
             <div className="grid">
               {accts.map((a)=><div key={a.uuid} className="card"><div className="mod-head"><img className="face" src={`https://visage.surgeplay.com/face/64/${a.uuid.replace(/-/g,'')}`} alt="" onError={(e)=>{e.currentTarget.src=`https://minotar.net/helm/${a.uuid.replace(/-/g,'')}/64.png`;}} /><div className="card-title">{a.name}</div></div><div className="meta">{a.active && <span className="pill green">✓ {t('acct.active')}</span>}</div><div className="actions">
-                {!a.active && <button className="mini" onClick={async()=>{await window.ferro.authSelect({uuid:a.uuid}); loadAuth();}}>{t('acct.use')}</button>}
-                <button className="mini danger" onClick={async()=>{await window.ferro.authRemove({uuid:a.uuid}); loadAuth();}}><X size={12} /> {t('acct.remove')}</button>
+                {!a.active && <button className="mini" onClick={async()=>{await window.ferro?.authSelect({uuid:a.uuid}); loadAuth();}}>{t('acct.use')}</button>}
+                <button className="mini danger" onClick={async()=>{await window.ferro?.authRemove({uuid:a.uuid}); loadAuth();}}><X size={12} /> {t('acct.remove')}</button>
               </div></div>)}
             </div>
             <h3>{t('acct.status')}</h3>
@@ -1968,7 +2025,7 @@ export default function App() {
               <button className="primary" onClick={addServer}><Plus size={14} /> {t('srv.add')}</button>
             </div>
             <div className="grid" style={{marginTop:10}}>
-              {servers.map((s)=>{const k=`${s.host}:${s.port}`; const p=srvPing[k]; return (<div key={k} className="card"><div className="card-title">{p?.favicon && <img src={p.favicon} alt="" style={{width:34,height:34,borderRadius:8,marginRight:8,verticalAlign:'middle'}} />}{s.name}</div><div className="meta"><span className="pill">{s.host}:{s.port}</span>{p ? (p.online ? <><span className="pill green">● {p.latencyMs} ms</span><span className="pill">{p.players.online}/{p.players.max}</span><span className="pill">{p.version}</span></> : <span className="pill">{t('srv.offline')}</span>) : <span className="pill"><span className="spinner" /></span>}</div>{p?.motd && <p style={{opacity:.7}}>{p.motd}</p>}<div className="actions"><button className="mini" onClick={()=>pingServer(s)}><RefreshCw size={12} /></button><button className="ghost" onClick={()=>playOn(s)} disabled={!launchInstance}><Play size={14} /> {t('srv.play')}</button><button className="ghost danger" onClick={async()=>{setServers(await window.ferro.serverRemove({host:s.host, port:s.port}));}}><Trash2 size={12} /></button></div></div>);})}
+              {servers.map((s)=>{const k=`${s.host}:${s.port}`; const p=srvPing[k]; return (<div key={k} className="card"><div className="card-title">{p?.favicon && <img src={p.favicon} alt="" style={{width:34,height:34,borderRadius:8,marginRight:8,verticalAlign:'middle'}} />}{s.name}</div><div className="meta"><span className="pill">{s.host}:{s.port}</span>{p ? (p.online ? <><span className="pill green">● {p.latencyMs} ms</span><span className="pill">{p.players.online}/{p.players.max}</span><span className="pill">{p.version}</span></> : <span className="pill">{t('srv.offline')}</span>) : <span className="pill"><span className="spinner" /></span>}</div>{p?.motd && <p style={{opacity:.7}}>{p.motd}</p>}<div className="actions"><button className="mini" onClick={()=>pingServer(s)}><RefreshCw size={12} /></button><button className="ghost" onClick={()=>playOn(s)} disabled={!launchInstance}><Play size={14} /> {t('srv.play')}</button><button className="mini" onClick={()=>{try{navigator.clipboard.writeText(`${s.host}:${s.port}`); setLog((l)=>l+`[ferro] IP copiada: ${s.host}:${s.port}\n`);}catch{}}} title={t('srv.copy')}><Copy size={12} /></button><button className="ghost danger" onClick={async()=>{setServers(await window.ferro?.serverRemove({host:s.host, port:s.port}));}}><Trash2 size={12} /></button></div></div>);})}
             </div>
             {servers.length===0 && <p style={{opacity:.6}}>{t('srv.none')}</p>}
           </div>
@@ -1993,7 +2050,7 @@ export default function App() {
             <div className="row">
               <select value={essInst || launchInstance || ''} onChange={(e)=>setEssInst(e.target.value)}>{instances.map((i)=><option key={i.name} value={i.name}>{i.name}</option>)}</select>
               <button className="ghost" onClick={scanEssential}><Search size={14} /> {t('fr.essentialScan')}</button>
-              <button className="ghost" onClick={()=>window.ferro.openUrl({url:'https://essential.gg'})}><ExternalLink size={14} /> essential.gg</button>
+              <button className="ghost" onClick={()=>window.ferro?.openUrl({url:'https://essential.gg'})}><ExternalLink size={14} /> essential.gg</button>
             </div>
             {essJars && <div className="meta" style={{marginTop:8}}>{essJars.length>0 ? <span className="pill green">● Essential: {essJars.join(', ')}</span> : <span className="pill">{t('fr.essentialMissing')}</span>}</div>}
           </div>
@@ -2004,11 +2061,11 @@ export default function App() {
           <div className="card" data-tour="settings">
             <h2>{t('set.updates')} {appVer && <span className="pill">v{appVer}</span>}</h2>
             <div className="row">
-              <button className="ghost" onClick={async()=>{setUpd({state:'checking'}); try{await window.ferro.checkUpdate();}catch(e){setUpd({state:'error',error:e.message});}}}>{t('set.checkUpd')}</button>
+              <button className="ghost" onClick={async()=>{setUpd({state:'checking'}); try{await window.ferro?.checkUpdate();}catch(e){setUpd({state:'error',error:e.message});}}}>{t('set.checkUpd')}</button>
               {upd.state==='checking' && <span className="pill"><span className="spinner" />{t('set.upChecking')}</span>}
               {upd.state==='available' && <span className="pill">{t('set.upAvail', {v:upd.version})}</span>}
               {upd.state==='downloading' && <span className="pill"><span className="spinner" />{(upd.percent||0).toFixed(0)}%</span>}
-              {upd.state==='downloaded' && <><span className="pill green">✓ v{upd.version} {t('set.upReady')}</span><button className="primary" onClick={()=>window.ferro.quitAndInstall()}>{t('set.restart')}</button></>}
+              {upd.state==='downloaded' && <><span className="pill green">✓ v{upd.version} {t('set.upReady')}</span><button className="primary" onClick={()=>window.ferro?.quitAndInstall()}>{t('set.restart')}</button></>}
               {upd.state==='error' && <span className="pill">{t('set.upErr')}{upd.error?`: ${upd.error.slice(0,80)}`:''}</span>}
               {upd.state==='dev' && <span className="pill">{t('set.upDev')}</span>}
             </div>
@@ -2048,22 +2105,22 @@ export default function App() {
           <div className="card">
             <h2>{t('ab.title')}</h2>
             <div className="row">
-              <select value={abCfg.mode} onChange={async(e)=>{try{setAbCfg(await window.ferro.autoBackupSet({mode:e.target.value}));}catch(er){setLog((l)=>l+`[error] ${er.message}\n`);}}}>
+              <select value={abCfg.mode} onChange={async(e)=>{try{setAbCfg(await window.ferro?.autoBackupSet({mode:e.target.value}));}catch(er){setLog((l)=>l+`[error] ${er.message}\n`);}}}>
                 <option value="off">{t('ab.off')}</option>
                 <option value="beforePlay">{t('ab.beforePlay')}</option>
                 <option value="daily">{t('ab.daily')}</option>
                 <option value="weekly">{t('ab.weekly')}</option>
               </select>
-              <label>{t('ab.keep')} <input type="number" min={1} max={20} value={abCfg.keep} onChange={async(e)=>{const v=Math.min(20,Math.max(1,Number(e.target.value)||3)); try{setAbCfg(await window.ferro.autoBackupSet({keep:v}));}catch(er){setLog((l)=>l+`[error] ${er.message}\n`);}}} style={{width:70}} /></label>
-              <button className="ghost" onClick={async()=>{try{const r=await window.ferro.autoBackupRun({force:true}); setLog((l)=>l+`[ferro] ${t('ab.done',{n:(r.done||[]).length})}\n`);}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('ab.now')}</button>
+              <label>{t('ab.keep')} <input type="number" min={1} max={20} value={abCfg.keep} onChange={async(e)=>{const v=Math.min(20,Math.max(1,Number(e.target.value)||3)); try{setAbCfg(await window.ferro?.autoBackupSet({keep:v}));}catch(er){setLog((l)=>l+`[error] ${er.message}\n`);}}} style={{width:70}} /></label>
+              <button className="ghost" onClick={async()=>{try{const r=await window.ferro?.autoBackupRun({force:true}); setLog((l)=>l+`[ferro] ${t('ab.done',{n:(r.done||[]).length})}\n`);}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('ab.now')}</button>
             </div>
             <p style={{opacity:.7}}>{t('ab.hint')}</p>
           </div>
           <div className="card">
             <h2>{t('wp.title')}</h2>
             <div className="row">
-              <button className="ghost" onClick={async()=>{try{await window.ferro.wallpaperSet(); setWp((await window.ferro.wallpaper())?.dataUrl || null);}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('wp.choose')}</button>
-              {wp && <button className="ghost" onClick={async()=>{try{await window.ferro.wallpaperClear(); setWp(null);}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('wp.clear')}</button>}
+              <button className="ghost" onClick={async()=>{try{await window.ferro?.wallpaperSet(); setWp((await window.ferro?.wallpaper())?.dataUrl || null);}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('wp.choose')}</button>
+              {wp && <button className="ghost" onClick={async()=>{try{await window.ferro?.wallpaperClear(); setWp(null);}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('wp.clear')}</button>}
             </div>
             <p style={{opacity:.7}}>{t('wp.hint')}</p>
           </div>
@@ -2079,23 +2136,23 @@ export default function App() {
           <div className="card">
             <h2>{t('set.discord')}</h2>
             <div className="row">
-              <button className="ghost" onClick={async()=>{const v=!dcOn; setDcOn(v); await window.ferro.setDiscord({enabled:v});}}>{dcOn ? `✓ ${t('set.sfxOn')}` : t('set.sfxOff')}</button>
-              <button className="ghost" onClick={async()=>{try{await window.ferro.testWebhook(); setLog((l)=>l+'[ferro] webhook OK\n');}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>Probar envío</button>
+              <button className="ghost" onClick={async()=>{const v=!dcOn; setDcOn(v); await window.ferro?.setDiscord({enabled:v});}}>{dcOn ? `✓ ${t('set.sfxOn')}` : t('set.sfxOff')}</button>
+              <button className="ghost" onClick={async()=>{try{await window.ferro?.testWebhook(); setLog((l)=>l+'[ferro] webhook OK\n');}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>Probar envío</button>
             </div>
           </div>
           <div className="card">
             <h2>{t('set.share')}</h2>
             <div className="row">
-              {social.github && <button className="ghost" onClick={()=>window.ferro.openUrl({url:social.github})}><GithubIcon size={15} /> GitHub</button>}
-              {social.discord && <button className="ghost" onClick={()=>window.ferro.openUrl({url:social.discord})}><DiscordIcon size={16} /> Discord</button>}
+              {social.github && <button className="ghost" onClick={()=>window.ferro?.openUrl({url:social.github})}><GithubIcon size={15} /> GitHub</button>}
+              {social.discord && <button className="ghost" onClick={()=>window.ferro?.openUrl({url:social.discord})}><DiscordIcon size={16} /> Discord</button>}
             </div>
           </div>
           <div className="card">
             <h2>{t('set.profile')}</h2>
             <p style={{opacity:.65}}>{t('set.profileDesc')}</p>
             <div className="row">
-              <button className="ghost" onClick={async()=>{await window.ferro.profileBackup();}}><Upload size={14} /> {t('set.profileBk')}</button>
-              <button className="ghost danger" onClick={()=>askConfirm(t('set.profileRsConfirm'), async()=>{await window.ferro.profileRestore(); refresh(); loadAuth();})}>{t('set.profileRs')}</button>
+              <button className="ghost" onClick={async()=>{await window.ferro?.profileBackup();}}><Upload size={14} /> {t('set.profileBk')}</button>
+              <button className="ghost danger" onClick={()=>askConfirm(t('set.profileRsConfirm'), async()=>{await window.ferro?.profileRestore(); refresh(); loadAuth();})}>{t('set.profileRs')}</button>
             </div>
           </div>
           <div className="card">
@@ -2195,14 +2252,14 @@ export default function App() {
             <select value={sJavaMode} onChange={(e)=>setSJavaMode(e.target.value)}><option value="auto">{t('inst.javaAuto')}</option><option value="custom">{t('inst.javaCustom')}</option></select>
             {sJavaMode==='custom' && <input value={sJavaPath} onChange={(e)=>setSJavaPath(e.target.value)} placeholder="C:\...\bin\java.exe" style={{minWidth:200}} />}
             <select value={sJvm} onChange={(e)=>setSJvm(e.target.value)} title={t('inst.jvm')}><option value="equilibrado">{t('inst.jvmEq')}</option><option value="rendimiento">{t('inst.jvmPerf')}</option><option value="patata">{t('inst.jvmPotato')}</option><option value="zgc">{t('inst.jvmZgc')}</option></select>
-            <button className="mini" onClick={async()=>{try{const r=await window.ferro.ramSuggest(); setSRam(String(r.suggestedMb)); setLog((l)=>l+`[ferro] RAM sugerida: ${r.suggestedMb} MB\n`);}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('inst.ramSug')}</button>
+            <button className="mini" onClick={async()=>{try{const r=await window.ferro?.ramSuggest(); setSRam(String(r.suggestedMb)); setLog((l)=>l+`[ferro] RAM sugerida: ${r.suggestedMb} MB\n`);}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('inst.ramSug')}</button>
             <button className="primary" onClick={saveSettings} disabled={saving}>{saving ? t('inst.saving') : t('inst.save')}</button>
           </div>
-          <div className="subhead"><span>{t('inst.backupsOf')} {settingsFor}</span><button className="mini" onClick={async()=>{await window.ferro.backupCreate({instanceName:settingsFor}); loadBackups(settingsFor);}}>{t('inst.createBk')}</button></div>
-          {bkList.length===0 ? <p style={{opacity:.6}}>{t('inst.noBk')}</p> : (<div className="sublist">{bkList.map((b)=><div key={b.file} className="subrow"><span className="grow" title={b.file}>{b.file}</span><span className="pill">{(b.size/1048576).toFixed(1)} MB</span><button className="mini" onClick={async()=>{await window.ferro.backupRestore({instanceName:settingsFor, file:b.file});}}>{t('inst.restore')}</button><button className="mini danger" onClick={async()=>{await window.ferro.backupDelete({instanceName:settingsFor, file:b.file}); loadBackups(settingsFor);}}><Trash2 size={12} /></button></div>)}</div>)}
-            <div className="subhead"><span>{t('inst.crashesOf')} {settingsFor}</span><button className="mini" onClick={async()=>{await window.ferro.openCrashes({instanceName:settingsFor});}}><FolderOpen size={12} /> {t('inst.folder')}</button><button className="mini" onClick={async()=>{try{setDiag(await window.ferro.diagnose({instanceName:settingsFor}));}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}><AlertTriangle size={12} /> {t('inst.diagnose')}</button></div>
-            {diag && (diag.list.length===0 ? <p style={{opacity:.6}}>{t('inst.diagNone')}</p> : (<div className="sublist">{diag.list.map((d)=><div key={d.id} className="subrow"><span className="grow" title={d.desc}><b>{d.title}</b> — {d.desc}</span>{d.fix && <button className="mini" onClick={async()=>{try{await window.ferro.doctorFix({instanceName:settingsFor, fix:d.fix}); setLog((l)=>l+`[ferro] ${t('inst.fixed')}: ${d.title}\n`); setDiag(await window.ferro.diagnose({instanceName:settingsFor})); refresh();}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{d.fix.label || t('inst.applyFix')}</button>}</div>)}</div>))}
-          {crList.length===0 ? <p style={{opacity:.6}}>{t('inst.noCrashes')}</p> : (<div className="sublist">{crList.map((c)=><div key={c.file} className="subrow"><span className="grow" title={c.description||c.file}>{c.description||c.file}</span><button className="mini" onClick={async()=>{const r = crOpen?.file===c.file ? null : await window.ferro.crashRead({instanceName:settingsFor, file:c.file}); setCrOpen(r);}}>{crOpen?.file===c.file ? t('mods.hide') : t('inst.view')}</button></div>)}</div>)}
+          <div className="subhead"><span>{t('inst.backupsOf')} {settingsFor}</span><button className="mini" onClick={async()=>{await window.ferro?.backupCreate({instanceName:settingsFor}); loadBackups(settingsFor);}}>{t('inst.createBk')}</button></div>
+          {bkList.length===0 ? <p style={{opacity:.6}}>{t('inst.noBk')}</p> : (<div className="sublist">{bkList.map((b)=><div key={b.file} className="subrow"><span className="grow" title={b.file}>{b.file}</span><span className="pill">{(b.size/1048576).toFixed(1)} MB</span><button className="mini" onClick={async()=>{await window.ferro?.backupRestore({instanceName:settingsFor, file:b.file});}}>{t('inst.restore')}</button><button className="mini danger" onClick={async()=>{await window.ferro?.backupDelete({instanceName:settingsFor, file:b.file}); loadBackups(settingsFor);}}><Trash2 size={12} /></button></div>)}</div>)}
+            <div className="subhead"><span>{t('inst.crashesOf')} {settingsFor}</span><button className="mini" onClick={async()=>{await window.ferro?.openCrashes({instanceName:settingsFor});}}><FolderOpen size={12} /> {t('inst.folder')}</button><button className="mini" onClick={async()=>{try{setDiag(await window.ferro?.diagnose({instanceName:settingsFor}));}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}><AlertTriangle size={12} /> {t('inst.diagnose')}</button></div>
+            {diag && (diag.list.length===0 ? <p style={{opacity:.6}}>{t('inst.diagNone')}</p> : (<div className="sublist">{diag.list.map((d)=><div key={d.id} className="subrow"><span className="grow" title={d.desc}><b>{d.title}</b> — {d.desc}</span>{d.fix && <button className="mini" onClick={async()=>{try{await window.ferro?.doctorFix({instanceName:settingsFor, fix:d.fix}); setLog((l)=>l+`[ferro] ${t('inst.fixed')}: ${d.title}\n`); setDiag(await window.ferro?.diagnose({instanceName:settingsFor})); refresh();}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{d.fix.label || t('inst.applyFix')}</button>}</div>)}</div>))}
+          {crList.length===0 ? <p style={{opacity:.6}}>{t('inst.noCrashes')}</p> : (<div className="sublist">{crList.map((c)=><div key={c.file} className="subrow"><span className="grow" title={c.description||c.file}>{c.description||c.file}</span><button className="mini" onClick={async()=>{const r = crOpen?.file===c.file ? null : await window.ferro?.crashRead({instanceName:settingsFor, file:c.file}); setCrOpen(r);}}>{crOpen?.file===c.file ? t('mods.hide') : t('inst.view')}</button></div>)}</div>)}
           {crOpen && <pre style={{marginTop:4}}>{crOpen.content}{crOpen.truncated ? '\n…(truncado)' : ''}</pre>}
         </MorphModal>
       )}
@@ -2214,12 +2271,22 @@ export default function App() {
             </div>
           ) : (<>
             <h3>{t('mods.installed')} ({mods.length})</h3>
+            <div className="row" style={{marginBottom:8}}>
+              <input value={imFilter} onChange={(e)=>setImFilter(e.target.value)} placeholder={t('mods.filterPh')} style={{minWidth:160}} />
+              <select value={imSort} onChange={(e)=>setImSort(e.target.value)}>
+                <option value="name">{t('mods.sortName')}</option>
+                <option value="date">{t('mods.sortDate')}</option>
+                <option value="size">{t('mods.sortSize')}</option>
+              </select>
+              <button className="mini" onClick={()=>bulkToggle(false)}>{t('mods.activate')}</button>
+              <button className="mini" onClick={()=>bulkToggle(true)}>{t('mods.deactivate')}</button>
+            </div>
             {kind==='shader' && (
             <div className="row" style={{marginBottom:10}}>
               {shaderCur?.iris
                 ? <span className="pill green">Iris OK{shaderCur.pack ? ` · ${shaderCur.pack}` : ''}</span>
                 : <span className="pill">{t('mods.needIris')}</span>}
-              {shaderCur?.pack && <button className="mini" onClick={async()=>{await window.ferro.shaderSet({instanceName:modsFor, file:null}); loadMods(modsFor);}}>{t('mods.shadersOff')}</button>}
+              {shaderCur?.pack && <button className="mini" onClick={async()=>{await window.ferro?.shaderSet({instanceName:modsFor, file:null}); loadMods(modsFor);}}>{t('mods.shadersOff')}</button>}
             </div>
             )}
             {kind==='resourcepack' && rpOn===null && mods.length>0 && <p style={{opacity:.6}}>{t('mods.playOnce')}</p>}
@@ -2230,17 +2297,17 @@ export default function App() {
             </div>
             )}
             <div className="grid">
-              {mods.map((m)=>{ const u = updMap[m.file];
+              {mods.filter((m)=>m.file.toLowerCase().includes(imFilter.trim().toLowerCase())).sort((a, b)=>imSort==='size' ? b.size - a.size : imSort==='date' ? (b.mtime || 0) - (a.mtime || 0) : a.file.localeCompare(b.file)).map((m)=>{ const u = updMap[m.file];
                 const rpActive = kind==='resourcepack' && rpOn?.includes(m.file);
                 const shaderActive = kind==='shader' && shaderCur?.pack===m.file && shaderCur?.enabled;
                 return (<div key={m.file} className="card"><div className="card-title" title={m.file}>{m.file}</div><div className="meta"><span className="pill">{(m.size/1048576).toFixed(1)} MB{m.disabled?' · desactivado':''}</span>{u && <span className="pill green">→ {u.latest}</span>}{rpActive && <span className="pill green">activo</span>}{shaderActive && <span className="pill green">en uso</span>}</div><div className="actions">
                 {kind==='mod' && u && <button className="primary" onClick={()=>doModUpdate(u)}>{t('mods.update')}</button>}
                 {kind==='resourcepack'
-                  ? <button className="mini" onClick={async()=>{await window.ferro.rpToggle({instanceName:modsFor, file:m.file, enable:!rpActive}); loadMods(modsFor);}}>{rpActive?t('mods.deactivate'):t('mods.activate')}</button>
+                  ? <button className="mini" onClick={async()=>{await window.ferro?.rpToggle({instanceName:modsFor, file:m.file, enable:!rpActive}); loadMods(modsFor);}}>{rpActive?t('mods.deactivate'):t('mods.activate')}</button>
                   : kind==='shader'
-                    ? <button className="mini hot" onClick={async()=>{await window.ferro.shaderSet({instanceName:modsFor, file:m.file}); loadMods(modsFor);}} disabled={!shaderCur?.iris}>{t('mods.use')}</button>
-                    : <button className="mini" onClick={async()=>{await window.ferro.modToggle({instanceName:modsFor, file:m.file, disable:!m.disabled, kind}); loadMods(modsFor);}}>{m.disabled?t('mods.activate'):t('mods.deactivate')}</button>}
-                <button className="mini danger" onClick={async()=>{await window.ferro.modRemove({instanceName:modsFor, file:m.file, kind}); loadMods(modsFor);}}><X size={12} /> {t('mods.remove')}</button>
+                    ? <button className="mini hot" onClick={async()=>{await window.ferro?.shaderSet({instanceName:modsFor, file:m.file}); loadMods(modsFor);}} disabled={!shaderCur?.iris}>{t('mods.use')}</button>
+                    : <button className="mini" onClick={async()=>{await window.ferro?.modToggle({instanceName:modsFor, file:m.file, disable:!m.disabled, kind}); loadMods(modsFor);}}>{m.disabled?t('mods.activate'):t('mods.deactivate')}</button>}
+                <button className="mini danger" onClick={async()=>{await window.ferro?.modRemove({instanceName:modsFor, file:m.file, kind}); loadMods(modsFor);}}><X size={12} /> {t('mods.remove')}</button>
               </div></div>);})}
             </div>
           </>)}
@@ -2280,12 +2347,12 @@ export default function App() {
               {galShots.map((s)=>(
                 <div key={s.file} className="gal-item">
                   {s.thumb
-                    ? <img src={s.thumb} alt={s.file} loading="lazy" onClick={async()=>{await window.ferro.shotView({instanceName:galName, file:s.file});}} />
+                    ? <img src={s.thumb} alt={s.file} loading="lazy" onClick={async()=>{await window.ferro?.shotView({instanceName:galName, file:s.file});}} />
                     : <div className="gal-ph"><span className="spinner" /></div>}
                   <div className="gal-foot"><span className="grow" title={s.file}>{s.file}</span></div>
                   <div className="actions">
-                    <button className="mini" onClick={async()=>{await window.ferro.shotView({instanceName:galName, file:s.file});}}>{t('inst.view')}</button>
-                    <button className="mini danger" onClick={async()=>{await window.ferro.shotDelete({instanceName:galName, file:s.file}); setGalShots((g)=>g.filter((x)=>x.file!==s.file));}}><Trash2 size={12} /></button>
+                    <button className="mini" onClick={async()=>{await window.ferro?.shotView({instanceName:galName, file:s.file});}}>{t('inst.view')}</button>
+                    <button className="mini danger" onClick={async()=>{await window.ferro?.shotDelete({instanceName:galName, file:s.file}); setGalShots((g)=>g.filter((x)=>x.file!==s.file));}}><Trash2 size={12} /></button>
                   </div>
                 </div>
               ))}

@@ -111,12 +111,25 @@ async function ensureJava(requiredMajor, runtimesDir, onProgress) {
   }
   fs.mkdirSync(runtimesDir, { recursive: true });
   const { downloadFile } = require('./downloader');
+  const AdmZip = require('adm-zip');
   const zipDest = path.join(runtimesDir, `.temurin-${requiredMajor}.zip`);
   onProgress && onProgress(`[ferro] descargando Java ${requiredMajor} (Temurin)...\n`);
-  await downloadFile(temurinUrl(requiredMajor), zipDest);
+  // Sin checksum oficial: descarga limpia + prueba de integridad (un zip
+  // parcial reutilizado fallaba para siempre con "No END header found").
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { fs.unlinkSync(zipDest); } catch {}
+    await downloadFile(temurinUrl(requiredMajor), zipDest);
+    try {
+      new AdmZip(zipDest).getEntries();
+      break;
+    } catch (e) {
+      try { fs.unlinkSync(zipDest); } catch {}
+      if (attempt === 2) throw new Error(`Java ${requiredMajor}: descarga corrupta tras 3 intentos. Revisa tu conexión y pulsa JUGAR de nuevo.`);
+      onProgress && onProgress(`[ferro] descarga de Java incompleta, reintentando (${attempt + 1}/3)...\n`);
+    }
+  }
   const destDir = path.join(runtimesDir, `java-${requiredMajor}`);
   fs.mkdirSync(destDir, { recursive: true });
-  const AdmZip = require('adm-zip');
   new AdmZip(zipDest).extractAllTo(destDir, true);
   try { fs.unlinkSync(zipDest); } catch {}
   const javaExe = findRecursively(destDir, 'java.exe');

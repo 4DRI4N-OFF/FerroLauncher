@@ -28,15 +28,33 @@ async function fetchJson(url) {
 
 async function downloadFile(url, dest, onProgress, expectedSize, expectedSha1) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
-  // Caché: reutiliza si coincide sha1 (o tamaño si no hay sha1)
+  // Caché: reutiliza si coincide sha1 (o tamaño si no hay sha1).
+  // Sin hash esperado: confirma el tamaño contra el servidor para no
+  // reutilizar eternamente un parcial (trampa de "No END header found").
   try {
     const st = fs.statSync(dest);
     if (expectedSha1) {
       if (sha1Of(dest) === expectedSha1.toLowerCase()) return dest;
     } else if (expectedSize ? st.size === expectedSize : st.size > 0) {
-      return dest;
+      if (!expectedSize && st.size > 1048576) {
+        try {
+          const head = await fetchRetry(url, { method: 'HEAD' });
+          const len = Number(head.headers.get('content-length') || 0);
+          if (len > 0 && st.size !== len) {
+            try { fs.unlinkSync(dest); } catch {}
+          } else {
+            return dest;
+          }
+        } catch {
+          return dest;
+        }
+      } else {
+        return dest;
+      }
+    } else {
+      try { fs.unlinkSync(dest); } catch {}
     }
-    fs.unlinkSync(dest); // corrupto o parcial: re-descargar
+    try { fs.unlinkSync(dest); } catch {}
   } catch {}
 
   const res = await fetchRetry(url);

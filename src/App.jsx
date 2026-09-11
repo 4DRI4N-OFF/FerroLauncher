@@ -4,7 +4,7 @@ import flMark from './assets/fl.png';
 import wardenBg from './assets/warden-bg.svg';
 import { sfx } from './sfx.js';
 import { STR, getLang } from './i18n.js';
-import { GithubIcon, DiscordIcon, YoutubeIcon, XIcon } from './brands.jsx';
+import { GithubIcon, DiscordIcon } from './brands.jsx';
 import Embers from './embers.jsx';
 import {
   Play, Square, Layers, Package, LayoutGrid, Gift, User, Users, Palette,
@@ -340,6 +340,9 @@ export default function App() {
   const [instModal, setInstModal] = useState(null);
   const [instOrigin, setInstOrigin] = useState(null);
   const [instClosing, setInstClosing] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createOrigin, setCreateOrigin] = useState(null);
+  const [createClosing, setCreateClosing] = useState(false);
   const [galName, setGalName] = useState('');
   const [galOrigin, setGalOrigin] = useState(null);
   const [galClosing, setGalClosing] = useState(false);
@@ -363,10 +366,13 @@ export default function App() {
     { tab: 'instancias', sel: '[data-tour="create"]', title: t('tour.s2t'), body: t('tour.s2x') },
     { tab: 'mods', sel: '[data-tour="mods-search"]', title: t('tour.s3t'), body: t('tour.s3x') },
     { tab: 'cuenta', sel: '[data-tour="account-login"]', title: t('tour.s4t'), body: t('tour.s4x') },
+    { tab: 'amigos', sel: '[data-tour="friends-add"]', title: t('tour.s6t'), body: t('tour.s6x') },
+    { tab: 'datapacks', sel: '[data-tour="dp-search"]', title: t('tour.s7t'), body: t('tour.s7x') },
+    { tab: 'noticias', sel: '[data-tour="news-list"]', title: t('tour.s8t'), body: t('tour.s8x') },
     { tab: 'ajustes', sel: '[data-tour="settings"]', title: t('tour.s5t'), body: t('tour.s5x') },
   ]);
   const startTour = () => setTourIdx(0);
-  const endTour = () => { setTourIdx(null); setTourRect(null); try { localStorage.setItem('ferro-tour-done', '1'); } catch {} };
+  const endTour = () => { setTourIdx(null); setTourRect(null); try { localStorage.setItem('ferro-tour-done-2', '1'); } catch {} };
 
   useEffect(() => {
     if (tourIdx === null) return;
@@ -390,7 +396,7 @@ export default function App() {
   // Auto-arranque solo la primera vez (tras la intro)
   useEffect(() => {
     let ok = false;
-    try { ok = !localStorage.getItem('ferro-tour-done'); } catch {}
+    try { ok = !localStorage.getItem('ferro-tour-done-2'); } catch {}
     if (!ok) return;
     const t1 = setTimeout(() => setTourIdx(0), 4500);
     return () => clearTimeout(t1);
@@ -911,24 +917,6 @@ export default function App() {
 
   const stopPoll = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
 
-  const shareLinks = (net) => {
-    const url = encodeURIComponent('https://github.com/4DRI4N-OFF/FerroLauncher');
-    const txt = encodeURIComponent(lang === 'en'
-      ? 'FerroLauncher: free open-source Minecraft Java launcher for Windows (all loaders, mods, modpacks)'
-      : 'FerroLauncher: launcher gratis y open-source de Minecraft Java para Windows (todos los loaders, mods, modpacks)');
-    const links = {
-      x: `https://x.com/intent/tweet?text=${txt}&url=${url}`,
-      reddit: `https://www.reddit.com/submit?url=${url}&title=${txt}`,
-      whatsapp: `https://wa.me/?text=${txt}%20${url}`,
-      telegram: `https://t.me/share/url?url=${url}&text=${txt}`,
-    };
-    if (net === 'copy') {
-      try { navigator.clipboard.writeText('https://github.com/4DRI4N-OFF/FerroLauncher'); setLog((l) => l + '[ferro] enlace copiado\n'); } catch {}
-      return;
-    }
-    window.ferro.openUrl(links[net]);
-  };
-
   const loadSkin = async (name) => {
     try { setSkinInfo(await window.ferro.skin({ name: name ?? skinName ?? username ?? 'Ferro' })); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -1176,6 +1164,7 @@ export default function App() {
       pushToast('success', t('toast.instCreated', {n:r.name}));
       setInstanceName('');
       setLaunchInstance(r.name);
+      closeCreate();
       refresh();
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
@@ -1190,7 +1179,7 @@ export default function App() {
         setLog((l) => l + `[ferro] ${t('ab.backing')} ${target}...\n`);
         await window.ferro.autoBackupOnce({ instanceName: target });
       }
-      setLog((l) => l + `[ferro] lanzando ${target} como ${username}...\n`);
+      setLog((l) => l + `[ferro] lanzando ${target} como ${account?.name || username}...\n`);
       setRunning(true);
       setLaunchProg(null);
       await window.ferro.launch({ instanceName: target, username, ...(srv ? { serverHost: srv.host, serverPort: srv.port } : {}) });
@@ -1326,13 +1315,14 @@ export default function App() {
       if (galName) closeGallery();
       else if (settingsFor) closeModal();
       else if (instModal) closeInstalled();
+      else if (createOpen) closeCreate();
       else if (confirmDlg) setConfirmDlg(null);
       else if (dragOn) { dragCount.current = 0; setDragOn(false); }
       else if (tourIdx !== null) endTour();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [galName, settingsFor, instModal, confirmDlg, dragOn, tourIdx]);
+  }, [galName, settingsFor, instModal, createOpen, confirmDlg, dragOn, tourIdx]);
 
   // Atajos: F5 jugar/parar, Ctrl+1..0 pestañas, Ctrl+, ajustes (no escribiendo)
   const goTab = (name) => {
@@ -1415,6 +1405,13 @@ export default function App() {
     setInstModal(which);
   };
   const closeInstalled = () => { setInstClosing(true); setTimeout(() => { setInstModal(null); setInstOrigin(null); setInstClosing(false); }, 280); };
+
+  const openCreate = (e) => {
+    const r = e?.currentTarget?.getBoundingClientRect?.();
+    setCreateOrigin(r ? { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width, h: r.height } : null);
+    setCreateOpen(true);
+  };
+  const closeCreate = () => { setCreateClosing(true); setTimeout(() => { setCreateOpen(false); setCreateOrigin(null); setCreateClosing(false); }, 280); };
 
   const [dance, setDance] = useState(() => { try { return localStorage.getItem('ferro-dance') !== 'off'; } catch { return true; } });
   const danceCtx = useRef(null);
@@ -1575,7 +1572,7 @@ export default function App() {
               </div>
             </div>
             <div className="row hero-controls">
-              <input value={username} onChange={(e)=>setUsername(e.target.value)} placeholder={t('play.userPh')} />
+              {!account && <input value={username} onChange={(e)=>setUsername(e.target.value)} placeholder={t('play.userPh')} />}
               <select value={launchInstance} onChange={(e)=>setLaunchInstance(e.target.value)}>
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' · '+i.type})</option>)}
               </select>
@@ -1631,23 +1628,7 @@ export default function App() {
           <div className="card">
             <h2>{t('inst.createTitle')}</h2>
             <div className="row" data-tour="create">
-              <input value={instanceName} onChange={(e)=>setInstanceName(e.target.value)} placeholder={t('inst.namePh')} />
-              <select value={versionId} onChange={(e)=>{touchedVer.current.create=true; setVersionId(e.target.value);}}>
-                {versions.map((v)=><option key={v.id} value={v.id}>{v.id}</option>)}
-              </select>
-              <select value={instanceType} onChange={(e)=>setInstanceType(e.target.value)}>
-                <option value="vanilla">Vanilla</option>
-                <option value="fabric">Fabric</option>
-                <option value="quilt">Quilt</option>
-                <option value="forge">Forge</option>
-                <option value="neoforge">NeoForge</option>
-              </select>
-              {instanceType!=='vanilla' && (
-                <select value={loaderVersion} onChange={(e)=>setLoaderVersion(e.target.value)}>
-                  {loaders.map((l)=><option key={l.loader} value={l.loader}>{l.loader}{l.tag?` (${l.tag})`:''}{l.stable && !l.tag?(lang==='en'?' (stable)':' (estable)'):''}</option>)}
-                </select>
-              )}
-              <button className="primary" onClick={create}><Plus size={14} /> {t('inst.create')}</button>
+              <button className="primary" onClick={(e)=>openCreate(e)}><Plus size={14} /> {t('inst.create')}</button>
             </div>
             <h3>{t('inst.installed')} ({instances.length})</h3>
             <div className="row" style={{marginBottom:10}}>
@@ -1769,7 +1750,7 @@ export default function App() {
         {tab==='datapacks' && (
           <div className="card">
             <h2>{t('dp.title')}</h2>
-            <div className="row">
+            <div className="row" data-tour="dp-search">
               <select value={dpFor} onChange={(e)=>{setDpFor(e.target.value); setDpWorld(''); setDpList([]); setDpHits([]);}}>
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId})</option>)}
               </select>
@@ -1801,7 +1782,7 @@ export default function App() {
         {tab==='noticias' && (
           <div className="card">
             <h2>{t('nw.title')}</h2>
-            <div className="row">
+            <div className="row" data-tour="news-list">
               <button className="ghost" onClick={loadNews} disabled={newsLoading}><RefreshCw size={14} /> {t('nw.refresh')}</button>
               {newsLoading && <span className="pill"><span className="spinner" /></span>}
             </div>
@@ -1977,7 +1958,7 @@ export default function App() {
           <>
           <div className="card">
             <h2>{t('fr.title')}</h2>
-            <div className="row">
+            <div className="row" data-tour="friends-add">
               <input value={friendName} onChange={(e)=>setFriendName(e.target.value)} placeholder={t('fr.nickPh')} style={{minWidth:200}} />
               <button className="primary" onClick={addFriend}><Plus size={14} /> {t('fr.add')}</button>
               <button className="ghost" onClick={loadFriends}><RefreshCw size={14} /> {t('fr.refresh')}</button>
@@ -2088,12 +2069,6 @@ export default function App() {
             <div className="row">
               {social.github && <button className="ghost" onClick={()=>window.ferro.openUrl({url:social.github})}><GithubIcon size={15} /> GitHub</button>}
               {social.discord && <button className="ghost" onClick={()=>window.ferro.openUrl({url:social.discord})}><DiscordIcon size={16} /> Discord</button>}
-              {social.youtube && <button className="ghost" onClick={()=>window.ferro.openUrl({url:social.youtube})}><YoutubeIcon size={16} /> YouTube</button>}
-            </div>
-            <div className="row" style={{marginTop:10}}>
-              <button className="ghost" onClick={()=>shareLinks('x')}><XIcon size={13} /> X</button>
-              <button className="ghost" onClick={()=>shareLinks('telegram')}>Telegram</button>
-              <button className="ghost" onClick={()=>shareLinks('copy')}>Copiar enlace</button>
             </div>
           </div>
           <div className="card">
@@ -2250,6 +2225,32 @@ export default function App() {
               </div></div>);})}
             </div>
           </>)}
+        </MorphModal>
+      )}
+      {createOpen && (
+        <MorphModal origin={createOrigin} closing={createClosing} onClose={closeCreate} title={t('inst.createTitle')}>
+          <div className="row">
+            <input value={instanceName} onChange={(e)=>setInstanceName(e.target.value)} placeholder={t('inst.namePh')} style={{minWidth:200}} />
+            <select value={versionId} onChange={(e)=>{touchedVer.current.create=true; setVersionId(e.target.value);}}>
+              {versions.map((v)=><option key={v.id} value={v.id}>{v.id}</option>)}
+            </select>
+            <select value={instanceType} onChange={(e)=>setInstanceType(e.target.value)}>
+              <option value="vanilla">Vanilla</option>
+              <option value="fabric">Fabric</option>
+              <option value="quilt">Quilt</option>
+              <option value="forge">Forge</option>
+              <option value="neoforge">NeoForge</option>
+            </select>
+            {instanceType!=='vanilla' && (
+              <select value={loaderVersion} onChange={(e)=>setLoaderVersion(e.target.value)}>
+                {loaders.map((l)=><option key={l.loader} value={l.loader}>{l.loader}{l.tag?` (${l.tag})`:''}{l.stable && !l.tag?(lang==='en'?' (stable)':' (estable)'):''}</option>)}
+              </select>
+            )}
+          </div>
+          <div className="actions" style={{marginTop:12}}>
+            <button className="ghost" onClick={closeCreate}>{t('ui.cancel')}</button>
+            <button className="primary" onClick={create}><Check size={14} /> {t('ui.confirm')}</button>
+          </div>
         </MorphModal>
       )}
       {galName && (

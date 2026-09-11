@@ -554,7 +554,11 @@ select {
 input[type="range"] { accent-color: var(--amber); padding: 0; border: none; background: transparent; }
 input:focus, select:focus { border-color: rgba(255, 182, 46, 0.65); box-shadow: 0 0 0 3px rgba(255, 110, 40, 0.18), 0 0 22px rgba(255, 140, 40, 0.25); }
 input::placeholder { color: rgba(235, 240, 255, 0.35); }
-select option { background: #141a2c; }
+select option { background: #1c130c; color: var(--ink); }
+[data-theme="midnight"] select option { background: #0a1020; }
+[data-theme="forest"] select option { background: #0c1710; }
+[data-theme="sakura"] select option { background: #1c0f16; }
+[data-theme="ancient"] select option { background: #041014; }
 
 /* ——— Botones ——— */
 button { font-family: inherit; }

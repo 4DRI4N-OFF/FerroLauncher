@@ -19,22 +19,27 @@
 
 | Area | What you get |
 |---|---|
-| 🎮 Play | Offline + Microsoft login (OAuth 2.0 + PKCE, auto-refresh, multi-account) |
+| 🎮 Play | Offline + Microsoft login (OAuth 2.0 + PKCE, auto-refresh, multi-account), playtime stats |
 | 🧩 Loaders | Vanilla, Fabric, Quilt, Forge, NeoForge (official installers) |
-| 📦 Instances | Isolated dirs, per-instance RAM / Java / resolution, start-stop console |
-| 🧪 Content | Mods, shaders, resource packs + one-click `.mrpack` modpacks (Modrinth) |
+| 📦 Instances | Isolated dirs, per-instance RAM / Java / resolution, size meter + cleanup, pins, start-stop console |
+| 🧪 Content | Mods, shaders, resource packs, datapacks per world + one-click `.mrpack` modpacks (Modrinth + CurseForge browsing) |
+| 🔍 Browse | Results up front with pages (top + bottom), installed manager in extra window |
+| 👥 Friends | Friend list with live server presence + Essential Mod panel |
+| 📰 News | Live Mojang feed inside the launcher |
+| 💾 Backups | Manual + automatic (daily, weekly, before playing), auto/ kept apart |
+| 🎨 UI | 5 themes (Ember, Midnight, Forest, Sakura, Ancient City + Warden), ES/EN, 14 sound styles, toasts, dance mode |
+| ⌨️ Shortcuts | F5 play/stop, Ctrl+1..0 tabs, Ctrl+, settings |
 | ☕ Java | Auto-detects the required version, downloads Temurin when missing |
-| 🎨 UI | Glassmorphism ember theme + Midnight / Forest / Sakura, ES/EN, sounds, toasts |
 | 🛡️ Safety | Premium-name anti-impersonation, download verification, backups |
-| 🔄 More | Auto-updater, skins & capes, Discord RPC + webhooks, crash viewer, gallery |
+| 🔄 More | Auto-updater, skins & capes, Discord RPC + webhooks + bot announcements, crash doctor, gallery |
 
 ## 📥 Install (players)
 
-1. Download `FerroLauncher Setup x.y.z.exe` from [**Releases**](https://github.com/4DRI4N-OFF/FerroLauncher/releases).
+1. Download `FerroLauncher-Setup.exe` (or `FerroLauncher-portable.exe`) from [**Releases**](https://github.com/4DRI4N-OFF/FerroLauncher/releases).
 2. Run it (unsigned yet: Windows SmartScreen will warn once — click *More info → Run anyway*).
 3. Create an instance and press **PLAY**. No account needed for offline.
 
-> A Microsoft account owning Minecraft: Java Edition unlocks online servers (pending Mojang app approval — offline works fully meanwhile).
+> A Microsoft account owning Minecraft: Java Edition unlocks online servers.
 
 ## 🛠️ Dev
 
@@ -42,7 +47,7 @@
 npm install
 npm run electron:dev     # Vite + Electron with hot reload
 npm run build            # UI bundle check
-npm run dist:full        # NSIS installer + portable .exe in release/
+npm run dist             # NSIS installer + portable .exe in release/
 ```
 
 Project layout: `core/` launcher engine (Mojang/Fabric/Modrinth/Xbox APIs) · `electron/` main + preload (IPC) · `src/` React UI.
@@ -51,13 +56,21 @@ Project layout: `core/` launcher engine (Mojang/Fabric/Modrinth/Xbox APIs) · `e
 
 ## 🖼️ Screenshots
 
-> Coming soon — in-game captures from the community. PRs with fresh screenshots are welcome!
+| Jugar | Instancias |
+|---|---|
+| ![Jugar](docs/shots/jugar.png) | ![Instancias](docs/shots/instancias.png) |
+
+| Contenido | Modpacks |
+|---|---|
+| ![Contenido](docs/shots/contenido.png) | ![Modpacks](docs/shots/modpacks.png) |
+
+> More tabs (Amigos, Datapacks, Noticias…) in the app. Fresh captures welcome via PRs!
 
 ## 🗺️ Roadmap
 
-- [x] Offline launch (all 5 loaders) · [x] Modrinth content · [x] Skins, backups, multi-account
-- [x] Auto-updater, icon, sounds, themes, Discord · [x] ES/EN
-- [ ] CurseForge browsing · [ ] Installer signing · [ ] Microsoft login approval
+- [x] Offline launch (all 5 loaders) · [x] Modrinth + CurseForge content · [x] Skins, backups, multi-account
+- [x] Auto-updater, icon, sounds, themes, Discord · [x] ES/EN · [x] Friends, datapacks, news, auto-backups
+- [ ] Installer signing · [ ] 2.0
 
 ## 🤝 Contributing
 
@@ -65,7 +78,7 @@ Issues and PRs welcome (ES/EN). Keep PRs small and tested (`npm run build`). See
 
 ## 🙏 Acknowledgments
 
-[Mojang](https://www.minecraft.net/) official APIs · [Modrinth](https://modrinth.com/) · [Fabric](https://fabricmc.net/), [Quilt](https://quiltmc.org/), [Forge](https://minecraftforge.net/), [NeoForge](https://neoforged.net/) · [Electron](https://www.electronjs.org/) · UI sounds synthesized in-app · Brand icons by [Simple Icons](https://simpleicons.org/) (CC0).
+[Mojang](https://www.minecraft.net/) official APIs · [Modrinth](https://modrinth.com/) · [Fabric](https://fabricmc.net/), [Quilt](https://quiltmc.org/), [Forge](https://minecraftforge.net/), [NeoForge](https://neoforged.net/) · [Electron](https://www.electronjs.org/) · UI sounds synthesized in-app + [UISFX](https://uisfx.com/) (CC0) · Brand icons by [Simple Icons](https://simpleicons.org/) (CC0).
 
 ## 📄 License
 

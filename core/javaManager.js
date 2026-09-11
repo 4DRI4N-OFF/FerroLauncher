@@ -65,12 +65,14 @@ async function findJava() {
 // Busca un Java compatible con el major requerido: primero runtimes gestionados, luego sistema.
 async function findCompatibleJava(requiredMajor, runtimesDir) {
   if (runtimesDir && requiredMajor) {
-    // Cualquier runtime gestionado compatible (exacto o mayor si >=17)
+    // Cualquier runtime gestionado compatible (exacto o mayor si >=17).
+    // OJO: el zip de Temurin trae subcarpeta jdk-XX, así que se busca en
+    // profundidad (antes solo miraba <dir>/bin y re-descargaba siempre).
     try {
       const entries = fs.readdirSync(runtimesDir, { withFileTypes: true }).filter((e) => e.isDirectory() && e.name.startsWith('java-'));
       for (const e of entries.sort().reverse()) {
-        const jp = path.join(runtimesDir, e.name, 'bin', 'java.exe');
-        if (!fs.existsSync(jp)) continue;
+        const jp = findRecursively(path.join(runtimesDir, e.name), 'java.exe');
+        if (!jp) continue;
         const info = await checkJava(jp);
         if (info && compatible(info.major, requiredMajor)) return { ...info, managed: true };
       }

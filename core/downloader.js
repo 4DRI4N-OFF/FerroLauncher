@@ -2,17 +2,24 @@ const fs = require('fs');
 const path = require('path');
 const { pipeline } = require('stream/promises');
 
-async function fetchRetry(url, opts = {}, tries = 3) {
+// fetch con reintentos. timeoutMs cubre la respuesta (cabeceras); el cuerpo
+// de las descargas lo vigila un detector de parones, no un límite total:
+// los PCs lentos no deben morir a los 20 s, solo los realmente atascados.
+async function fetchRetry(url, opts = {}, tries = 3, timeoutMs = 30000) {
   let last;
   for (let i = 0; i < tries; i++) {
+    const ctl = timeoutMs > 0 ? new AbortController() : null;
+    const to = ctl ? setTimeout(() => ctl.abort(), timeoutMs) : null;
     try {
-      const res = await fetch(url, { ...opts, signal: AbortSignal.timeout(20000) });
+      const res = await fetch(url, { ...opts, ...(ctl ? { signal: ctl.signal } : {}) });
+      if (to) clearTimeout(to);
       if ((res.status >= 500 || res.status === 429) && i < tries - 1) {
         await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
         continue;
       }
       return res;
     } catch (e) {
+      if (to) clearTimeout(to);
       last = e;
       await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
     }
@@ -57,19 +64,30 @@ async function downloadFile(url, dest, onProgress, expectedSize, expectedSha1) {
     try { fs.unlinkSync(dest); } catch {}
   } catch {}
 
-  const res = await fetchRetry(url);
+  const res = await fetchRetry(url, {}, 3, 0);
   if (!res.ok || !res.body) throw new Error(`Descarga fallida ${res.status}: ${url}`);
   const total = Number(res.headers.get('content-length') || 0);
-  let done = 0;
+  let done = 0, lastData = Date.now();
   const file = fs.createWriteStream(dest);
   // Convertimos web stream a node stream manualmente (sin getReader previo: bloquearía el stream)
   const { Readable } = require('stream');
   const readable = Readable.fromWeb(res.body);
   readable.on('data', (c) => {
     done += c.length;
+    lastData = Date.now();
     if (onProgress && total) onProgress(done / total);
   });
-  await pipeline(readable, file);
+  // Solo muere si se para de verdad (90 s sin un byte), nunca por ir lento
+  const watchdog = setInterval(() => {
+    if (Date.now() - lastData > 90000) {
+      try { readable.destroy(new Error('Descarga detenida 90 s sin datos. Revisa tu conexión.')); } catch {}
+    }
+  }, 5000);
+  try {
+    await pipeline(readable, file);
+  } finally {
+    clearInterval(watchdog);
+  }
   if (expectedSize) {
     const got = fs.statSync(dest).size;
     if (got !== expectedSize) {

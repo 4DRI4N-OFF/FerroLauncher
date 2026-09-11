@@ -7,13 +7,15 @@ const LEGACY = 'https://launchercontent.mojang.com';
 let cache = { at: 0, data: null };
 const TTL = 6 * 3600000;
 
-async function fetchText(url, timeoutMs = 25000) {
+async function fetchText(url, timeoutMs = 60000) {
   const ctl = new AbortController();
   const to = setTimeout(() => ctl.abort(), timeoutMs);
   try {
     const res = await fetch(url, { headers: UA, signal: ctl.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.text();
+  } catch (e) {
+    throw new Error(`Noticias: tiempo agotado con Mojang (${e?.cause?.code || e?.message}). Revisa tu conexión.`);
   } finally { clearTimeout(to); }
 }
 

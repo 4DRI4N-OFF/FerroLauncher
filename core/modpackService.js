@@ -13,11 +13,11 @@ async function apiJson(url) {
   return res.json();
 }
 
-async function searchModpacks(query, mcVersion, { loader = null, sort = 'relevance', limit = 24 } = {}) {
+async function searchModpacks(query, mcVersion, { loader = null, sort = 'relevance', limit = 24, offset = 0 } = {}) {
   const facets = [[`versions:${mcVersion}`], ['project_type:modpack']];
   if (loader) facets.push([`categories:${loader}`]);
   const sorts = ['relevance', 'downloads', 'follows', 'newest', 'updated'];
-  const url = `${API}/search?query=${encodeURIComponent(query)}&facets=${encodeURIComponent(JSON.stringify(facets))}&limit=${limit}&index=${sorts.includes(sort) ? sort : 'relevance'}`;
+  const url = `${API}/search?query=${encodeURIComponent(query)}&facets=${encodeURIComponent(JSON.stringify(facets))}&limit=${limit}&offset=${offset}&index=${sorts.includes(sort) ? sort : 'relevance'}`;
   const data = await apiJson(url);
   return {
     total: data.total_hits || 0,

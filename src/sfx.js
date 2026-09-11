@@ -1,22 +1,53 @@
-// Packs de sonido sintetizados: Cristal (UI pro) y ASMR (taps, cuencos, aire).
-// Cero assets, 100% offline, sin licencias de terceros.
+// Packs de sonido: Cristal y ASMR sintetizados (cero assets, 100% offline)
+// + 12 estilos UISFX (CC0, archivos locales en assets/sfx).
 const KEY = 'ferro-sfx';
 
+const FILE_FEELS = ['minimal', 'soft', 'glass', 'arcade', 'mechanical', 'organic', 'dreamy', 'scifi', 'rubber', 'cinematic', 'studio', 'zen'];
+
 function loadCfg() {
-  try {
-    return { enabled: true, volume: 0.5, hover: true, pack: 'cristal', ...JSON.parse(localStorage.getItem(KEY) || '{}') };
-  } catch { return { enabled: true, volume: 0.5, hover: true, pack: 'cristal' }; }
+  let c = {};
+  try { c = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch {}
+  const pack = PACKS.includes(c.pack) ? c.pack : 'cristal';
+  return { enabled: true, volume: 0.5, hover: true, pack, ...c, pack };
 }
 
-export const PACKS = ['cristal', 'asmr'];
+export const PACKS = ['cristal', 'asmr', ...FILE_FEELS];
+
+// cue del launcher -> archivo UISFX
+const FILE_CUE = { click: 'press', hover: 'hover', success: 'success', error: 'error', launch: 'start', alarm: 'warning' };
+
+const fileUrls = (() => {
+  const map = {};
+  try {
+    const mods = import.meta.glob('./assets/sfx/*/*.mp3', { eager: true, query: '?url', import: 'default' });
+    for (const [k, v] of Object.entries(mods)) {
+      const m = String(k).match(/sfx\/([^/]+)\/([^/]+)\.mp3$/);
+      if (m) (map[m[1]] = map[m[1]] || {})[m[2]] = v;
+    }
+  } catch {}
+  return map;
+})();
 
 export const sfx = {
   cfg: loadCfg(),
   save() { try { localStorage.setItem(KEY, JSON.stringify(this.cfg)); } catch {} },
   play(name) {
-    if (!this.cfg.enabled || !PACK[this.cfg.pack]?.[name]) return;
+    if (!this.cfg.enabled) return;
     if (name === 'hover' && !this.cfg.hover) return;
-    try { PACK[this.cfg.pack][name](this.cfg.volume); } catch {}
+    try {
+      const pack = this.cfg.pack;
+      if (FILE_FEELS.includes(pack)) {
+        const url = fileUrls[pack]?.[FILE_CUE[name]];
+        if (url) {
+          const a = new Audio(url);
+          a.volume = Math.max(0, Math.min(1, this.cfg.volume));
+          a.play().catch(() => {});
+          return;
+        }
+        // Sin archivo: cae al sintético de siempre (momentos de marca)
+      }
+      (PACK[pack]?.[name] || PACK.cristal[name])?.(this.cfg.volume);
+    } catch {}
   },
 };
 

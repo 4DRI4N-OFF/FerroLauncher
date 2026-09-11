@@ -82,7 +82,8 @@ function ping(host, port = 25565, timeoutMs = 5000) {
           latencyMs: Date.now() - t0,
           version: json.version?.name || null,
           protocol: json.version?.protocol ?? null,
-          players: { online: json.players?.online ?? null, max: json.players?.max ?? null },
+          players: { online: json.players?.online ?? null, max: json.players?.max ?? null,
+            sample: Array.isArray(json.players?.sample) ? json.players.sample.map((p) => p && p.name).filter(Boolean).slice(0, 50) : [] },
           motd: chatToText(json.description).slice(0, 200),
           favicon: json.favicon || null,
         });

@@ -1,16 +1,56 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import brand from './assets/brand.png';
 import flMark from './assets/fl.png';
+import wardenBg from './assets/warden-bg.svg';
 import { sfx } from './sfx.js';
 import { STR, getLang } from './i18n.js';
 import { GithubIcon, DiscordIcon, YoutubeIcon, XIcon } from './brands.jsx';
 import Embers from './embers.jsx';
 import {
-  Play, Square, Layers, Package, LayoutGrid, Gift, User, Palette,
+  Play, Square, Layers, Package, LayoutGrid, Gift, User, Users, Palette,
   Settings, Search, Plus, RefreshCw, FolderOpen, Copy, Pencil, Trash2,
   Download, Upload, Check, X, AlertTriangle, Info, Camera,
-  MessageCircle, ExternalLink, Server, Pin, PinOff,
+  MessageCircle, ExternalLink, Server, Pin, PinOff, Database, Newspaper, Menu, Star,
 } from 'lucide-react';
+
+// Paginador reutilizable (se muestra arriba y abajo de las listas)
+function Pager({ t, page, total, onPage, busy }) {
+  const pages = Math.max(1, Math.ceil((total || 0) / 24));
+  if ((total || 0) <= 24) return null;
+  return (
+  <div className="row" style={{marginTop:12, marginBottom:6, justifyContent:'center', gap:16}}>
+    <button className="ghost" style={{padding:'10px 24px', fontSize:15}} disabled={page<=1 || busy} onClick={()=>onPage(page-1)}>‹ {t('pg.prev')}</button>
+    <span className="pill" style={{padding:'10px 18px', fontSize:14}}>{t('pg.page')} {page} / {pages}</span>
+    <button className="ghost" style={{padding:'10px 24px', fontSize:15}} disabled={busy || page>=pages} onClick={()=>onPage(page+1)}>{t('pg.next')} ›</button>
+  </div>);
+}
+
+// Menú hamburguesa para acciones que desbordan (se cierra solo)
+function DotsMenu({ children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const card = ref.current?.closest?.('.card');
+    const prev = card ? card.style.zIndex : '';
+    if (card) card.style.zIndex = '70';
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); if (card) card.style.zIndex = prev; };
+  }, [open ]);
+  return (
+  <div className="dots" ref={ref}>
+    <button className="ghost" onClick={() => setOpen((o) => !o)} title="···"><Menu size={16} /></button>
+    {open && <div className="dots-menu" onClick={() => setOpen(false)}>{children}</div>}
+  </div>);
+}
+
+const fmtSize = (b) => {
+  if (!b) return '0 MB';
+  return b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : `${Math.max(1, Math.round(b / 1048576))} MB`;
+};
 
 // Resortes al fijar/soltar la sidebar: los botones entran en cascada con muelle.
 function springNav() {
@@ -165,6 +205,7 @@ export default function App() {
   const [modQuery, setModQuery] = useState('');
   const [modHits, setModHits] = useState([]);
   const [modTotal, setModTotal] = useState(0);
+  const [modPage, setModPage] = useState(1);
   const [fVersion, setFVersion] = useState('1.21.1');
   const [fLoader, setFLoader] = useState('fabric');
   const [fSort, setFSort] = useState('relevance');
@@ -172,6 +213,21 @@ export default function App() {
   const kindName = kind === 'shader' ? 'shaders' : kind === 'resourcepack' ? 'resource packs' : 'mods';
   const [mods, setMods] = useState([]);
   const [modsFor, setModsFor] = useState('');
+  const [dpFor, setDpFor] = useState('');
+  const [dpWorlds, setDpWorlds] = useState([]);
+  const [dpWorld, setDpWorld] = useState('');
+  const [dpList, setDpList] = useState([]);
+  const [dpQuery, setDpQuery] = useState('');
+  const [dpHits, setDpHits] = useState([]);
+  const [dpTotal, setDpTotal] = useState(0);
+  const [abCfg, setAbCfg] = useState({ mode: 'off', keep: 3 });
+  const [wp, setWp] = useState(null);
+  const [szMap, setSzMap] = useState({});
+  const [szLoading, setSzLoading] = useState(false);
+  const [newsList, setNewsList] = useState([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+  const [dpPage, setDpPage] = useState(1);
+  const [dpSearching, setDpSearching] = useState(false);
   const [searching, setSearching] = useState(false);
   const [installingId, setInstallingId] = useState(null);
   const [installedIds, setInstalledIds] = useState([]);
@@ -192,6 +248,7 @@ export default function App() {
   const [packSort, setPackSort] = useState('relevance');
   const [packTotal, setPackTotal] = useState(0);
   const [packQuery, setPackQuery] = useState('');
+  const [packPage, setPackPage] = useState(1);
   const [packHits, setPackHits] = useState([]);
   const [packVers, setPackVers] = useState({});
   const [packBusy, setPackBusy] = useState(null);
@@ -280,6 +337,9 @@ export default function App() {
   const [crOpen, setCrOpen] = useState(null);
   const [modalOrigin, setModalOrigin] = useState(null);
   const [modalClosing, setModalClosing] = useState(false);
+  const [instModal, setInstModal] = useState(null);
+  const [instOrigin, setInstOrigin] = useState(null);
+  const [instClosing, setInstClosing] = useState(false);
   const [galName, setGalName] = useState('');
   const [galOrigin, setGalOrigin] = useState(null);
   const [galClosing, setGalClosing] = useState(false);
@@ -382,11 +442,14 @@ export default function App() {
   const [diag, setDiag] = useState(null);
   const [impScan, setImpScan] = useState(null);
   const [servers, setServers] = useState([]);
+  const [friends, setFriends] = useState([]);
+  const [friendName, setFriendName] = useState('');
+  const [essInst, setEssInst] = useState('');
+  const [essJars, setEssJars] = useState(null);
   const [srvName, setSrvName] = useState('');
   const [srvHost, setSrvHost] = useState('');
   const [srvPort, setSrvPort] = useState('');
   const [srvPing, setSrvPing] = useState({});
-  const [heroBg, setHeroBg] = useState(null);
   const [confirmDlg, setConfirmDlg] = useState(null);
   const [confirmInput, setConfirmInput] = useState('');
   const [loginFx, setLoginFx] = useState(0);
@@ -523,12 +586,29 @@ export default function App() {
         if (!touchedVer.current.pack) setPackMc(latest);
       }
       const inst = await window.ferro.instances();
+      inst.sort((a, b) => ((b.settings?.pinned ? 1 : 0) - (a.settings?.pinned ? 1 : 0)));
       setInstances(inst);
-      if (inst[0]) {
-        if (!launchInstance || !inst.some((i) => i.name === launchInstance)) setLaunchInstance(inst[0].name);
-      }
-      if (inst[0] && !modsFor) setModsFor(inst[0].name);
+      // Saneado global: ninguna referencia puede apuntar a una instancia que ya no existe
+      // (vale tras borrar, renombrar, duplicar o importar).
+      const names = inst.map((i) => i.name);
+      const first = inst.find((i) => i.settings?.pinned)?.name || inst[0]?.name || '';
+      const pick = (cur) => (cur && names.includes(cur) ? cur : first);
+      const li = pick(launchInstance); if (li !== launchInstance) setLaunchInstance(li);
+      const mf = pick(modsFor); if (mf !== modsFor) setModsFor(mf);
+      const df = pick(dpFor);
+      if (df !== dpFor) { setDpFor(df); setDpWorld(''); setDpList([]); setDpHits([]); }
+      if (df) loadWorlds(df);
+      if (essInst && !names.includes(essInst)) { setEssInst(first); setEssJars(null); }
+      if (settingsFor && !names.includes(settingsFor)) { setSettingsFor(''); setModalOrigin(null); }
+      if (galName && !names.includes(galName)) closeGallery();
+      if (instModal === 'mods' && modsFor && !names.includes(modsFor)) closeInstalled();
+      if (instModal === 'datapacks' && dpFor && !names.includes(dpFor)) closeInstalled();
       setJava(await window.ferro.java());
+      try { setAbCfg(await window.ferro.autoBackupGet()); } catch {}
+      try {
+        const r = await window.ferro.autoBackupRun();
+        if (r?.due) setLog((l) => l + `[ferro] ${t('ab.done', { n: (r.done || []).length })}\n`);
+      } catch {}
       try { setAccount(await window.ferro.authStatus()); } catch {}
     } catch (e) {
       setLog((l) => l + `[error] ${e.message}\n`);
@@ -557,6 +637,59 @@ export default function App() {
       }
     }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const loadWorlds = async (name) => {
+    if (!name) return;
+    try {
+      const w = await window.ferro.worlds({ instanceName: name });
+      setDpWorlds(w);
+      setDpWorld((cur) => (w.includes(cur) ? cur : (w[0] || '')));
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const loadDpList = async (name, world) => {
+    if (!name || !world) { setDpList([]); return; }
+    try { setDpList(await window.ferro.mods({ instanceName: name, kind: 'datapack', world })); }
+    catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const dpSearch = async (page) => {
+    const p = Math.max(1, page || 1);
+    const inst = instances.find((i) => i.name === dpFor);
+    if (!inst) return;
+    const q = dpQuery.trim();
+    setDpPage(p);
+    setDpSearching(true);
+    try {
+      const r = await window.ferro.modSearch({ query: q, mcVersion: inst.versionId, loader: 'fabric', sort: q ? 'relevance' : 'downloads', kind: 'datapack', offset: (p - 1) * 24 });
+      setDpHits(r.hits || []);
+      setDpTotal(r.total || 0);
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+    finally { setDpSearching(false); }
+  };
+
+  const dpInstall = async (m) => {
+    if (!dpFor || !dpWorld) { setLog((l) => l + `[error] ${t('dp.needWorld')}\n`); return; }
+    try {
+      await window.ferro.modInstall({ instanceName: dpFor, projectId: m.id, kind: 'datapack', world: dpWorld });
+      setDpHits((h) => h.filter((x) => x.id !== m.id));
+      await loadDpList(dpFor, dpWorld);
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const dpToggle = async (f) => {
+    try {
+      await window.ferro.modToggle({ instanceName: dpFor, file: f.file, disable: !f.disabled, kind: 'datapack', world: dpWorld });
+      await loadDpList(dpFor, dpWorld);
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const dpRemove = async (f) => {
+    try {
+      await window.ferro.modRemove({ instanceName: dpFor, file: f.file, kind: 'datapack', world: dpWorld });
+      await loadDpList(dpFor, dpWorld);
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
   const checkUpdates = async () => {
@@ -596,6 +729,8 @@ export default function App() {
   };
 
   useEffect(() => { if (tab === 'mods' && modsFor) loadMods(modsFor); }, [modsFor]);
+  useEffect(() => { if (dpFor) loadWorlds(dpFor); }, [dpFor]);
+  useEffect(() => { if (dpFor && dpWorld) loadDpList(dpFor, dpWorld); else setDpList([]); }, [dpFor, dpWorld]);
 
   useEffect(() => {
     const inst = instances.find((i) => i.name === modsFor);
@@ -605,10 +740,16 @@ export default function App() {
     }
   }, [modsFor]);
 
-  const doSearch = async () => {
+  const doSearch = async (page, over = {}) => {
+    const p = Math.max(1, page || 1);
+    const q = String(over.query !== undefined ? over.query : modQuery).trim();
+    const ver = over.mcVersion || fVersion;
+    const loader = over.loader || fLoader;
+    const k = over.kind || kind;
+    setModPage(p);
     setSearching(true);
     try {
-      const r = await window.ferro.modSearch({ query: modQuery, mcVersion: fVersion, loader: fLoader, sort: fSort, kind });
+      const r = await window.ferro.modSearch({ query: q, mcVersion: ver, loader, sort: q ? (over.sort || fSort) : 'downloads', kind: k, offset: (p - 1) * 24 });
       setModHits(r.hits || r);
       setModTotal(r.total || (r.hits || r).length);
       setInstalledIds([]);
@@ -683,9 +824,12 @@ export default function App() {
     finally { setCfBusy(null); }
   };
 
-  const doPackSearch = async () => {
+  const doPackSearch = async (page, over = {}) => {
+    const p = Math.max(1, page || 1);
+    const q = String(over.query !== undefined ? over.query : packQuery).trim();
+    setPackPage(p);
     try {
-      const r = await window.ferro.packSearch({ query: packQuery, mcVersion: packMc, loader: packLoader || undefined, sort: packSort });
+      const r = await window.ferro.packSearch({ query: q, mcVersion: over.mcVersion || packMc, loader: (over.loader !== undefined ? over.loader : packLoader) || undefined, sort: q ? (over.sort || packSort) : 'downloads', offset: (p - 1) * 24 });
       setPackHits(r.hits || r);
       setPackTotal(r.total || (r.hits || r).length);
       setPackVers({});
@@ -1042,6 +1186,10 @@ export default function App() {
     try {
       setTab('jugar');
       setLaunchInstance(target);
+      if (abCfg?.mode === 'beforePlay') {
+        setLog((l) => l + `[ferro] ${t('ab.backing')} ${target}...\n`);
+        await window.ferro.autoBackupOnce({ instanceName: target });
+      }
       setLog((l) => l + `[ferro] lanzando ${target} como ${username}...\n`);
       setRunning(true);
       setLaunchProg(null);
@@ -1062,6 +1210,28 @@ export default function App() {
       const list = await window.ferro.servers();
       setServers(list);
       list.forEach((s) => pingServer(s));
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const loadSizes = async (list) => {
+    const arr = list || instances;
+    if (!arr.length) return;
+    setSzLoading(true);
+    try {
+      const out = {};
+      for (const i of arr) {
+        try { const r = await window.ferro.instSize({ instanceName: i.name }); out[i.name] = fmtSize(r.bytes); } catch {}
+      }
+      setSzMap((m) => ({ ...m, ...out }));
+    } finally { setSzLoading(false); }
+  };
+
+  const cleanInstance = async (name) => {
+    try {
+      const r = await window.ferro.instClean({ instanceName: name });
+      setLog((l) => l + `[ferro] ${t('sz.freed', { n: name, m: fmtSize(r.freed), c: r.removed })}\n`);
+      setSzMap((m) => { const n = { ...m }; delete n[name]; return n; });
+      try { const s = await window.ferro.instSize({ instanceName: name }); setSzMap((m) => ({ ...m, [name]: fmtSize(s.bytes) })); } catch {}
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -1088,6 +1258,53 @@ export default function App() {
     play(launchInstance, s);
   };
 
+  const loadFriends = async () => {
+    try { setFriends(await window.ferro.friendsPresence()); }
+    catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const addFriend = async () => {
+    if (!friendName.trim()) return;
+    const me = String(account?.name || username || '').toLowerCase();
+    if (me && friendName.trim().toLowerCase() === me) {
+      setLog((l) => l + `[error] ${t('fr.self')}\n`);
+      return;
+    }
+    try {
+      await window.ferro.friendAdd({ name: friendName.trim() });
+      setFriendName('');
+      await loadFriends();
+      setLog((l) => l + `[ferro] ${t('fr.added')}\n`);
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const removeFriend = async (name) => {
+    try { setFriends(await window.ferro.friendRemove({ name })); }
+    catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const joinFriend = async (f) => {
+    const s = servers.find((x) => (x.name || x.host) === f.server);
+    if (!s) { setLog((l) => l + `[error] ${t('fr.noServer')}\n`); return; }
+    playOn(s);
+  };
+
+  const scanEssential = async () => {
+    const name = essInst || launchInstance || (instances[0] && instances[0].name);
+    if (!name) return;
+    try { setEssJars(await window.ferro.essentialScan({ instanceName: name })); }
+    catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+  };
+
+  const loadNews = async () => {
+    setNewsLoading(true);
+    try {
+      const r = await window.ferro.news();
+      setNewsList(r.entries || []);
+    } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
+    finally { setNewsLoading(false); }
+  };
+
   const filteredLog = useMemo(() => {
     const lines = log.split('\n');
     return lines.filter((ln) => {
@@ -1108,13 +1325,40 @@ export default function App() {
       if (e.key !== 'Escape') return;
       if (galName) closeGallery();
       else if (settingsFor) closeModal();
+      else if (instModal) closeInstalled();
       else if (confirmDlg) setConfirmDlg(null);
       else if (dragOn) { dragCount.current = 0; setDragOn(false); }
       else if (tourIdx !== null) endTour();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [galName, settingsFor, confirmDlg, dragOn, tourIdx]);
+  }, [galName, settingsFor, instModal, confirmDlg, dragOn, tourIdx]);
+
+  // Atajos: F5 jugar/parar, Ctrl+1..0 pestañas, Ctrl+, ajustes (no escribiendo)
+  const goTab = (name) => {
+    setTab(name);
+    if (name === 'servers') loadServers();
+    else if (name === 'amigos') { loadServers(); loadFriends(); }
+    else if (name === 'cuenta') loadAuth();
+    else if (name === 'mods' && modsFor) loadMods(modsFor);
+  };
+  useEffect(() => {
+    const onKey = (e) => {
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      if (e.key === 'F5') { e.preventDefault(); if (running) stop(); else play(); return; }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+        if (e.key === ',') { e.preventDefault(); setTab('ajustes'); return; }
+        const tabs = ['jugar', 'versiones', 'instancias', 'mods', 'packs', 'datapacks', 'servers', 'amigos', 'cuenta', 'skin'];
+        let idx = -1;
+        if (e.key >= '1' && e.key <= '9') idx = Number(e.key) - 1;
+        else if (e.key === '0') idx = 9;
+        if (idx >= 0 && idx < tabs.length) { e.preventDefault(); goTab(tabs[idx]); }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   const confirmGo = () => { const v = confirmDlg.input ? confirmInput : true; const f = confirmDlg.onOk; setConfirmDlg(null); f(v); };
 
@@ -1122,7 +1366,7 @@ export default function App() {
 
   useEffect(() => {
     window.ferro.onProgress?.((d) => setLaunchProg(d));
-    window.ferro.heroBg?.().then((r) => { if (r?.dataUrl) setHeroBg(r.dataUrl); }).catch(() => {});
+    window.ferro.wallpaper?.().then((r) => { setWp(r?.dataUrl || null); }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -1163,6 +1407,86 @@ export default function App() {
 
   const closeModal = () => { setModalClosing(true); setTimeout(() => { setSettingsFor(''); setModalOrigin(null); setModalClosing(false); }, 280); };
 
+  const openInstalled = (which, e) => {
+    const r = e?.currentTarget?.getBoundingClientRect?.();
+    setInstOrigin(r ? { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width, h: r.height } : null);
+    if (which === 'datapacks') loadDpList(dpFor, dpWorld);
+    else loadMods(modsFor);
+    setInstModal(which);
+  };
+  const closeInstalled = () => { setInstClosing(true); setTimeout(() => { setInstModal(null); setInstOrigin(null); setInstClosing(false); }, 280); };
+
+  const [dance, setDance] = useState(() => { try { return localStorage.getItem('ferro-dance') !== 'off'; } catch { return true; } });
+  const danceCtx = useRef(null);
+  const danceStream = useRef(null);
+  const danceRaf = useRef(null);
+  const danceAn = useRef(null);
+  const stopDance = (save = true) => {
+    try { danceRaf.current && cancelAnimationFrame(danceRaf.current); } catch {}
+    danceRaf.current = null;
+    try { danceStream.current && danceStream.current.getTracks().forEach((tr) => tr.stop()); } catch {}
+    danceStream.current = null;
+    try { danceCtx.current && danceCtx.current.close(); } catch {}
+    danceCtx.current = null; danceAn.current = null;
+    document.body.classList.remove('dancing');
+    try { document.documentElement.style.removeProperty('--beat'); } catch {}
+    try { window.__ferroBeat = 0; } catch {}
+    try {
+      document.querySelectorAll('.layout > .main .card').forEach((c) => { c.style.transition = ''; c.style.transform = ''; c.style.transformOrigin = ''; });
+    } catch {}
+    setDance(false);
+    if (save) { try { localStorage.setItem('ferro-dance', 'off'); } catch {} }
+  };
+  const startDance = async () => {
+    stopDance(false);
+    try {
+      let stream = null, lastErr = null;
+      for (const sid of ['screen:0:0', 'screen:0']) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: { mandatory: { chromeMediaSource: 'desktop' } },
+            video: { mandatory: { chromeMediaSource: 'desktop', chromeMediaSourceId: sid, maxWidth: 64, maxHeight: 64, maxFrameRate: 2 } },
+          });
+          break;
+        } catch (e) { lastErr = e; }
+      }
+      if (!stream) throw lastErr || new Error('sin audio');
+      try { stream.getVideoTracks().forEach((tr) => tr.stop()); } catch {}
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx();
+      const src = ctx.createMediaStreamSource(stream);
+      const an = ctx.createAnalyser();
+      an.fftSize = 1024; an.smoothingTimeConstant = 0.8;
+      src.connect(an);
+      danceCtx.current = ctx; danceStream.current = stream; danceAn.current = an;
+      document.body.classList.add('dancing');
+      const resume = () => { try { ctx.state === 'suspended' && ctx.resume(); } catch {} };
+      if (ctx.state === 'suspended') { window.addEventListener('pointerdown', resume, { once: true }); window.addEventListener('keydown', resume, { once: true }); }
+      const buf = new Uint8Array(an.frequencyBinCount);
+      let beat = 0;
+      const loop = () => {
+        try {
+          an.getByteFrequencyData(buf);
+          let b = 0; for (let i = 1; i <= 3; i++) b += buf[i] || 0;
+          b = b / 3 / 255;
+          beat = Math.max(b, beat * 0.9);
+          const shaped = Math.pow(beat, 1.6);
+          document.documentElement.style.setProperty('--beat', shaped.toFixed(3));
+          try { window.__ferroBeat = shaped; } catch {}
+        } catch {}
+        danceRaf.current = requestAnimationFrame(loop);
+      };
+      loop();
+      setDance(true);
+      try { localStorage.setItem('ferro-dance', 'on'); } catch {}
+    } catch (e) {
+      setDance(false);
+      try { localStorage.setItem('ferro-dance', 'off'); } catch {}
+      setLog((l) => l + `[error] ${t('set.danceErr')}: ${e.message}\n`);
+    }
+  };
+  useEffect(() => { if (dance) startDance(); return () => {}; }, []);
+
   const openGallery = async (name, e) => {
     const r = e?.currentTarget?.getBoundingClientRect?.();
     setGalOrigin(r ? { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width, h: r.height } : null);
@@ -1194,6 +1518,11 @@ export default function App() {
 
   return (
     <div className="layout">
+      {wp ? <div className="bg-photo" style={{ backgroundImage: `url(${wp})` }} /> : theme === 'ancient' ? null : <div className="bg-mark" style={{ backgroundImage: `url(${flMark})` }} />}
+      {theme === 'ancient' && !wp && (
+      <div className="bg-warden">
+        <img src={wardenBg} alt="" />
+      </div>)}
       <Embers />
       <div className={`side${sideBig ? '' : ' collapsed'}`}>
         <div className="brand-swap" ref={sideLogoRef}>
@@ -1203,13 +1532,16 @@ export default function App() {
         </div>
         <button className={tab==='jugar'?'active':''} onClick={()=>setTab('jugar')}><Play size={16} /><span className="nav-label">{t('tab.play')}</span></button>
         <button className={tab==='versiones'?'active':''} onClick={()=>setTab('versiones')}><Layers size={16} /><span className="nav-label">{t('tab.versions')}</span></button>
-        <button className={tab==='instancias'?'active':''} onClick={()=>setTab('instancias')}><Package size={16} /><span className="nav-label">{t('tab.instances')}</span></button>
-        <button className={tab==='mods'?'active':''} onClick={()=>{setTab('mods'); if(modsFor) loadMods(modsFor);}}><LayoutGrid size={16} /><span className="nav-label">{t('tab.content')}</span></button>
-        <button className={tab==='packs'?'active':''} onClick={()=>setTab('packs')}><Gift size={16} /><span className="nav-label">{t('tab.packs')}</span></button>
+        <button className={tab==='instancias'?'active':''} onClick={()=>{setTab('instancias'); loadSizes();}}><Package size={16} /><span className="nav-label">{t('tab.instances')}</span></button>
+        <button className={tab==='mods'?'active':''} onClick={()=>{setTab('mods'); if(modsFor) loadMods(modsFor); if(source==='mr' && modHits.length===0 && !searching) doSearch(1);}}><LayoutGrid size={16} /><span className="nav-label">{t('tab.content')}</span></button>
+        <button className={tab==='packs'?'active':''} onClick={()=>{setTab('packs'); if(packSrc==='mr' && packHits.length===0) doPackSearch(1);}}><Gift size={16} /><span className="nav-label">{t('tab.packs')}</span></button>
+        <button className={tab==='datapacks'?'active':''} onClick={()=>{setTab('datapacks'); if(dpHits.length===0 && !dpSearching) dpSearch(1);}}><Database size={16} /><span className="nav-label">{t('tab.datapacks')}</span></button>
+        <button className={tab==='noticias'?'active':''} onClick={()=>{setTab('noticias'); loadNews();}}><Newspaper size={16} /><span className="nav-label">{t('tab.news')}</span></button>
+        <button className={tab==='servers'?'active':''} onClick={()=>{setTab('servers'); loadServers();}}><Server size={16} /><span className="nav-label">{t('tab.servers')}</span></button>
+        <button className={tab==='amigos'?'active':''} onClick={()=>{setTab('amigos'); loadServers(); loadFriends();}}><Users size={16} /><span className="nav-label">{t('tab.friends')}</span></button>
         <button className={tab==='cuenta'?'active':''} onClick={()=>{setTab('cuenta'); loadAuth();}}><User size={16} /><span className="nav-label">{t('tab.account')}</span></button>
         <button className={tab==='skin'?'active':''} onClick={()=>{setTab('skin'); loadSkin();}}><Palette size={16} /><span className="nav-label">{t('tab.skin')}</span></button>
         <button className={tab==='ajustes'?'active':''} onClick={()=>setTab('ajustes')}><Settings size={16} /><span className="nav-label">{t('tab.settings')}</span></button>
-        <button className={tab==='servers'?'active':''} onClick={()=>{setTab('servers'); loadServers();}}><Server size={16} /><span className="nav-label">{t('tab.servers')}</span></button>
         <div className="player-chip" onClick={()=>setTab('cuenta')} title={t('tab.account')}>
           {playFace ? <img className="face" src={playFace} alt="" onError={()=>setPlayFace(null)} /> : <User size={18} />}
           <div className="pc-id"><b className={account ? 'premium-shine' : ''}>{account?.name || username || '—'}</b><span>{account ? t('play.online') : t('play.offline')}</span></div>
@@ -1221,7 +1553,6 @@ export default function App() {
         <div className="bounce">
         {tab==='jugar' && (<>
           <div className={`card hero hero-${(() => { const s = instances.find((i)=>i.name===launchInstance); return s ? s.type : 'vanilla'; })()}`}>
-            {heroBg && <img className="hero-bg" src={heroBg} alt="" />}
             <div className="hero-top">
               {playFace && <img className="face xl" src={playFace} alt="" onError={()=>setPlayFace(null)} />}
               <div className="hero-id">
@@ -1323,7 +1654,7 @@ export default function App() {
               <input value={instFilter} onChange={(e)=>setInstFilter(e.target.value)} placeholder={t('inst.filterPh')} />
             </div>
             <div className="grid">
-              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className={"card" + (exploding === i.name ? " exploding" : "")}><div className="card-title" title={i.name} onDoubleClick={()=>play(i.name)} style={{cursor:'pointer'}}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}</span><span className={`pill l-${i.type}`}>{i.type==='vanilla' ? 'vanilla' : `${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}{fmtPlay(i.playSecs) ? ` · ${fmtPlay(i.playSecs)}` : ''}</span> : <span className="pill">{t('inst.neverPlayed')}</span>}</div><div className="actions"><button className="ghost" onClick={(e)=>editSettings(i.name, e)}><Settings size={14} /> {t('inst.settings')}</button><button className="ghost" onClick={(e)=>openGallery(i.name, e)}><Camera size={14} /> {t('inst.shots')}</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}><Upload size={14} /> {t('inst.export')}</button><button className="ghost" onClick={async()=>{await window.ferro.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> {t('inst.folder')}</button><button className="ghost" onClick={async()=>{await window.ferro.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> {t('inst.duplicate')}</button><button className="ghost" onClick={()=>askRename(i.name, async (n)=>{await window.ferro.renameInstance({instanceName:i.name, newName:n}); refresh();})}><Pencil size={14} /> {t('inst.rename')}</button><button className="ghost danger" onClick={(e)=>{ const card = e.currentTarget.closest('.card'); askConfirm(t('inst.delConfirm', {n:i.name}), ()=>explodeInstance(i.name, card)); }}><Trash2 size={14} /> {t('inst.delete')}</button></div>
+              {instances.filter((i)=>i.name.toLowerCase().includes(instFilter.toLowerCase())).map((i)=><div key={i.name} className={"card" + (exploding === i.name ? " exploding" : "")}><div className="card-title" title={i.name} onDoubleClick={()=>play(i.name)} style={{cursor:'pointer'}}>{i.name}</div><div className="meta"><span className="pill">{i.versionId}</span>{szMap[i.name] ? <span className="pill">{szMap[i.name]}</span> : (szLoading && <span className="pill"><span className="spinner" /></span>)}<span className={`pill l-${i.type}`}>{i.type==='vanilla' ? 'vanilla' : `${i.type} ${i.loaderVersion||''}`}</span><span className="pill">{(i.settings?.ramMb||2048)/1024} GB · {i.settings?.width||854}×{i.settings?.height||480}</span>{i.lastPlayed ? <span className="pill"><Play size={12} /> {new Date(i.lastPlayed).toLocaleDateString()}{i.plays ? ` · ${i.plays}×` : ''}{fmtPlay(i.playSecs) ? ` · ${fmtPlay(i.playSecs)}` : ''}</span> : <span className="pill">{t('inst.neverPlayed')}</span>}</div><div className="actions"><button className="ghost" onClick={async()=>{await window.ferro.updateSettings({instanceName:i.name, patch:{pinned:!i.settings?.pinned}}); refresh();}} title={t('inst.fav')}>{i.settings?.pinned ? <Star size={14} fill="currentColor" /> : <Star size={14} />}</button><DotsMenu><button className="ghost" onClick={(e)=>editSettings(i.name, e)}><Settings size={14} /> {t('inst.settings')}</button><button className="ghost" onClick={(e)=>openGallery(i.name, e)}><Camera size={14} /> {t('inst.shots')}</button><button className="ghost" onClick={async()=>{await window.ferro.exportInstance({instanceName:i.name});}}><Upload size={14} /> {t('inst.export')}</button><button className="ghost" onClick={async()=>{await window.ferro.openFolder({instanceName:i.name});}}><FolderOpen size={14} /> {t('inst.folder')}</button><button className="ghost" onClick={()=>askConfirm(t('sz.cleanAsk', {n:i.name}), ()=>cleanInstance(i.name))}><Trash2 size={14} /> {t('sz.clean')}</button><button className="ghost" onClick={async()=>{await window.ferro.duplicateInstance({instanceName:i.name}); refresh();}}><Copy size={14} /> {t('inst.duplicate')}</button><button className="ghost" onClick={()=>askRename(i.name, async (n)=>{await window.ferro.renameInstance({instanceName:i.name, newName:n}); refresh();})}><Pencil size={14} /> {t('inst.rename')}</button><button className="ghost danger" onClick={(e)=>{ const card = e.currentTarget.closest('.card'); askConfirm(t('inst.delConfirm', {n:i.name}), ()=>explodeInstance(i.name, card)); }}><Trash2 size={14} /> {t('inst.delete')}</button></DotsMenu></div>
 </div>)}
             </div>
             <div className="row" style={{marginTop:12}}>
@@ -1341,40 +1672,40 @@ export default function App() {
           <div className="card">
             <h2>{t('mods.title')}</h2>
             <div className="row" data-tour="mods-search">
-              <select value={source} onChange={(e)=>{setSource(e.target.value); setModHits([]); setCfHits([]); setInstalledIds([]); if(e.target.value==='cf') loadCfKey();}} title="Fuente">
+              <select value={source} onChange={(e)=>{setSource(e.target.value); setModHits([]); setCfHits([]); setInstalledIds([]); setModPage(1); if(e.target.value==='cf') loadCfKey(); else doSearch(1);}} title="Fuente">
                 <option value="mr">Modrinth</option>
                 <option value="cf">CurseForge</option>
               </select>
               <select value={modsFor} onChange={(e)=>{setModsFor(e.target.value); setUpdMap({}); setUpdMsg(''); setRpOn(null); setShaderCur(null); loadMods(e.target.value);}}>
                 {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId}{i.type==='vanilla'?'':' '+i.type})</option>)}
               </select>
-              <select value={kind} onChange={(e)=>{setKind(e.target.value); setModHits([]); setInstalledIds([]); setUpdMap({}); setUpdMsg(''); setRpOn(null); setShaderCur(null); loadMods(modsFor, e.target.value);}} title="Tipo">
+              <select value={kind} onChange={(e)=>{setKind(e.target.value); setModHits([]); setInstalledIds([]); setUpdMap({}); setUpdMsg(''); setRpOn(null); setShaderCur(null); loadMods(modsFor, e.target.value); if(source==='mr') doSearch(1, {kind:e.target.value});}} title="Tipo">
                 <option value="mod">{t('mods.tMods')}</option>
                 <option value="shader">{t('mods.tShaders')}</option>
                 <option value="resourcepack">{t('mods.tRp')}</option>
               </select>
-              <input value={modQuery} onChange={(e)=>setModQuery(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter') doSearch();}} placeholder={`Buscar ${kindName}...`} />
-              <select value={fVersion} onChange={(e)=>{touchedVer.current.filter=true; setFVersion(e.target.value);}} title="Versión de Minecraft">
+              <input value={modQuery} onChange={(e)=>setModQuery(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter') doSearch(1);}} placeholder={`Buscar ${kindName}...`} />
+              <select value={fVersion} onChange={(e)=>{touchedVer.current.filter=true; setFVersion(e.target.value); if(source==='mr') doSearch(1, {mcVersion:e.target.value});}} title="Versión de Minecraft">
                 {versions.map((v)=><option key={v.id} value={v.id}>{v.id}</option>)}
               </select>
               {kind==='mod' && (
-              <select value={fLoader} onChange={(e)=>setFLoader(e.target.value)} title="Loader">
+              <select value={fLoader} onChange={(e)=>{setFLoader(e.target.value); if(source==='mr') doSearch(1, {loader:e.target.value});}} title="Loader">
                 <option value="fabric">Fabric</option>
                 <option value="quilt">Quilt</option>
                 <option value="forge">Forge</option>
                 <option value="neoforge">NeoForge</option>
               </select>
               )}
-              <select value={fSort} onChange={(e)=>setFSort(e.target.value)} title="Orden">
+              <select value={fSort} onChange={(e)=>{setFSort(e.target.value); if(source==='mr') doSearch(1, {sort:e.target.value});}} title="Orden">
                 <option value="relevance">{t('mods.sRelevance')}</option>
                 <option value="downloads">{t('mods.sDownloads')}</option>
                 <option value="follows">{t('mods.sFollows')}</option>
                 <option value="newest">{t('mods.sNewest')}</option>
                 <option value="updated">{t('mods.sUpdated')}</option>
               </select>
-              <button className="primary" onClick={()=>{source==='cf' ? doCfSearch() : doSearch();}} disabled={searching || !modsFor}>{searching ? t('mods.searching') : <><Search size={14} /> {t('mods.search')}</>}</button>
+              <button className="primary" onClick={()=>{source==='cf' ? doCfSearch() : doSearch(1);}} disabled={searching || !modsFor}>{searching ? t('mods.searching') : <><Search size={14} /> {t('mods.search')}</>}</button>
               {source==='cf' && <button className="ghost" onClick={doCfTrending} disabled={searching}>Tendencias</button>}
-              <button className="mini" onClick={()=>loadMods(modsFor)} disabled={!modsFor}>{t('mods.viewInstalled')}</button>
+              <button className="mini" onClick={(e)=>openInstalled('mods', e)} disabled={!modsFor}>{t('mods.viewInstalled')} ({mods.length})</button>
             </div>
             {source==='cf' && (
             <div className="row" style={{marginTop:8}}>
@@ -1386,6 +1717,7 @@ export default function App() {
             {!modsFor && <p>{t('mods.needLoader')}</p>}
             <h3>{t('mods.results')}{modTotal>0 && ` (${modTotal.toLocaleString()})`} · {fVersion} · {fLoader}</h3>
             {modHits.length===0 && <p style={{opacity:.6}}>{t('mods.noResults')}</p>}
+            {source==='mr' && <Pager t={t} page={modPage} total={modTotal} busy={searching} onPage={(p)=>doSearch(p)} />}
             <div className="grid">
               {modHits.map((m)=>{
                 const busy = installingId===m.id;
@@ -1403,6 +1735,7 @@ export default function App() {
                 </div>);
               })}
             </div>
+            {source==='mr' && <Pager t={t} page={modPage} total={modTotal} busy={searching} onPage={(p)=>doSearch(p)} />}
             {source==='cf' && kind==='shader' && <p style={{opacity:.65}}>CurseForge no lista shaders: cambia a Modrinth para esta pestaña.</p>}
             {source==='cf' && (<>
             <h3>CurseForge{cfTotal>0 && ` (${cfTotal.toLocaleString()})`} · {fVersion}</h3>
@@ -1414,6 +1747,8 @@ export default function App() {
                   <div className="desc">{m.description?.slice(0,120)}</div>
                   <div className="meta"><span className="pill"><Download size={12} /> {m.downloads?.toLocaleString?.() || m.downloads}</span>{m.updated && <span className="pill">↻ {new Date(m.updated).toLocaleDateString()}</span>}</div>
                   <div className="actions"><button className="mini" onClick={()=>doCfFiles(m.id)}>{t('packs.versions')}</button></div>
+                  {(cfFiles[m.id]||[]).length>0 && (
+                  <div className="vers">
                   {(cfFiles[m.id]||[]).map((f)=>(
                     <div className="meta" key={f.id}>
                       <span className="pill">{f.name.length > 26 ? f.name.slice(0,25)+'…' : f.name}</span>
@@ -1422,72 +1757,97 @@ export default function App() {
                       </button>
                     </div>
                   ))}
+                  </div>)}
                   {cfFiles[m.id] && cfFiles[m.id].length===0 && <p style={{opacity:.6}}>Sin archivos para {fVersion}.</p>}
                 </div>
               ))}
             </div>
             </>)}
-            <h3>{t('mods.installed')} ({mods.length})</h3>
-            {kind==='shader' && (
-            <div className="row" style={{marginBottom:10}}>
-              {shaderCur?.iris
-                ? <span className="pill green">Iris OK{shaderCur.pack ? ` · ${shaderCur.pack}` : ''}</span>
-                : <span className="pill">{t('mods.needIris')}</span>}
-              {shaderCur?.pack && <button className="mini" onClick={async()=>{await window.ferro.shaderSet({instanceName:modsFor, file:null}); loadMods(modsFor);}}>{t('mods.shadersOff')}</button>}
+            {/* instalados en ventana */}
+          </div>
+        )}
+        {tab==='datapacks' && (
+          <div className="card">
+            <h2>{t('dp.title')}</h2>
+            <div className="row">
+              <select value={dpFor} onChange={(e)=>{setDpFor(e.target.value); setDpWorld(''); setDpList([]); setDpHits([]);}}>
+                {instances.map((i)=><option key={i.name} value={i.name}>{i.name} ({i.versionId})</option>)}
+              </select>
+              <select value={dpWorld} onChange={(e)=>{setDpWorld(e.target.value); if(dpHits.length===0 && !dpSearching) dpSearch(1);}} disabled={!dpWorlds.length}>
+                {dpWorlds.map((w)=><option key={w} value={w}>{w}</option>)}
+              </select>
+              <input value={dpQuery} onChange={(e)=>setDpQuery(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter') dpSearch(1);}} placeholder={t('dp.searchPh')} style={{minWidth:200}} />
+              <button className="primary" onClick={()=>dpSearch(1)} disabled={dpSearching || !dpFor}>{dpSearching ? t('mods.searching') : <><Search size={14} /> {t('dp.search')}</>}</button>
+              <button className="mini" onClick={(e)=>openInstalled('datapacks', e)} disabled={!dpWorld}>{t('dp.viewInstalled')} ({dpList.length})</button>
             </div>
-            )}
-            {kind==='resourcepack' && rpOn===null && mods.length>0 && <p style={{opacity:.6}}>{t('mods.playOnce')}</p>}
-            {kind==='mod' && (
-            <div className="row" style={{marginBottom:10}}>
-              <button className="ghost" onClick={checkUpdates} disabled={checkingUpd || !modsFor}>{checkingUpd ? t('mods.updating') : t('mods.checkUpd')}</button>
-              {updMsg && <span className="pill green">{updMsg}</span>}
-            </div>
-            )}
+            {dpFor && !dpWorlds.length && <p style={{opacity:.6}}>{t('dp.noWorld')}</p>}
+            {dpHits.length>0 && (<>
+            <h3>Modrinth</h3>
+            <Pager t={t} page={dpPage} total={dpTotal} busy={dpSearching} onPage={(p)=>dpSearch(p)} />
             <div className="grid">
-              {mods.map((m)=>{ const u = updMap[m.file];
-                const rpActive = kind==='resourcepack' && rpOn?.includes(m.file);
-                const shaderActive = kind==='shader' && shaderCur?.pack===m.file && shaderCur?.enabled;
-                return (<div key={m.file} className="card"><div className="card-title" title={m.file}>{m.file}</div><div className="meta"><span className="pill">{(m.size/1048576).toFixed(1)} MB{m.disabled?' · desactivado':''}</span>{u && <span className="pill green">→ {u.latest}</span>}{rpActive && <span className="pill green">activo</span>}{shaderActive && <span className="pill green">en uso</span>}</div><div className="actions">
-                {kind==='mod' && u && <button className="primary" onClick={()=>doModUpdate(u)}>{t('mods.update')}</button>}
-                {kind==='resourcepack'
-                  ? <button className="mini" onClick={async()=>{await window.ferro.rpToggle({instanceName:modsFor, file:m.file, enable:!rpActive}); loadMods(modsFor);}}>{rpActive?t('mods.deactivate'):t('mods.activate')}</button>
-                  : kind==='shader'
-                    ? <button className="mini hot" onClick={async()=>{await window.ferro.shaderSet({instanceName:modsFor, file:m.file}); loadMods(modsFor);}} disabled={!shaderCur?.iris}>{t('mods.use')}</button>
-                    : <button className="mini" onClick={async()=>{await window.ferro.modToggle({instanceName:modsFor, file:m.file, disable:!m.disabled, kind}); loadMods(modsFor);}}>{m.disabled?t('mods.activate'):t('mods.deactivate')}</button>}
-                <button className="mini danger" onClick={async()=>{await window.ferro.modRemove({instanceName:modsFor, file:m.file, kind}); loadMods(modsFor);}}><X size={12} /> {t('mods.remove')}</button>
-              </div></div>);})}
+              {dpHits.map((m)=>(
+                <div key={m.id} className="card">
+                  <div className="mod-head">{m.icon && <img className="mod-icon" src={m.icon} alt="" />}<b>{m.title}</b></div>
+                  <div className="desc">{m.description?.slice(0,120)}</div>
+                  <div className="meta"><span className="pill"><Download size={12} /> {m.downloads?.toLocaleString?.() || m.downloads}</span>{m.updated && <span className="pill">↻ {new Date(m.updated).toLocaleDateString()}</span>}</div>
+                  <div className="actions"><button className="mini hot" disabled={!dpWorld} onClick={()=>dpInstall(m)}><Download size={12} /> {t('dp.install')}</button></div>
+                </div>))}
             </div>
+            <Pager t={t} page={dpPage} total={dpTotal} busy={dpSearching} onPage={(p)=>dpSearch(p)} />
+            </>)}
+            {/* instalados en ventana */}
+          </div>
+        )}
+        {tab==='noticias' && (
+          <div className="card">
+            <h2>{t('nw.title')}</h2>
+            <div className="row">
+              <button className="ghost" onClick={loadNews} disabled={newsLoading}><RefreshCw size={14} /> {t('nw.refresh')}</button>
+              {newsLoading && <span className="pill"><span className="spinner" /></span>}
+            </div>
+            <div className="grid" style={{marginTop:10}}>
+              {newsList.map((n)=>(
+                <div key={n.id} className="card">
+                  {n.image && <img src={n.image} alt="" style={{width:'100%', borderRadius:12, marginBottom:8}} loading="lazy" />}
+                  <div className="mod-head"><b>{n.title}</b></div>
+                  <div className="meta"><span className="pill">{n.category}</span>{n.date && <span className="pill">{n.date}</span>}</div>
+                  <div className="desc">{n.text?.slice(0,140)}</div>
+                  <div className="actions"><button className="mini hot" onClick={()=>window.ferro.openUrl({url:n.url})}><ExternalLink size={12} /> {t('nw.read')}</button></div>
+                </div>))}
+            </div>
+            {!newsLoading && newsList.length===0 && <p style={{opacity:.6}}>{t('nw.none')}</p>}
           </div>
         )}
         {tab==='packs' && (
           <div className="card">
             <h2>{t('packs.title')}</h2>
             <div className="row">
-              <select value={packSrc} onChange={(e)=>{setPackSrc(e.target.value); setPackHits([]); setPackTotal(0); setPackVers({}); setCfPackVers({});}} title="Fuente">
+              <select value={packSrc} onChange={(e)=>{setPackSrc(e.target.value); setPackHits([]); setPackTotal(0); setPackVers({}); setCfPackVers({}); setPackPage(1); if(e.target.value==='mr') doPackSearch(1);}} title="Fuente">
                 <option value="mr">Modrinth</option>
                 <option value="cf">CurseForge</option>
               </select>
-              <select value={packMc} onChange={(e)=>{touchedVer.current.pack=true; setPackMc(e.target.value);}}>
+              <select value={packMc} onChange={(e)=>{touchedVer.current.pack=true; setPackMc(e.target.value); if(packSrc==='mr') doPackSearch(1, {mcVersion:e.target.value});}}>
                 {versions.map((v)=><option key={v.id} value={v.id}>{v.id}</option>)}
               </select>
-              <input value={packQuery} onChange={(e)=>setPackQuery(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter') doPackSearch();}} placeholder={t('packs.searchPh')} />
-              <select value={packLoader} onChange={(e)=>setPackLoader(e.target.value)} title="Loader">
+              <input value={packQuery} onChange={(e)=>setPackQuery(e.target.value)} onKeyDown={(e)=>{if(e.key==='Enter') doPackSearch(1);}} placeholder={t('packs.searchPh')} />
+              <select value={packLoader} onChange={(e)=>{setPackLoader(e.target.value); if(packSrc==='mr') doPackSearch(1, {loader:e.target.value});}} title="Loader">
                 <option value="">{t('packs.loaderAll')}</option>
                 <option value="fabric">Fabric</option>
                 <option value="quilt">Quilt</option>
                 <option value="forge">Forge</option>
                 <option value="neoforge">NeoForge</option>
               </select>
-              <select value={packSort} onChange={(e)=>setPackSort(e.target.value)} title="Orden">
+              <select value={packSort} onChange={(e)=>{setPackSort(e.target.value); if(packSrc==='mr') doPackSearch(1, {sort:e.target.value});}} title="Orden">
                 <option value="relevance">{t('mods.sRelevance')}</option>
                 <option value="downloads">{t('mods.sDownloads')}</option>
                 <option value="follows">{t('mods.sFollows')}</option>
                 <option value="newest">{t('mods.sNewest')}</option>
                 <option value="updated">{t('mods.sUpdated')}</option>
               </select>
-              <button className="primary" onClick={()=>{packSrc==='cf' ? doCfPackSearch() : doPackSearch();}}><Search size={14} /> {t('packs.search')}</button>
+              <button className="primary" onClick={()=>{packSrc==='cf' ? doCfPackSearch() : doPackSearch(1);}}><Search size={14} /> {t('packs.search')}</button>
             </div>
             <p style={{opacity:.65}}>{packTotal>0 ? `${packTotal.toLocaleString()} resultados · ` : ''}{packMc}{packLoader ? ` · ${packLoader}` : ''}. Crea una instancia nueva con el MC + loader que pida el pack. El progreso sale en ▶ Jugar.</p>
+            {packSrc==='mr' && <Pager t={t} page={packPage} total={packTotal} busy={false} onPage={(p)=>doPackSearch(p)} />}
             <div className="grid">
               {packHits.map((p)=>(
                 <div key={p.id} className="card">
@@ -1495,14 +1855,14 @@ export default function App() {
                   <div className="desc">{p.description?.slice(0,120)}</div>
                   <div className="meta"><span className="pill"><Download size={12} /> {p.downloads?.toLocaleString?.() || p.downloads}</span>{p.updated && <span className="pill">↻ {new Date(p.updated).toLocaleDateString()}</span>}</div>
                     <div className="actions"><button className="ghost" onClick={()=>{packSrc==='cf' ? doCfPackVers(p.id) : doPackVers(p.id)}}>{(packSrc==='cf' ? cfPackVers[p.id] : packVers[p.id]) ? t('mods.hide') : t('packs.versions')}</button></div>
-                  {(packSrc==='cf' ? (cfPackVers[p.id]||[]) : (packVers[p.id]||[])).map((v)=>(
+                  {((packSrc==='cf' ? (cfPackVers[p.id]||[]) : (packVers[p.id]||[])).length>0 || (packVers[p.id]||[]).length>0) && (
+                  <div className="vers">
+                  {packSrc==='cf' && (cfPackVers[p.id]||[]).map((v)=>(
                     <div className="meta" key={v.id}>
                       <span className="pill">{v.number || v.name}</span>
                       {(v.loaders||[]).map((ld)=><span className="pill" key={ld}>{ld}</span>)}
                       {(v.game||[]).slice(0,3).map((g)=><span className="pill" key={g}>{g}</span>)}
-                      {packSrc==='cf'
-                        ? <button className="mini hot" disabled={!!cfPackBusy} onClick={()=>doCfPackInstall(p, v)}>{cfPackBusy===v.id ? <><span className="spinner" />{t('mods.installing')}</> : t('mods.install')}</button>
-                        : null}
+                      <button className="mini hot" disabled={!!cfPackBusy} onClick={()=>doCfPackInstall(p, v)}>{cfPackBusy===v.id ? <><span className="spinner" />{t('mods.installing')}</> : t('mods.install')}</button>
                     </div>
                   ))}
                   {packSrc==='mr' && (packVers[p.id]||[]).map((v)=>(
@@ -1515,9 +1875,11 @@ export default function App() {
                       </button>
                     </div>
                   ))}
+                  </div>)}
                 </div>
               ))}
             </div>
+            {packSrc==='mr' && <Pager t={t} page={packPage} total={packTotal} busy={false} onPage={(p)=>doPackSearch(p)} />}
           </div>
         )}
         {tab==='cuenta' && (
@@ -1606,10 +1968,36 @@ export default function App() {
               <button className="primary" onClick={addServer}><Plus size={14} /> {t('srv.add')}</button>
             </div>
             <div className="grid" style={{marginTop:10}}>
-              {servers.map((s)=>{const k=`${s.host}:${s.port}`; const p=srvPing[k]; return (<div key={k} className="card"><div className="card-title">{s.name}</div><div className="meta"><span className="pill">{s.host}:{s.port}</span>{p ? (p.online ? <><span className="pill green">● {p.latencyMs} ms</span><span className="pill">{p.players.online}/{p.players.max}</span><span className="pill">{p.version}</span></> : <span className="pill">{t('srv.offline')}</span>) : <span className="pill"><span className="spinner" /></span>}</div>{p?.motd && <p style={{opacity:.7}}>{p.motd}</p>}<div className="actions"><button className="mini" onClick={()=>pingServer(s)}><RefreshCw size={12} /></button><button className="ghost" onClick={()=>playOn(s)} disabled={!launchInstance}><Play size={14} /> {t('srv.play')}</button><button className="ghost danger" onClick={async()=>{setServers(await window.ferro.serverRemove({host:s.host, port:s.port}));}}><Trash2 size={12} /></button></div></div>);})}
+              {servers.map((s)=>{const k=`${s.host}:${s.port}`; const p=srvPing[k]; return (<div key={k} className="card"><div className="card-title">{p?.favicon && <img src={p.favicon} alt="" style={{width:34,height:34,borderRadius:8,marginRight:8,verticalAlign:'middle'}} />}{s.name}</div><div className="meta"><span className="pill">{s.host}:{s.port}</span>{p ? (p.online ? <><span className="pill green">● {p.latencyMs} ms</span><span className="pill">{p.players.online}/{p.players.max}</span><span className="pill">{p.version}</span></> : <span className="pill">{t('srv.offline')}</span>) : <span className="pill"><span className="spinner" /></span>}</div>{p?.motd && <p style={{opacity:.7}}>{p.motd}</p>}<div className="actions"><button className="mini" onClick={()=>pingServer(s)}><RefreshCw size={12} /></button><button className="ghost" onClick={()=>playOn(s)} disabled={!launchInstance}><Play size={14} /> {t('srv.play')}</button><button className="ghost danger" onClick={async()=>{setServers(await window.ferro.serverRemove({host:s.host, port:s.port}));}}><Trash2 size={12} /></button></div></div>);})}
             </div>
             {servers.length===0 && <p style={{opacity:.6}}>{t('srv.none')}</p>}
           </div>
+        )}
+        {tab==='amigos' && (
+          <>
+          <div className="card">
+            <h2>{t('fr.title')}</h2>
+            <div className="row">
+              <input value={friendName} onChange={(e)=>setFriendName(e.target.value)} placeholder={t('fr.nickPh')} style={{minWidth:200}} />
+              <button className="primary" onClick={addFriend}><Plus size={14} /> {t('fr.add')}</button>
+              <button className="ghost" onClick={loadFriends}><RefreshCw size={14} /> {t('fr.refresh')}</button>
+            </div>
+            <div className="grid" style={{marginTop:10}}>
+              {friends.map((f)=>(<div key={f.name} className="card"><div className="card-title"><img className="face" src={f.face} alt="" onError={(e)=>{e.currentTarget.style.display='none';}} /> {f.name}</div><div className="meta">{f.status==='online' ? <><span className="pill green">● {t('fr.online')}</span><span className="pill">{f.server}</span></> : <span className="pill">{t('fr.offline')}</span>}{!f.uuid && <span className="pill">{t('fr.noPremium')}</span>}</div><div className="actions">{f.status==='online' && <button className="ghost" onClick={()=>joinFriend(f)} disabled={!launchInstance}><Play size={14} /> {t('fr.join')}</button>}<button className="ghost danger" onClick={()=>removeFriend(f.name)}><Trash2 size={12} /></button></div></div>))}
+            </div>
+            {friends.length===0 && <p style={{opacity:.6}}>{t('fr.none')}</p>}
+          </div>
+          <div className="card">
+            <h2>{t('fr.essential')}</h2>
+            <p style={{opacity:.7}}>{t('fr.essentialHelp')}</p>
+            <div className="row">
+              <select value={essInst || launchInstance || ''} onChange={(e)=>setEssInst(e.target.value)}>{instances.map((i)=><option key={i.name} value={i.name}>{i.name}</option>)}</select>
+              <button className="ghost" onClick={scanEssential}><Search size={14} /> {t('fr.essentialScan')}</button>
+              <button className="ghost" onClick={()=>window.ferro.openUrl({url:'https://essential.gg'})}><ExternalLink size={14} /> essential.gg</button>
+            </div>
+            {essJars && <div className="meta" style={{marginTop:8}}>{essJars.length>0 ? <span className="pill green">● Essential: {essJars.join(', ')}</span> : <span className="pill">{t('fr.essentialMissing')}</span>}</div>}
+          </div>
+          </>
         )}
         {tab==='ajustes' && (
           <>
@@ -1637,6 +2025,7 @@ export default function App() {
                 <option value="midnight">Medianoche</option>
                 <option value="forest">Bosque</option>
                 <option value="sakura">Sakura</option>
+                <option value="ancient">Ancient City</option>
               </select>
               <button className="ghost" onClick={startTour}>{t('tour.replay')}</button>
             </div>
@@ -1645,13 +2034,46 @@ export default function App() {
             <h2>{t('set.sound')}</h2>
             <div className="row">
               <button className="ghost" onClick={()=>{sfx.cfg.enabled=!sfx.cfg.enabled; sfx.save(); setSfxOn(sfx.cfg.enabled); if(sfx.cfg.enabled) sfx.play('success');}}>{sfxOn ? `✓ ${t('set.sfxOn')}` : t('set.sfxOff')}</button>
+              <button className="ghost" onClick={()=>{dance ? stopDance() : startDance();}} title={t('set.danceHint')}>{dance ? `✓ ♪ ${t('set.dance')}` : t('set.danceOff')}</button>
               <select value={sfxPack} onChange={(e)=>{sfx.cfg.pack=e.target.value; sfx.save(); setSfxPack(sfx.cfg.pack); sfx.play('success');}} title={t('set.pack')}>
                 <option value="cristal">{t('set.packCristal')}</option>
                 <option value="asmr">{t('set.packAsmr')}</option>
+                {['minimal', 'soft', 'glass', 'arcade', 'mechanical', 'organic', 'dreamy', 'scifi', 'rubber', 'cinematic', 'studio', 'zen'].map((f)=><option key={f} value={f}>{f[0].toUpperCase() + f.slice(1)}</option>)}
               </select>
               <button className="ghost" onClick={()=>{sfx.cfg.hover=!sfx.cfg.hover; sfx.save(); setSfxHover(sfx.cfg.hover);}}>{t('set.hover')}: {sfxHover ? t('set.yes') : t('set.no')}</button>
               <label>{t('set.volume')} <input type="range" min={0} max={1} step={0.05} value={sfxVol} onChange={(e)=>{sfx.cfg.volume=Number(e.target.value); sfx.save(); setSfxVol(sfx.cfg.volume);}} style={{width:130}} /></label>
               <button className="ghost" onClick={()=>sfx.play('launch')}>{t('set.test')}</button>
+            </div>
+          </div>
+          <div className="card">
+            <h2>{t('ab.title')}</h2>
+            <div className="row">
+              <select value={abCfg.mode} onChange={async(e)=>{try{setAbCfg(await window.ferro.autoBackupSet({mode:e.target.value}));}catch(er){setLog((l)=>l+`[error] ${er.message}\n`);}}}>
+                <option value="off">{t('ab.off')}</option>
+                <option value="beforePlay">{t('ab.beforePlay')}</option>
+                <option value="daily">{t('ab.daily')}</option>
+                <option value="weekly">{t('ab.weekly')}</option>
+              </select>
+              <label>{t('ab.keep')} <input type="number" min={1} max={20} value={abCfg.keep} onChange={async(e)=>{const v=Math.min(20,Math.max(1,Number(e.target.value)||3)); try{setAbCfg(await window.ferro.autoBackupSet({keep:v}));}catch(er){setLog((l)=>l+`[error] ${er.message}\n`);}}} style={{width:70}} /></label>
+              <button className="ghost" onClick={async()=>{try{const r=await window.ferro.autoBackupRun({force:true}); setLog((l)=>l+`[ferro] ${t('ab.done',{n:(r.done||[]).length})}\n`);}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('ab.now')}</button>
+            </div>
+            <p style={{opacity:.7}}>{t('ab.hint')}</p>
+          </div>
+          <div className="card">
+            <h2>{t('wp.title')}</h2>
+            <div className="row">
+              <button className="ghost" onClick={async()=>{try{await window.ferro.wallpaperSet(); setWp((await window.ferro.wallpaper())?.dataUrl || null);}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('wp.choose')}</button>
+              {wp && <button className="ghost" onClick={async()=>{try{await window.ferro.wallpaperClear(); setWp(null);}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('wp.clear')}</button>}
+            </div>
+            <p style={{opacity:.7}}>{t('wp.hint')}</p>
+          </div>
+          <div className="card">
+            <h2>{t('sc.title')}</h2>
+            <div className="meta">
+              <span className="pill">F5 · {t('sc.play')}</span>
+              <span className="pill">Ctrl+1..0 · {t('sc.tabs')}</span>
+              <span className="pill">Ctrl+, · {t('sc.settings')}</span>
+              <span className="pill">Esc · {t('sc.close')}</span>
             </div>
           </div>
           <div className="card">
@@ -1788,6 +2210,46 @@ export default function App() {
             {diag && (diag.list.length===0 ? <p style={{opacity:.6}}>{t('inst.diagNone')}</p> : (<div className="sublist">{diag.list.map((d)=><div key={d.id} className="subrow"><span className="grow" title={d.desc}><b>{d.title}</b> — {d.desc}</span>{d.fix && <button className="mini" onClick={async()=>{try{await window.ferro.doctorFix({instanceName:settingsFor, fix:d.fix}); setLog((l)=>l+`[ferro] ${t('inst.fixed')}: ${d.title}\n`); setDiag(await window.ferro.diagnose({instanceName:settingsFor})); refresh();}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{d.fix.label || t('inst.applyFix')}</button>}</div>)}</div>))}
           {crList.length===0 ? <p style={{opacity:.6}}>{t('inst.noCrashes')}</p> : (<div className="sublist">{crList.map((c)=><div key={c.file} className="subrow"><span className="grow" title={c.description||c.file}>{c.description||c.file}</span><button className="mini" onClick={async()=>{const r = crOpen?.file===c.file ? null : await window.ferro.crashRead({instanceName:settingsFor, file:c.file}); setCrOpen(r);}}>{crOpen?.file===c.file ? t('mods.hide') : t('inst.view')}</button></div>)}</div>)}
           {crOpen && <pre style={{marginTop:4}}>{crOpen.content}{crOpen.truncated ? '\n…(truncado)' : ''}</pre>}
+        </MorphModal>
+      )}
+      {instModal && (
+        <MorphModal origin={instOrigin} closing={instClosing} onClose={closeInstalled} title={instModal==='datapacks' ? `${t('dp.installed')} · ${dpWorld}` : `${t('mods.installed')} · ${modsFor}`}>
+          {instModal==='datapacks' ? (
+            <div className="grid">
+              {dpList.map((m)=>(<div key={m.file} className="card"><div className="card-title" title={m.file}>{m.file}</div><div className="meta"><span className="pill">{(m.size/1048576).toFixed(1)} MB{m.disabled?' · desactivado':''}</span></div><div className="actions"><button className="mini" onClick={()=>dpToggle(m)}>{m.disabled?t('dp.activate'):t('dp.deactivate')}</button><button className="mini danger" onClick={()=>dpRemove(m)}><X size={12} /> {t('dp.remove')}</button></div></div>))}
+            </div>
+          ) : (<>
+            <h3>{t('mods.installed')} ({mods.length})</h3>
+            {kind==='shader' && (
+            <div className="row" style={{marginBottom:10}}>
+              {shaderCur?.iris
+                ? <span className="pill green">Iris OK{shaderCur.pack ? ` · ${shaderCur.pack}` : ''}</span>
+                : <span className="pill">{t('mods.needIris')}</span>}
+              {shaderCur?.pack && <button className="mini" onClick={async()=>{await window.ferro.shaderSet({instanceName:modsFor, file:null}); loadMods(modsFor);}}>{t('mods.shadersOff')}</button>}
+            </div>
+            )}
+            {kind==='resourcepack' && rpOn===null && mods.length>0 && <p style={{opacity:.6}}>{t('mods.playOnce')}</p>}
+            {kind==='mod' && (
+            <div className="row" style={{marginBottom:10}}>
+              <button className="ghost" onClick={checkUpdates} disabled={checkingUpd || !modsFor}>{checkingUpd ? t('mods.updating') : t('mods.checkUpd')}</button>
+              {updMsg && <span className="pill green">{updMsg}</span>}
+            </div>
+            )}
+            <div className="grid">
+              {mods.map((m)=>{ const u = updMap[m.file];
+                const rpActive = kind==='resourcepack' && rpOn?.includes(m.file);
+                const shaderActive = kind==='shader' && shaderCur?.pack===m.file && shaderCur?.enabled;
+                return (<div key={m.file} className="card"><div className="card-title" title={m.file}>{m.file}</div><div className="meta"><span className="pill">{(m.size/1048576).toFixed(1)} MB{m.disabled?' · desactivado':''}</span>{u && <span className="pill green">→ {u.latest}</span>}{rpActive && <span className="pill green">activo</span>}{shaderActive && <span className="pill green">en uso</span>}</div><div className="actions">
+                {kind==='mod' && u && <button className="primary" onClick={()=>doModUpdate(u)}>{t('mods.update')}</button>}
+                {kind==='resourcepack'
+                  ? <button className="mini" onClick={async()=>{await window.ferro.rpToggle({instanceName:modsFor, file:m.file, enable:!rpActive}); loadMods(modsFor);}}>{rpActive?t('mods.deactivate'):t('mods.activate')}</button>
+                  : kind==='shader'
+                    ? <button className="mini hot" onClick={async()=>{await window.ferro.shaderSet({instanceName:modsFor, file:m.file}); loadMods(modsFor);}} disabled={!shaderCur?.iris}>{t('mods.use')}</button>
+                    : <button className="mini" onClick={async()=>{await window.ferro.modToggle({instanceName:modsFor, file:m.file, disable:!m.disabled, kind}); loadMods(modsFor);}}>{m.disabled?t('mods.activate'):t('mods.deactivate')}</button>}
+                <button className="mini danger" onClick={async()=>{await window.ferro.modRemove({instanceName:modsFor, file:m.file, kind}); loadMods(modsFor);}}><X size={12} /> {t('mods.remove')}</button>
+              </div></div>);})}
+            </div>
+          </>)}
         </MorphModal>
       )}
       {galName && (

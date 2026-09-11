@@ -70,12 +70,65 @@ function updateInstanceSettings(instancesDir, name, patch) {
     const ok = ['equilibrado', 'rendimiento', 'patata', 'zgc'];
     s.jvmPreset = ok.includes(patch.jvmPreset) ? patch.jvmPreset : 'equilibrado';
   }
+  if (patch.pinned !== undefined) s.pinned = !!patch.pinned;
   cfg.settings = s;
   fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
   return withSettings({ name, path: dir, ...cfg });
 }
 
-module.exports = { ensureDirs, listInstances, createInstance, updateInstanceSettings, defaultSettings, setForgeProfile, duplicateInstance, deleteInstance, renameInstance, touchPlayed, addPlayTime };
+module.exports = { ensureDirs, listInstances, createInstance, updateInstanceSettings, defaultSettings, setForgeProfile, duplicateInstance, deleteInstance, renameInstance, touchPlayed, addPlayTime, instanceSize, cleanInstance };
+
+// Peso de una instancia (recursivo, sin seguir enlaces) + desglose por carpeta
+function walkSize(p, agg) {
+  let st;
+  try { st = fs.lstatSync(p); } catch { return; }
+  if (st.isSymbolicLink()) return;
+  if (st.isFile()) { agg.bytes += st.size; agg.files++; return; }
+  if (!st.isDirectory()) return;
+  let entries;
+  try { entries = fs.readdirSync(p); } catch { return; }
+  for (const e of entries) walkSize(path.join(p, e), agg);
+}
+function instanceSize(instanceDir) {
+  const top = {};
+  let total = 0, files = 0;
+  let entries;
+  try { entries = fs.readdirSync(instanceDir); } catch { return { bytes: 0, files: 0, top: {} }; }
+  for (const e of entries) {
+    const agg = { bytes: 0, files: 0 };
+    walkSize(path.join(instanceDir, e), agg);
+    if (agg.bytes > 0) top[e] = agg.bytes;
+    total += agg.bytes; files += agg.files;
+  }
+  return { bytes: total, files, top };
+}
+
+// Limpieza segura: logs enteros + crash-reports de más de 30 días
+function cleanInstance(instanceDir) {
+  let freed = 0, removed = 0;
+  const rmFile = (p) => {
+    try {
+      const s = fs.statSync(p);
+      if (!s.isFile()) return;
+      freed += s.size; fs.unlinkSync(p); removed++;
+    } catch {}
+  };
+  try {
+    const logs = path.join(instanceDir, 'logs');
+    if (fs.existsSync(logs)) for (const f of fs.readdirSync(logs)) rmFile(path.join(logs, f));
+  } catch {}
+  try {
+    const cr = path.join(instanceDir, 'crash-reports');
+    if (fs.existsSync(cr)) {
+      const limit = Date.now() - 30 * 86400000;
+      for (const f of fs.readdirSync(cr)) {
+        const p = path.join(cr, f);
+        try { if (fs.statSync(p).mtimeMs < limit) rmFile(p); } catch {}
+      }
+    }
+  } catch {}
+  return { freed, removed };
+}
 
 function copyDir(src, dest) {
   fs.mkdirSync(dest, { recursive: true });

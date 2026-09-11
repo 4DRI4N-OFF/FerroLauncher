@@ -40,4 +40,19 @@ function heroShot(instancesDir) {
   return best;
 }
 
-module.exports = { listShots, deleteShot, shotsDir, heroShot };
+// Últimas capturas de todas las instancias (fondo en diapositivas)
+function recentShots(instancesDir, limit = 6) {
+  const all = [];
+  try {
+    for (const e of fs.readdirSync(instancesDir, { withFileTypes: true })) {
+      if (!e.isDirectory()) continue;
+      for (const s of listShots(path.join(instancesDir, e.name))) {
+        if (s.size > 4 * 1048576) continue;
+        all.push({ ...s, instance: e.name });
+      }
+    }
+  } catch {}
+  return all.sort((a, b) => b.mtime - a.mtime).slice(0, limit);
+}
+
+module.exports = { listShots, deleteShot, shotsDir, heroShot, recentShots };

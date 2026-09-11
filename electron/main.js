@@ -5,7 +5,7 @@ if (process.platform === 'win32') {
 const path = require('path');
 const fs = require('fs');
 const { getDataDir, dirs } = require('../core/constants');
-const { ensureDirs, listInstances, createInstance, updateInstanceSettings, setForgeProfile, duplicateInstance, deleteInstance, renameInstance, touchPlayed, addPlayTime } = require('../core/instanceManager');
+const { ensureDirs, listInstances, createInstance, updateInstanceSettings, setForgeProfile, duplicateInstance, deleteInstance, renameInstance, touchPlayed, addPlayTime, instanceSize, cleanInstance } = require('../core/instanceManager');
 const { listVersions, getVersionDetails, downloadClientJar } = require('../core/mojangService');
 const { findJava, ensureJava } = require('../core/javaManager');
 const { resolveLibraries, launch } = require('../core/launcher');
@@ -19,7 +19,7 @@ function loaderApi(type) {
   if (type === 'quilt') return { list: quilt.listLoaders, meta: quilt.getLoaderMeta, resolve: quilt.resolveQuiltLibraries, label: 'quilt' };
   return { list: listLoaders, meta: getLoaderMeta, resolve: resolveFabricLibraries, label: 'fabric' };
 }
-const { searchMods, listMods, installMod, removeMod, toggleMod, checkModUpdates, updateMod } = require('../core/modrinthService');
+const { searchMods, listMods, listWorlds, installMod, removeMod, toggleMod, checkModUpdates, updateMod } = require('../core/modrinthService');
 const { searchModpacks, packVersions, getPackVersion, installMrpack, readMrpackManifest } = require('../core/modpackService');
 const auth = require('../core/authService');
 const skins = require('../core/skinService');
@@ -34,6 +34,8 @@ const perf = require('../core/perfService');
 const doctor = require('../core/crashDoctor');
 const imp = require('../core/importService');
 const srv = require('../core/serverService');
+const friends = require('../core/friendsService');
+const news = require('../core/newsService');
 
 function findInstance(d, name) {
   const inst = listInstances(d.instances).find((i) => i.name === name);
@@ -308,22 +310,24 @@ ipcMain.handle('ferro:loaders', async (_, { mcVersion, type }) => {
   return loaderApi(type).list(mcVersion);
 });
 
-ipcMain.handle('ferro:modSearch', async (_, { query, mcVersion, loader, sort, kind }) => searchMods(query || '', mcVersion, ['quilt', 'forge', 'neoforge'].includes(loader) ? loader : 'fabric', { sort, kind: ['shader', 'resourcepack'].includes(kind) ? kind : 'mod' }));
-ipcMain.handle('ferro:mods', async (_, { instanceName, kind }) => listMods(findInstance(getDirs(), instanceName).path, kind));
-ipcMain.handle('ferro:modInstall', async (event, { instanceName, projectId, kind }) => {
-  const k = ['shader', 'resourcepack'].includes(kind) ? kind : 'mod';
+ipcMain.handle('ferro:modSearch', async (_, { query, mcVersion, loader, sort, kind, offset }) => searchMods(query || '', mcVersion, ['quilt', 'forge', 'neoforge'].includes(loader) ? loader : 'fabric', { sort, kind: ['shader', 'resourcepack', 'datapack'].includes(kind) ? kind : 'mod', offset: Math.max(0, Number(offset) || 0) }));
+ipcMain.handle('ferro:mods', async (_, { instanceName, kind, world }) => listMods(findInstance(getDirs(), instanceName).path, kind, world));
+ipcMain.handle('ferro:worlds', async (_, { instanceName }) => listWorlds(findInstance(getDirs(), instanceName).path));
+ipcMain.handle('ferro:modInstall', async (event, { instanceName, projectId, kind, world }) => {
+  const k = ['shader', 'resourcepack', 'datapack'].includes(kind) ? kind : 'mod';
   const inst = findInstance(getDirs(), instanceName);
   if (k === 'mod' && inst.type === 'vanilla') throw new Error('Los mods requieren instancia con loader');
+  if (k === 'datapack' && !world) throw new Error('Elige un mundo para el datapack');
   const send = (t) => win && win.webContents.send('ferro:log', t);
-  const r = await installMod(inst.path, projectId, inst.versionId, inst.type, send, k);
+  const r = await installMod(inst.path, projectId, inst.versionId, inst.type, send, k, world);
   notify(getDirs().base, 'ok', `Contenido instalado`, `${r.file} → ${instanceName}`);
   return r;
 });
-ipcMain.handle('ferro:modRemove', async (_, { instanceName, file, kind }) => {
-  removeMod(findInstance(getDirs(), instanceName).path, file, kind);
+ipcMain.handle('ferro:modRemove', async (_, { instanceName, file, kind, world }) => {
+  removeMod(findInstance(getDirs(), instanceName).path, file, kind, world);
   return true;
 });
-ipcMain.handle('ferro:modToggle', async (_, { instanceName, file, disable, kind }) => toggleMod(findInstance(getDirs(), instanceName).path, file, disable, kind));
+ipcMain.handle('ferro:modToggle', async (_, { instanceName, file, disable, kind, world }) => toggleMod(findInstance(getDirs(), instanceName).path, file, disable, kind, world));
 ipcMain.handle('ferro:modUpdates', async (event, { instanceName }) => {
   const inst = findInstance(getDirs(), instanceName);
   const send = (t) => win && win.webContents.send('ferro:log', t);
@@ -381,7 +385,7 @@ ipcMain.handle('ferro:shaderSet', async (_, { instanceName, file }) => {
   const inst = findInstance(getDirs(), instanceName);
   return res.setShader(inst.path, file || null);
 });
-ipcMain.handle('ferro:packSearch', async (_, { query, mcVersion, loader, sort }) => searchModpacks(query || '', mcVersion, { loader: ['fabric', 'forge', 'neoforge', 'quilt'].includes(loader) ? loader : null, sort }));
+ipcMain.handle('ferro:packSearch', async (_, { query, mcVersion, loader, sort, offset }) => searchModpacks(query || '', mcVersion, { loader: ['fabric', 'forge', 'neoforge', 'quilt'].includes(loader) ? loader : null, sort, offset: Math.max(0, Number(offset) || 0) }));
 ipcMain.handle('ferro:packVersions', async (_, { projectId, mcVersion, loader }) => {
   const vers = await packVersions(projectId, mcVersion, ['fabric', 'forge', 'neoforge', 'quilt'].includes(loader) ? [loader] : undefined);
   return vers.map((v) => ({ id: v.id, number: v.version_number, type: v.version_type, loaders: v.loaders, game: v.game_versions, files: v.files?.length || 0 }));
@@ -426,9 +430,10 @@ ipcMain.handle('ferro:testWebhook', async () => {
   if (!ok) throw new Error('Discord rechazó el envío (URL inválida o sin conexión)');
   return true;
 });
-ipcMain.handle('ferro:openUrl', async (_, { url }) => {
+ipcMain.handle('ferro:openUrl', async (_, data) => {
+  const url = typeof data === 'string' ? data : data?.url;
   const u = String(url || '');
-  if (!/^https:\/\/(x\.com|www\.reddit\.com|wa\.me|t\.me|github\.com|discord\.gg|discord\.com|www\.youtube\.com|youtu\.be|www\.tiktok\.com)\//.test(u)) throw new Error('URL no permitida');
+  if (!/^https:\/\/(x\.com|www\.reddit\.com|wa\.me|t\.me|github\.com|discord\.gg|discord\.com|www\.youtube\.com|youtu\.be|www\.tiktok\.com|essential\.gg|minecraft\.net|www\.minecraft\.net|help\.minecraft\.net|feedback\.minecraft\.net|modrinth\.com|curseforge\.com|www\.curseforge\.com)\//.test(u)) throw new Error('URL no permitida');
   await shell.openExternal(u);
   return true;
 });
@@ -595,6 +600,8 @@ ipcMain.handle('ferro:deleteInstance', async (_, { instanceName }) => {
   }
 });
 ipcMain.handle('ferro:renameInstance', async (_, { instanceName, newName }) => renameInstance(getDirs().instances, instanceName, newName));
+ipcMain.handle('ferro:instSize', async (_, { instanceName }) => instanceSize(findInstance(getDirs(), instanceName).path));
+ipcMain.handle('ferro:instClean', async (_, { instanceName }) => cleanInstance(findInstance(getDirs(), instanceName).path));
 
 ipcMain.handle('ferro:exportInstance', async (_, { instanceName }) => {
   const d = getDirs();
@@ -623,6 +630,18 @@ ipcMain.handle('ferro:backupRestore', async (_, { instanceName, file }) => {
   return backups.restoreBackup(d.base, d.instances, instanceName, file, send);
 });
 ipcMain.handle('ferro:backupDelete', async (_, { instanceName, file }) => backups.deleteBackup(getDirs().base, instanceName, file));
+ipcMain.handle('ferro:autoBackupGet', async () => backups.getAutoCfg(getDirs().base));
+ipcMain.handle('ferro:autoBackupSet', async (_, data) => backups.setAutoCfg(getDirs().base, data || {}));
+ipcMain.handle('ferro:autoBackupRun', async (_, data) => {
+  const d = getDirs();
+  const send = (t) => win && win.webContents.send('ferro:log', t);
+  return backups.runAutoBackups(d.base, listInstances(d.instances), send, data && data.force);
+});
+ipcMain.handle('ferro:autoBackupOnce', async (_, { instanceName }) => {
+  const d = getDirs();
+  const send = (t) => win && win.webContents.send('ferro:log', t);
+  return backups.autoBackupOnce(d.base, findInstance(d, instanceName).path, instanceName, send);
+});
 ipcMain.handle('ferro:profileBackup', async () => {
   const d = getDirs();
   const send = (t) => win && win.webContents.send('ferro:log', t);
@@ -654,7 +673,15 @@ ipcMain.handle('ferro:heroBg', async () => {
     instanceName: hit.instance, file: hit.file,
     dataUrl: 'data:image/png;base64,' + require('fs').readFileSync(hit.path).toString('base64'),
   };
-});ipcMain.handle('ferro:shotThumb', async (_, { instanceName, file }) => {
+});ipcMain.handle('ferro:bgShotList', async () => gallery.recentShots(getDirs().instances, 6));
+ipcMain.handle('ferro:bgShots', async () => {
+  const list = gallery.recentShots(getDirs().instances, 6);
+  return list.map((s) => ({
+    instance: s.instance, file: s.file,
+    dataUrl: 'data:image/png;base64,' + require('fs').readFileSync(s.path).toString('base64'),
+  }));
+});
+ipcMain.handle('ferro:shotThumb', async (_, { instanceName, file }) => {
   const list = gallery.listShots(findInstance(getDirs(), instanceName).path);
   const hit = list.find((s) => s.file === path.basename(file));
   if (!hit) throw new Error('Captura no encontrada');
@@ -673,6 +700,32 @@ ipcMain.handle('ferro:openShots', async (_, { instanceName }) => {
   const dir = gallery.shotsDir(findInstance(getDirs(), instanceName).path);
   require('fs').mkdirSync(dir, { recursive: true });
   await shell.openPath(dir);
+  return true;
+});
+ipcMain.handle('ferro:wallpaper', async () => {
+  const base = getDirs().base;
+  const fs = require('fs');
+  const hit = ['wallpaper.png', 'wallpaper.jpg', 'wallpaper.jpeg', 'wallpaper.webp'].map((f) => path.join(base, f)).find((p) => { try { return fs.statSync(p).isFile(); } catch { return false; } });
+  if (!hit) return null;
+  if (fs.statSync(hit).size > 12 * 1048576) return { tooBig: true };
+  const ext = path.extname(hit).slice(1).toLowerCase().replace('jpg', 'jpeg');
+  return { dataUrl: `data:image/${ext};base64,` + fs.readFileSync(hit).toString('base64') };
+});
+ipcMain.handle('ferro:wallpaperSet', async () => {
+  const r = await dialog.showOpenDialog(win, { properties: ['openFile'], filters: [{ name: 'Imagen', extensions: ['png', 'jpg', 'jpeg', 'webp'] }] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const base = getDirs().base;
+  const fs = require('fs');
+  for (const f of ['wallpaper.png', 'wallpaper.jpg', 'wallpaper.jpeg', 'wallpaper.webp']) { try { fs.unlinkSync(path.join(base, f)); } catch {} }
+  const ext = path.extname(r.filePaths[0]).toLowerCase();
+  const dest = path.join(base, 'wallpaper' + (['.png', '.jpg', '.jpeg', '.webp'].includes(ext) ? ext : '.png'));
+  fs.copyFileSync(r.filePaths[0], dest);
+  return true;
+});
+ipcMain.handle('ferro:wallpaperClear', async () => {
+  const base = getDirs().base;
+  const fs = require('fs');
+  for (const f of ['wallpaper.png', 'wallpaper.jpg', 'wallpaper.jpeg', 'wallpaper.webp']) { try { fs.unlinkSync(path.join(base, f)); } catch {} }
   return true;
 });
 ipcMain.handle('ferro:stop', async () => {
@@ -794,6 +847,12 @@ ipcMain.handle('ferro:importPrism', async (_, { from, instPath, asName }) => {
 ipcMain.handle('ferro:servers', async () => srv.listServers(getDirs().base));
 ipcMain.handle('ferro:serverAdd', async (_, data) => srv.addServer(getDirs().base, data || {}));
 ipcMain.handle('ferro:serverRemove', async (_, { host, port }) => srv.removeServer(getDirs().base, host, port));
+ipcMain.handle('ferro:friends', async () => friends.listFriends(getDirs().base));
+ipcMain.handle('ferro:friendAdd', async (_, data) => friends.addFriend(getDirs().base, data || {}));
+ipcMain.handle('ferro:friendRemove', async (_, data) => friends.removeFriend(getDirs().base, data || {}));
+ipcMain.handle('ferro:friendsPresence', async () => friends.presence(getDirs().base));
+ipcMain.handle('ferro:essentialScan', async (_, { instanceName }) => friends.essentialScan(findInstance(getDirs(), instanceName).path));
+ipcMain.handle('ferro:news', async () => news.getNews(24));
 ipcMain.handle('ferro:serverPing', async (_, { host, port }) => srv.ping(String(host || '').trim(), Number(port) || 25565));
 
 const NAME_RE = /^[a-zA-Z0-9_]{3,16}$/;

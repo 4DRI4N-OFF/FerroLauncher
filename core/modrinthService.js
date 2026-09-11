@@ -19,12 +19,12 @@ function kindDir(kind) {
   return KINDS[kind] || 'mods';
 }
 
-async function searchMods(query, mcVersion, loader = 'fabric', { sort = 'relevance', limit = 24, kind = 'mod' } = {}) {
+async function searchMods(query, mcVersion, loader = 'fabric', { sort = 'relevance', limit = 24, offset = 0, kind = 'mod' } = {}) {
   const type = KINDS[kind] ? kind : 'mod';
   const facets = [[`versions:${mcVersion}`], [`project_type:${type}`]];
   // Los shaders/RP no siempre etiquetan loader: solo filtra si es mod
   if (type === 'mod') facets.push([`categories:${loader}`]);
-  const url = `${API}/search?query=${encodeURIComponent(query)}&facets=${encodeURIComponent(JSON.stringify(facets))}&limit=${limit}&index=${SORTS.includes(sort) ? sort : 'relevance'}`;
+  const url = `${API}/search?query=${encodeURIComponent(query)}&facets=${encodeURIComponent(JSON.stringify(facets))}&limit=${limit}&offset=${offset}&index=${SORTS.includes(sort) ? sort : 'relevance'}`;
   const data = await apiJson(url);
   return {
     total: data.total_hits || 0,
@@ -52,12 +52,27 @@ function modsDir(instanceDir) {
   return path.join(instanceDir, 'mods');
 }
 
-function contentDir(instanceDir, kind) {
+function contentDir(instanceDir, kind, world) {
+  // Los datapacks viven por mundo: saves/<mundo>/datapacks
+  if (kind === 'datapack' && world) return path.join(instanceDir, 'saves', String(world), 'datapacks');
   return path.join(instanceDir, kindDir(kind));
 }
 
-function listMods(instanceDir, kind = 'mod') {
-  const dir = contentDir(instanceDir, kind);
+// Mundos de una instancia (carpetas en saves/, con level.dat primero)
+function listWorlds(instanceDir) {
+  const saves = path.join(String(instanceDir), 'saves');
+  let entries = [];
+  try { entries = fs.readdirSync(saves, { withFileTypes: true }); } catch { return []; }
+  const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+  return dirs.sort((a, b) => {
+    const la = fs.existsSync(path.join(saves, a, 'level.dat')) ? 0 : 1;
+    const lb = fs.existsSync(path.join(saves, b, 'level.dat')) ? 0 : 1;
+    return la - lb || a.localeCompare(b);
+  });
+}
+
+function listMods(instanceDir, kind = 'mod', world) {
+  const dir = contentDir(instanceDir, kind, world);
   fs.mkdirSync(dir, { recursive: true });
   const exts = kind === 'mod' ? ['.jar'] : ['.zip'];
   return fs.readdirSync(dir, { withFileTypes: true })
@@ -70,32 +85,32 @@ function listMods(instanceDir, kind = 'mod') {
     );
 }
 
-async function installModFile(instanceDir, fileUrl, fileName, onProgress, kind = 'mod', expectedSize, expectedSha1) {
+async function installModFile(instanceDir, fileUrl, fileName, onProgress, kind = 'mod', expectedSize, expectedSha1, world) {
   const safe = String(fileName).replace(/[^\w\-.+() \[\]]+/g, '_');
-  return downloadFile(fileUrl, path.join(contentDir(instanceDir, kind), safe), onProgress, expectedSize, expectedSha1);
+  return downloadFile(fileUrl, path.join(contentDir(instanceDir, kind, world), safe), onProgress, expectedSize, expectedSha1);
 }
 
-async function installMod(instanceDir, projectId, mcVersion, loader = 'fabric', onLog, kind = 'mod') {
+async function installMod(instanceDir, projectId, mcVersion, loader = 'fabric', onLog, kind = 'mod', world) {
   const versions = await projectVersions(projectId, mcVersion, kind === 'mod' ? loader : null);
   const v = pickVersion(versions);
   if (!v) throw new Error('Sin versión compatible');
   const file = (v.files || []).find((f) => f.primary) || v.files?.[0];
   if (!file?.url) throw new Error('Versión sin archivo');
   onLog && onLog(`[ferro] ${kind} ${v.name} (${file.filename})\n`);
-  await installModFile(instanceDir, file.url, file.filename, undefined, kind, file.size, file.hashes?.sha1);
+  await installModFile(instanceDir, file.url, file.filename, undefined, kind, file.size, file.hashes?.sha1, world);
   return { version: v.version_number, file: file.filename };
 }
 
-function toggleMod(instanceDir, file, disable, kind = 'mod') {
-  const dir = contentDir(instanceDir, kind);
+function toggleMod(instanceDir, file, disable, kind = 'mod', world) {
+  const dir = contentDir(instanceDir, kind, world);
   const from = path.join(dir, file);
   const to = disable ? (file.endsWith('.disabled') ? from : from + '.disabled') : from.replace(/\.disabled$/, '');
   if (from !== to) fs.renameSync(from, to);
   return path.basename(to);
 }
 
-function removeMod(instanceDir, file, kind = 'mod') {
-  fs.unlinkSync(path.join(contentDir(instanceDir, kind), file));
+function removeMod(instanceDir, file, kind = 'mod', world) {
+  fs.unlinkSync(path.join(contentDir(instanceDir, kind, world), file));
 }
 
 function sha1File(p) {
@@ -159,4 +174,4 @@ async function updateMod(instanceDir, projectId, mcVersion, loader, oldFile, onL
   return { version: v.version_number, file: file.filename };
 }
 
-module.exports = { searchMods, projectVersions, pickVersion, listMods, installModFile, installMod, toggleMod, removeMod, checkModUpdates, updateMod };
+module.exports = { searchMods, projectVersions, pickVersion, listMods, listWorlds, installModFile, installMod, toggleMod, removeMod, checkModUpdates, updateMod };

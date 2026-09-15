@@ -3,6 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const AdmZip = require('adm-zip');
 const { downloadFile } = require('./downloader');
+const { extractEntries } = require('./zipService');
 
 const API = 'https://api.modrinth.com/v2';
 const UA = { 'User-Agent': `FerroLauncher/${require('../package.json').version} (github.com/4DRI4N-OFF/FerroLauncher)` };
@@ -93,16 +94,17 @@ async function installMrpack(instanceDir, mrpackUrl, onLog) {
     done += Math.min(CONC, files.length - done);
     onLog && onLog(`[ferro] modpack ${done}/${files.length}\n`);
   }
-  // overrides/ -> raíz de la instancia (configs, resourcepacks, etc.)
-  for (const e of zip.getEntries()) {
-    if (e.isDirectory || !e.entryName.startsWith('overrides/')) continue;
-    const rel = e.entryName.slice('overrides/'.length);
-    if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) continue; // zip-slip
-    zip.extractEntryTo(e, instanceDir, false, true);
-  }
+  // overrides/ -> raíz de la instancia, CON sus subcarpetas: overrides/config/x.cfg
+  // tiene que caer en config/x.cfg. Rutas raras o salidas del destino se saltan
+  // y se avisan en consola (antes se callaban y, además, se aplastaban al raíz).
+  const ov = extractEntries(zip, instanceDir, {
+    stripPrefix: 'overrides/',
+    onSkip: (name, why) => onLog && onLog(`[ferro] salto override ${name}${why ? ` (${why})` : ''}\n`),
+  });
+  if (ov.written) onLog && onLog(`[ferro] overrides: ${ov.written} archivos\n`);
   try { if (!isLocal) fs.rmSync(tmp, { recursive: true, force: true }); } catch {}
   const { loaderType, loaderVersion } = loaderFromDeps(deps);
-  return { name: index.name, mcVersion: deps.minecraft, loaderType, loaderVersion, files: files.length };
+  return { name: index.name, mcVersion: deps.minecraft, loaderType, loaderVersion, files: files.length, overrides: ov.written };
 }
 
 module.exports = { searchModpacks, packVersions, getPackVersion, installMrpack, readMrpackManifest, loaderFromDeps };

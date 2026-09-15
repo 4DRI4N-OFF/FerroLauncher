@@ -8,29 +8,37 @@
     "dev": "vite",
     "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build",
+    "lint": "eslint . --max-warnings 166",
+    "test": "node scripts/run-tests.js",
+    "test:docs": "node scripts/docs-version.js --check",
+    "check": "npm run lint && npm run test && npm run test:docs && npm run build",
+    "docs:version": "node scripts/docs-version.js",
     "dist": "npm run build && electron-builder --win nsis portable",
     "dist:full": "npm run build && electron-builder --win --dir && node scripts/brand-exe.js && node scripts/app-update-yml.js && electron-builder --win nsis portable --prepackaged release\\win-unpacked",
     "start": "electron ."
   },
   "dependencies": {
-    "adm-zip": "^0.6.0",
+    "adm-zip": "^0.6.1",
     "discord-rpc": "^4.0.1",
     "electron-updater": "^6.8.9",
     "lucide-react": "^1.42.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "uisfx": "^0.4.0"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
-    "electron": "^36.0.0",
-    "electron-builder": "^25.1.8",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.10.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "rcedit": "^5.0.2",
     "vite": "^6.0.3",
     "wait-on": "^8.0.3"
   },
   "allowScripts": {
-    "electron@36.9.5": true,
+    "electron@44.3.0": true,
     "esbuild@0.25.12": true
   },
   "build": {

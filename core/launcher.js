@@ -1,4 +1,3 @@
-const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { downloadFile } = require('./downloader');
@@ -133,7 +132,9 @@ function buildLaunchPlan({ versionDetails, clientJar, librariesCp, nativesDir, l
     jvmArgs = ['-Djava.library.path=${natives_directory}', '-cp', '${classpath}'].map(sub);
   }
   // RAM + logging + jar info (vanilla moderno lo espera)
-  jvmArgs = [`-Xmx${ramMb}M`, `-Xms512M`, `-Dminecraft.client.jar=${clientJar}`, ...(loggingPath ? [`-Dlog4j.configurationFile=${loggingPath}`] : []), ...jvmArgs];
+  // -Xms nunca por encima de -Xmx (con RAM baja, 512M de reserva hacía abortar a la JVM)
+  const xmsMb = Math.max(128, Math.min(512, Math.floor(ramMb / 2)));
+  jvmArgs = [`-Xmx${ramMb}M`, `-Xms${xmsMb}M`, `-Dminecraft.client.jar=${clientJar}`, ...(loggingPath ? [`-Dlog4j.configurationFile=${loggingPath}`] : []), ...jvmArgs];
   try {
     const { flagsFor } = require('./perfService');
     jvmArgs.push(...flagsFor(jvmPreset, javaMajor));
@@ -157,4 +158,5 @@ function buildLaunchPlan({ versionDetails, clientJar, librariesCp, nativesDir, l
   return { jvmArgs, gameArgs, mainClass, classpath, uuid };
 }
 
-module.exports = { resolveLibraries, launch, buildLaunchPlan, offlineUuid };
+// ruleAllows/splitArgs/flattenArgs se exportan también para poder probarlos sueltos
+module.exports = { resolveLibraries, launch, buildLaunchPlan, offlineUuid, ruleAllows, splitArgs, flattenArgs };

@@ -13,9 +13,11 @@ function withSettings(cfg) {
   return { ...cfg, settings: { ...defaultSettings(), ...(cfg.settings || {}) } };
 }
 
-// Los nombres vienen de la UI, pero nunca deben escapar del dir de instancias
+// Los nombres vienen de la UI, pero nunca deben escapar del dir de instancias.
+// Se normalizan '\' a '/' antes del basename: path.basename solo entiende el
+// separador de la plataforma y dejaría pasar 'a\\..\\b' (y cualquier ruta Windows).
 function safeName(n) {
-  const s = path.basename(String(n || ''));
+  const s = path.basename(String(n || '').replace(/\\/g, '/'));
   if (!s || s === '.' || s === '..') throw new Error('Nombre no válido');
   return s;
 }
@@ -32,8 +34,15 @@ function listInstances(instancesDir) {
     });
 }
 
+// '..' y '.' son caracteres válidos para el filtro, así que sobreviven a él y
+// como nombre de carpeta significan "fuera del dir de instancias": se quitan.
+function instanceBase(name) {
+  const cleaned = String(name || '').replace(/[^\w\-. ]+/g, '_').trim().replace(/^\.+$/, '');
+  return cleaned || 'Instancia';
+}
+
 function createInstance(instancesDir, name, versionId, opts = {}) {
-  const base = name.replace(/[^\w\-. ]+/g, '_').trim() || 'Instancia';
+  const base = instanceBase(name);
   const taken = (s) => {
     const d = path.join(instancesDir, s);
     try {
@@ -42,7 +51,11 @@ function createInstance(instancesDir, name, versionId, opts = {}) {
   };
   let safe = base, i = 2;
   while (taken(safe)) safe = `${base} (${i++})`;
-  const dir = path.join(instancesDir, safe);
+  const dir = path.resolve(instancesDir, safe);
+  // última red: la ruta final tiene que quedar dentro de instancesDir
+  if (dir !== path.resolve(instancesDir) && !dir.startsWith(path.resolve(instancesDir) + path.sep)) {
+    throw new Error('Nombre no válido');
+  }
   fs.mkdirSync(dir, { recursive: true });
   const type = ['fabric', 'quilt', 'forge', 'neoforge'].includes(opts.type) ? opts.type : 'vanilla';
   const cfg = withSettings({
@@ -85,7 +98,8 @@ function updateInstanceSettings(instancesDir, name, patch) {
   return withSettings({ name, path: dir, ...cfg });
 }
 
-module.exports = { ensureDirs, listInstances, createInstance, updateInstanceSettings, defaultSettings, setForgeProfile, duplicateInstance, deleteInstance, renameInstance, touchPlayed, addPlayTime, instanceSize, cleanInstance };
+// safeName se exporta para probarlo suelto (es la valla de las rutas)
+module.exports = { ensureDirs, listInstances, createInstance, safeName, instanceBase, updateInstanceSettings, defaultSettings, setForgeProfile, duplicateInstance, deleteInstance, renameInstance, touchPlayed, addPlayTime, instanceSize, cleanInstance };
 
 // Peso de una instancia (recursivo, sin seguir enlaces) + desglose por carpeta
 function walkSize(p, agg) {

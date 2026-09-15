@@ -1,7 +1,7 @@
 const COLORS = { info: 0xffb62e, ok: 0x34d399, error: 0xf87171 };
 
 async function notify(baseDir, kind, title, desc) {
-  let cfg = {};
+  let cfg;
   try {
     cfg = JSON.parse(require('fs').readFileSync(require('path').join(baseDir, 'ferro-config.json'), 'utf8'));
   } catch { return false; }

@@ -3,6 +3,7 @@ const os = require('os');
 const path = require('path');
 const AdmZip = require('adm-zip');
 const { downloadFile } = require('./downloader');
+const { extractEntries } = require('./zipService');
 
 const API = 'https://api.curseforge.com/v1';
 const UA = { 'User-Agent': `FerroLauncher/${require('../package.json').version} (github.com/4DRI4N-OFF/FerroLauncher)` };
@@ -192,12 +193,12 @@ async function finishPack(baseDir, tmpDir, zipPath, instanceDir, onLog) {
     done += Math.min(CONC, allFiles.length - done);
     onLog && onLog(`[ferro] modpack ${done}/${allFiles.length}\n`);
   }
-  for (const e of zip.getEntries()) {
-    if (e.isDirectory || !e.entryName.startsWith('overrides/')) continue;
-    const sub = e.entryName.slice('overrides/'.length);
-    if (!sub || sub.startsWith('..') || path.isAbsolute(sub)) continue;
-    zip.extractEntryTo(e, instanceDir, false, true);
-  }
+  // overrides/ conservando subcarpetas (ver modpackService: mismo criterio)
+  const ov = extractEntries(zip, instanceDir, {
+    stripPrefix: 'overrides/',
+    onSkip: (name, why) => onLog && onLog(`[ferro] salto override ${name}${why ? ` (${why})` : ''}\n`),
+  });
+  if (ov.written) onLog && onLog(`[ferro] overrides: ${ov.written} archivos\n`);
   try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
   return { files: allFiles.length };
 }

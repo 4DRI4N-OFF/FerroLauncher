@@ -50,7 +50,7 @@ async function premiumUuidOf(name) {
   const key = String(name || '').toLowerCase();
   const hit = premiumCache.get(key);
   if (hit && Date.now() - hit.t < PREMIUM_TTL) return hit.v;
-  let out = null;
+  let out;
   try {
     const res = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`);
     if (res.status === 200) out = (await res.json()).id || null;
@@ -922,7 +922,7 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
   } else {
     java = await ensureJava(requiredJavaVanilla, d.runtimes, send);
   }
-  const javaBin = java.path === 'java' ? 'java' : java.path;
+  let javaBin = java.path === 'java' ? 'java' : java.path;
   send(`[ferro] Java ${java.version} (major ${java.major}) en ${java.path}${java.managed ? ' [gestionado]' : ''}\n`);
 
   // Perfil efectivo: vanilla, modloader ligero, o el generado por el instalador Forge/NeoForge
@@ -960,6 +960,23 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
     send(`[ferro] ${api.label}: ${fab.count} libs, main ${fab.mainClass}\n`);
   }
   const requiredJava = details.javaVersion?.majorVersion || requiredJavaVanilla;
+  // El perfil EFECTIVO (el del loader/instalador) es el que manda: puede pedir un
+  // Java más nuevo que el de vanilla. Antes se calculaba aquí y no se usaba.
+  if (requiredJava && java.major != null && requiredJava > 8 && java.major < requiredJava && !(inst.settings?.javaMode === 'custom')) {
+    send(`[ferro] el perfil pide Java ${requiredJava} y el actual es ${java.major}: resolviendo...\n`);
+    try {
+      const better = await ensureJava(requiredJava, d.runtimes, send);
+      if (better && better.major >= requiredJava) {
+        java = better;
+        javaBin = java.path === 'java' ? 'java' : java.path;
+        send(`[ferro] Java ${java.version} (major ${java.major}) en ${java.path}${java.managed ? ' [gestionado]' : ''}\n`);
+      } else {
+        send(`[ferro] no hay Java ${requiredJava}: se lanza con ${java.major}, puede fallar\n`);
+      }
+    } catch (e) {
+      send(`[ferro] aviso: no se pudo conseguir Java ${requiredJava} (${e.message}). Se sigue con ${java.major}\n`);
+    }
+  }
 
   const forClient = details.downloads?.client?.url ? details : vanilla;
   const clientJar = await downloadClientJar(forClient, d.versions, (p) => { send(`[ferro] client ${(p*100).toFixed(0)}%\n`); prog('client', { done: p, total: 1 }); });

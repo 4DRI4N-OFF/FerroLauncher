@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const AdmZip = require('adm-zip');
 const { downloadFile } = require('./downloader');
+const { extractEntries } = require('./zipService');
 
 function is64() { return ['x64', 'arm64'].includes(process.arch); }
 
@@ -53,14 +54,13 @@ function ruleAllows(rules) {
 }
 
 function extractJar(dest, nativesDir, lib) {
-  const zip = new AdmZip(dest);
-  for (const e of zip.getEntries()) {
-    if (e.isDirectory) continue;
-    if (e.entryName.startsWith('META-INF')) continue;
-    const excl = lib.extract?.exclude || [];
-    if (excl.some((x) => e.entryName.startsWith(x))) continue;
-    zip.extractEntryTo(e, nativesDir, false, true);
-  }
+  const excl = lib.extract?.exclude || [];
+  // flatten: Java busca los .dll en plano (-Djava.library.path=<dir>), así que
+  // 'win64/lwjgl.dll' debe escribirse como 'lwjgl.dll' dentro del dir de natives.
+  return extractEntries(new AdmZip(dest), nativesDir, {
+    flatten: true,
+    filter: (e) => !e.entryName.startsWith('META-INF') && !excl.some((x) => e.entryName.startsWith(x)),
+  });
 }
 
 // Las versiones nuevas (p. ej. 26.x) piden subcarpetas: -Djava.library.path=${natives_directory}/java

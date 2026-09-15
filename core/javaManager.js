@@ -25,10 +25,6 @@ function compatible(systemMajor, required) {
   return systemMajor >= required; // 17+ suele tirar con Java más nuevo (21/25)
 }
 
-function managedJavaPath(runtimesDir, major) {
-  return path.join(runtimesDir, `java-${major}`, 'bin', 'java.exe');
-}
-
 async function checkJava(javaPath) {
   const version = await execJavaVersion(javaPath);
   if (!version) return null;

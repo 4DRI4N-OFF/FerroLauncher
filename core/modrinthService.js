@@ -48,20 +48,23 @@ function pickVersion(versions, { releaseOnly = true } = {}) {
   return list[0] || versions?.[0] || null;
 }
 
-function modsDir(instanceDir) {
-  return path.join(instanceDir, 'mods');
+// Nombres que vienen de la UI (mundo, archivo): nunca deben escapar del dir
+function safeSegment(n) {
+  const s = path.basename(String(n || '').replace(/\\/g, '/'));
+  if (!s || s === '.' || s === '..') throw new Error('Nombre no válido');
+  return s;
 }
 
 function contentDir(instanceDir, kind, world) {
   // Los datapacks viven por mundo: saves/<mundo>/datapacks
-  if (kind === 'datapack' && world) return path.join(instanceDir, 'saves', String(world), 'datapacks');
+  if (kind === 'datapack' && world) return path.join(instanceDir, 'saves', safeSegment(world), 'datapacks');
   return path.join(instanceDir, kindDir(kind));
 }
 
 // Mundos de una instancia (carpetas en saves/, con level.dat primero)
 function listWorlds(instanceDir) {
   const saves = path.join(String(instanceDir), 'saves');
-  let entries = [];
+  let entries;
   try { entries = fs.readdirSync(saves, { withFileTypes: true }); } catch { return []; }
   const dirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
   return dirs.sort((a, b) => {
@@ -103,14 +106,15 @@ async function installMod(instanceDir, projectId, mcVersion, loader = 'fabric', 
 
 function toggleMod(instanceDir, file, disable, kind = 'mod', world) {
   const dir = contentDir(instanceDir, kind, world);
-  const from = path.join(dir, file);
+  const base = safeSegment(file);
+  const from = path.join(dir, base);
   const to = disable ? (file.endsWith('.disabled') ? from : from + '.disabled') : from.replace(/\.disabled$/, '');
   if (from !== to) fs.renameSync(from, to);
   return path.basename(to);
 }
 
 function removeMod(instanceDir, file, kind = 'mod', world) {
-  fs.unlinkSync(path.join(contentDir(instanceDir, kind, world), file));
+  fs.unlinkSync(path.join(contentDir(instanceDir, kind, world), safeSegment(file)));
 }
 
 function sha1File(p) {
@@ -174,4 +178,4 @@ async function updateMod(instanceDir, projectId, mcVersion, loader, oldFile, onL
   return { version: v.version_number, file: file.filename };
 }
 
-module.exports = { searchMods, projectVersions, pickVersion, listMods, listWorlds, installModFile, installMod, toggleMod, removeMod, checkModUpdates, updateMod };
+module.exports = { safeSegment, searchMods, projectVersions, pickVersion, listMods, listWorlds, installModFile, installMod, toggleMod, removeMod, checkModUpdates, updateMod };

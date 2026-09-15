@@ -1,0 +1,82 @@
+name: CI
+
+# La revisión la hace la máquina: lint + tests + build en cada PR, y empaquetado
+# real en Windows (donde el launcher existe de verdad).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: lint + tests + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1" # el binario de Electron no hace falta para construir la UI
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint (el presupuesto de avisos no sube)
+        run: npm run lint
+
+      - name: Tests de core
+        run: npm run test
+
+      - name: Versión de la landing
+        run: npm run test:docs
+
+      - name: Build de la UI
+        run: npm run build
+
+      - name: Auditoría de dependencias de ejecución
+        # high/critical = rojo; los moderados salen en el log para tratarlos
+        run: npm audit --omit=dev --audit-level=high
+
+  package:
+    name: empaquetar (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 25
+    needs: check
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Construir y empaquetar (--dir + brand-exe + app-update.yml)
+        shell: pwsh
+        run: |
+          npm run build
+          npx electron-builder --win --dir
+          node scripts/brand-exe.js
+          node scripts/app-update-yml.js
+
+      - name: Subir el exe como artefacto (aún sin firmar, solo para probar)
+        uses: actions/upload-artifact@v7
+        with:
+          name: FerroLauncher-win-unpacked
+          path: release/win-unpacked/FerroLauncher.exe
+          if-no-files-found: error
+          retention-days: 7

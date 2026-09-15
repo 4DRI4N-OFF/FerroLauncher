@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const AdmZip = require('adm-zip');
+const { extractEntries } = require('./zipService');
 
 function backupsDir(baseDir, instanceName) {
   return path.join(baseDir, 'backups', instanceName);
@@ -41,7 +42,7 @@ function importPack(zipPath, instancesDir, onLog) {
   const name = uniqueDir(instancesDir, (readPackName(zipPath) || path.basename(zipPath, '.ferro')).replace(/[^\w\-. ]+/g, '_').trim() || 'Instancia');
   const dest = path.join(instancesDir, name);
   fs.mkdirSync(dest, { recursive: true });
-  new AdmZip(zipPath).extractAllTo(dest, true);
+  extractEntries(new AdmZip(zipPath), dest);
   // Normaliza el nombre interno
   try {
     const cfgPath = path.join(dest, 'ferro.json');
@@ -101,7 +102,7 @@ function restoreBackup(baseDir, instancesDir, instanceName, file, onLog) {
   const tmp = dest + '.restore-tmp';
   fs.rmSync(tmp, { recursive: true, force: true });
   fs.mkdirSync(tmp, { recursive: true });
-  new AdmZip(src).extractAllTo(tmp, true);
+  extractEntries(new AdmZip(src), tmp);
   fs.rmSync(dest, { recursive: true, force: true });
   fs.renameSync(tmp, dest);
   onLog && onLog(`[ferro] ${instanceName} restaurada desde ${file}\n`);
@@ -211,7 +212,7 @@ function profileRestore(zipPath, baseDir, onLog) {
   } catch (e) {
     throw new Error(`Perfil no válido: ${e.message}`);
   }
-  new AdmZip(zipPath).extractAllTo(baseDir, true);
+  extractEntries(new AdmZip(zipPath), baseDir);
   onLog && onLog('[ferro] perfil restaurado (reinicia el launcher)\n');
   return true;
 }

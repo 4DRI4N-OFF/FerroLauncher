@@ -4,14 +4,18 @@ const KEY = 'ferro-sfx';
 
 const FILE_FEELS = ['minimal', 'soft', 'glass', 'arcade', 'mechanical', 'organic', 'dreamy', 'scifi', 'rubber', 'cinematic', 'studio', 'zen'];
 
+// antes de loadCfg(): si se declara debajo, loadCfg se ejecuta contra una const en
+// TDZ y el launcher arranca en blanco (el fallo que ya dio en 0.9.3)
+export const PACKS = ['cristal', 'asmr', ...FILE_FEELS];
+
 function loadCfg() {
   let c = {};
   try { c = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch {}
   const pack = PACKS.includes(c.pack) ? c.pack : 'cristal';
-  return { enabled: true, volume: 0.5, hover: true, pack, ...c, pack };
+  // 'pack' al final: el valor validado gana sobre lo que hubiera en localStorage
+  // (antes la clave estaba duplicada y la primera asignación no servía de nada)
+  return { enabled: true, volume: 0.5, hover: true, ...c, pack };
 }
-
-export const PACKS = ['cristal', 'asmr', ...FILE_FEELS];
 
 // cue del launcher -> archivo UISFX
 const FILE_CUE = { click: 'press', hover: 'hover', success: 'success', error: 'error', launch: 'start', alarm: 'warning' };

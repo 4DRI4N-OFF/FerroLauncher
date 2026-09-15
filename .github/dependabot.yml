@@ -1,0 +1,15 @@
+# Dependabot: el launcher descarga de Mojang/Modrinth/curseforge, pero su
+# superficie de ataque local son las deps (adm-zip, electron). Que avise él.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule: { interval: weekly, time: "03:00", timezone: Europe/Madrid }
+    open-pull-requests-limit: 5
+    groups:
+      electron:
+        patterns: ["electron", "electron-builder", "electron-updater"]
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 3

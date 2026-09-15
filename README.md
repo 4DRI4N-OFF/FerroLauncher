@@ -48,7 +48,16 @@ npm install
 npm run electron:dev     # Vite + Electron with hot reload
 npm run build            # UI bundle check
 npm run dist             # NSIS installer + portable .exe in release/
+npm run check            # lint + core tests + landing version + build (this is what CI runs)
 ```
+
+`core/` is covered by `node --test` (`npm run test`): launch arguments, zip
+extraction, instance settings and the auth store. Add a test when you touch those.
+`npm run lint` has a warning budget (`--max-warnings`) that may only go down, so new
+silent `catch {}` blocks show up in CI instead of in a white screen.
+
+`npm run dist:full` uses the `rcedit` devDependency (override with `FERRO_RCDIT=<path>`
+if you keep your own copy).
 
 Project layout: `core/` launcher engine (Mojang/Fabric/Modrinth/Xbox APIs) · `electron/` main + preload (IPC) · `src/` React UI.
 
@@ -70,7 +79,9 @@ Project layout: `core/` launcher engine (Mojang/Fabric/Modrinth/Xbox APIs) · `e
 
 - [x] Offline launch (all 5 loaders) · [x] Modrinth + CurseForge content · [x] Skins, backups, multi-account
 - [x] Auto-updater, icon, sounds, themes, Discord · [x] ES/EN · [x] Friends, datapacks, news, auto-backups
-- [ ] Installer signing · [ ] 2.0
+- [ ] Installer signing (`electron-builder` 26 ships `@electron/windows-sign`: worth a try before the custom `brand-exe` step)
+- [ ] Split `src/App.jsx` per tab + `React.lazy` (single 417 kB chunk today)
+- [x] CI (lint + `node --test` + Windows packaging smoke) · [x] tokens at rest via `safeStorage` · [x] Electron 44 · [x] zip extraction hardened
 
 ## 🤝 Contributing
 

@@ -28,6 +28,46 @@ function readJson(p, fallback = null) {
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; }
 }
 
+// --- tokens en reposo -------------------------------------------------------
+// Windows cifra con DPAPI a través de safeStorage (clave del perfil de usuario).
+// Donde no esté disponible (otro SO, keyring roto, tests) se sigue guardando en
+// claro y el launcher funciona igual: es un mejora progresiva, no un requisito.
+const SECRET_FIELDS = ['mcToken', 'msRefresh', 'uhs'];
+
+let safeOverride = null; // costura para tests: setSafeStorageForTest()
+function setSafeStorageForTest(ss) { safeOverride = ss; }
+
+function getSafe() {
+  if (safeOverride !== null) return safeOverride;
+  try {
+    const ss = require('electron').safeStorage;
+    if (!ss || typeof ss.encryptString !== 'function') return null;
+    return ss.isEncryptionAvailable() ? ss : null;
+  } catch { return null; }
+}
+
+function encryptAccount(acc, safe) {
+  if (!safe) return acc;
+  const sec = {};
+  for (const k of SECRET_FIELDS) if (acc[k] !== undefined) sec[k] = acc[k];
+  if (!Object.keys(sec).length) return acc;
+  const out = { ...acc };
+  for (const k of SECRET_FIELDS) delete out[k];
+  out.secrets = safe.encryptString(JSON.stringify(sec)).toString('base64');
+  return out;
+}
+
+function decryptAccount(acc, safe) {
+  if (!acc || !acc.secrets) return acc;
+  const out = { ...acc };
+  delete out.secrets;
+  if (!safe) return null; // hay sesión cifrada pero no podemos leerla: mejor no fingir que existe
+  try {
+    Object.assign(out, JSON.parse(safe.decryptString(Buffer.from(String(acc.secrets), 'base64'))));
+  } catch { return null; }
+  return out;
+}
+
 // IDs de distribución: build/secrets.json local (gitignored) para tus builds.
 // Nunca commitees IDs: rota en Azure/Discord si alguno se filtró al historial.
 function localSecrets() {
@@ -166,6 +206,8 @@ async function fetchProfile(mcToken) {
   return { uuid: p.id, name: p.name, skins: p.skins || [], capes: p.capes || [] };
 }
 
+// En memoria las cuentas van SIEMPRE con los tokens en claro (es lo que espera
+// todo el resto del código); el cifrado es solo del archivo de disco.
 function loadStore(baseDir) {
   const p = authPaths(baseDir);
   let store = readJson(p.accounts, null);
@@ -177,16 +219,37 @@ function loadStore(baseDir) {
       store.accounts[old.profile.uuid] = old;
       store.active = old.profile.uuid;
     }
-    try { fs.mkdirSync(path.dirname(p.accounts), { recursive: true }); fs.writeFileSync(p.accounts, JSON.stringify(store, null, 2)); } catch {}
+    try { fs.mkdirSync(path.dirname(p.accounts), { recursive: true }); fs.writeFileSync(p.accounts, JSON.stringify(store, null, 2)); } catch (e) { console.error('[ferro] no se pudo crear accounts.json:', e.message); }
   }
   store.accounts = store.accounts || {};
+  const safe = getSafe();
+  let upgraded = false;
+  if (safe) {
+    for (const [uuid, acc] of Object.entries(store.accounts)) {
+      if (acc && acc.secrets) store.accounts[uuid] = decryptAccount(acc, safe) || null;
+      else if (acc && SECRET_FIELDS.some((k) => acc[k] !== undefined)) upgraded = true; // aún en claro: se cifra al reescribir
+      if (!store.accounts[uuid]) delete store.accounts[uuid]; // blob ilegible = sesión inservible, no cuenta a medias
+    }
+    if (store.active && !store.accounts[store.active]) store.active = Object.keys(store.accounts)[0] || null;
+    // migración: lo que había en claro se reescribe ya cifrado (writeStore cifra)
+    if (upgraded) {
+      try { writeStore(baseDir, store); } catch (e) { console.error('[ferro] no se pudo migrar accounts.json a tokens cifrados:', e.message); }
+    }
+  } else {
+    for (const [uuid, acc] of Object.entries(store.accounts)) if (acc && acc.secrets) delete store.accounts[uuid];
+  }
   return store;
 }
 
 function writeStore(baseDir, store) {
   const p = authPaths(baseDir).accounts;
+  const safe = getSafe();
+  const toDisk = {
+    active: store.active || null,
+    accounts: Object.fromEntries(Object.entries(store.accounts || {}).map(([uuid, acc]) => [uuid, safe ? encryptAccount(acc, safe) : acc])),
+  };
   fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, JSON.stringify(store, null, 2));
+  fs.writeFileSync(p, JSON.stringify(toDisk, null, 2));
 }
 
 function saveAccount(baseDir, account) {
@@ -261,7 +324,8 @@ async function validAccount(baseDir, clientId) {
 
 module.exports = {
   getClientId, getClientIdPublic, maskId, setClientId, getDiscord, setDiscord, deviceStart, devicePollOnce,
-  completeLogin, validAccount, loadAccount, clearAccount,
+  setSafeStorageForTest, encryptAccount, decryptAccount,
+  completeLogin, validAccount, loadAccount, saveAccount, clearAccount,
   listAccounts, setActive, removeAccount,
   exchangeCode, authorizeUrl, NATIVE_REDIRECT, SCOPE,
 };

@@ -34,7 +34,7 @@
     "eslint": "^10.10.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "rcedit": "^5.0.2",
-    "vite": "^6.0.3",
+    "vite": "^8.3.0",
     "wait-on": "^8.0.3"
   },
   "allowScripts": {

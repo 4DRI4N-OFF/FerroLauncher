@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, dialog, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 if (process.platform === 'win32') {
   try { app.setAppUserModelId('com.ferro.launcher'); } catch {}
 }
@@ -75,7 +75,6 @@ function shakeWindow() {
 }
 
 let win = null;
-let splash = null;
 let D = null;
 let activeChild = null;
 let bridgeTimer = null;
@@ -153,41 +152,6 @@ function boundsPath() { return path.join(getDirs().base, 'win-bounds.json'); }
 function loadBounds() { try { return JSON.parse(fs.readFileSync(boundsPath(), 'utf8')); } catch { return null; } }
 function saveBounds() { try { if (win && !win.isDestroyed()) fs.writeFileSync(boundsPath(), JSON.stringify(win.getBounds())); } catch {} }
 
-function createSplash() {
-  splash = new BrowserWindow({
-    width: 380, height: 430,
-    frame: false, transparent: true, alwaysOnTop: true,
-    resizable: false, skipTaskbar: true,
-    webPreferences: { nodeIntegration: false, contextIsolation: true },
-  });
-  splash.loadFile(path.join(__dirname, 'splash.html'));
-  splash._t0 = Date.now();
-}
-
-// Expande la ventana desde un rect inicial hasta el final con fade-in (morph splash -> app).
-// El centro queda clavado: solo crece el tamaño, así el logo centrado no deriva.
-function morphWindow(target, from, to, ms, done) {
-  const t0 = Date.now();
-  const cx = from.x + from.width / 2;
-  const cy = from.y + from.height / 2;
-  const ease = (t) => 1 - Math.pow(1 - t, 3);
-  const timer = setInterval(() => {
-    const t = Math.min(1, (Date.now() - t0) / ms);
-    const e = ease(t);
-    try {
-      const w = Math.round(from.width + (to.width - from.width) * e);
-      const h = Math.round(from.height + (to.height - from.height) * e);
-      target.setBounds({ x: Math.round(cx - w / 2), y: Math.round(cy - h / 2), width: w, height: h });
-      target.setOpacity(Math.max(0, Math.min(1, e)));
-    } catch { clearInterval(timer); return; }
-    if (t >= 1) {
-      clearInterval(timer);
-      try { target.setOpacity(1); } catch {}
-      done && done();
-    }
-  }, 16);
-}
-
 function createWindow() {
   win = new BrowserWindow({
     width: 1100, height: 700,
@@ -207,56 +171,26 @@ function createWindow() {
   if (dev) win.loadURL('http://localhost:5173');
   else win.loadFile(path.join(__dirname, '../dist/index.html'));
   win.once('ready-to-show', () => {
-    // Tiempo mínimo para que la animación del splash se aprecie
-    const wait = Math.max(0, 2400 - (Date.now() - ((splash && splash._t0) || Date.now())));
-    setTimeout(() => {
-      try {
-        if (win && !win.isDestroyed()) {
-          // La ventana nace con el tamaño del splash y crece hasta la app (morph)
-          let from = null;
-          const saved = loadBounds();
-          const target = { width: 1100, height: 700, x: undefined, y: undefined };
-          if (saved && saved.width >= 800 && saved.height >= 550) {
-            target.width = Math.min(2560, saved.width);
-            target.height = Math.min(1440, saved.height);
-          }
-          try {
-            if (splash && !splash.isDestroyed()) {
-              from = splash.getBounds();
-              const area = screen.getDisplayMatching(from).workArea;
-              target.x = Math.round(area.x + (area.width - 1100) / 2);
-              target.y = Math.round(area.y + (area.height - 700) / 2);
-              win.setBounds(from);
-            }
-          } catch {}
-          win.setOpacity(0);
-          win.show();
-          win.webContents.send('ferro:shown');
-          const settled = () => { try { win.webContents.send('ferro:settled'); } catch {} };
-          if (from) morphWindow(win, from, target, 650, settled);
-          else { try { win.setOpacity(1); } catch {} settled(); }
-          // Solape: el splash tapa el primer tramo para que no haya corte
-          setTimeout(() => {
-            try { if (splash && !splash.isDestroyed()) splash.close(); } catch {}
-            splash = null;
-          }, 250);
-        }
-      } catch {}
-    }, wait);
-  });
-  // Seguridad: si la ventana no carga (p. ej. sin servidor dev), no dejar el splash colgado
-  setTimeout(() => {
     try {
-      if (splash && !splash.isDestroyed() && win && !win.isVisible()) {
-        splash.close(); splash = null; win.show(); win.webContents.send('ferro:shown'); win.webContents.send('ferro:settled');
+      if (win && !win.isDestroyed()) {
+        const saved = loadBounds();
+        if (saved && saved.width >= 800 && saved.height >= 550) {
+          try {
+            win.setBounds({
+              width: Math.min(2560, saved.width),
+              height: Math.min(1440, saved.height),
+              x: saved.x, y: saved.y,
+            });
+          } catch {}
+        }
+        win.show();
       }
     } catch {}
-  }, 25000);
+  });
 }
 
 app.whenReady().then(() => {
   getDirs();
-  createSplash();
   createWindow();
   initUpdater();
   setTimeout(refreshIdlePresence, 5000);

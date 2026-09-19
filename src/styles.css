@@ -186,11 +186,37 @@ body::after {
 .dots-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; display: flex; flex-direction: column; gap: 6px; background: var(--glass-strong); border: 1px solid var(--stroke); border-radius: 14px; padding: 8px; min-width: 190px; box-shadow: 0 18px 50px rgba(0,0,0,.55); }
 .dots-menu > button { justify-content: flex-start; width: 100%; }
 
-/* ——— Modo baile: logo al ritmo + gelatina de resorte en ventanas (vía JS) ——— */
+/* ——— Modo AFK: cabeceo + brasas alborotadas (no bloquea: pointer-events none) ——— */
+.afk-overlay {
+  position: fixed; inset: 0; z-index: 150;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 30%, rgba(5, 3, 2, 0.55) 100%);
+  animation: fade-in 0.6s ease both;
+}
+.afk-badge {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  backdrop-filter: blur(28px) saturate(1.6);
+  border: 1px solid var(--stroke);
+  border-radius: 22px; padding: 26px 34px;
+  max-width: min(420px, 90vw);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6), 0 0 50px rgba(255, 130, 30, 0.12);
+  animation: afk-breathe 3s ease-in-out infinite;
+}
+.afk-badge img { width: 54px; filter: drop-shadow(0 8px 22px rgba(255, 120, 25, 0.5)); animation: afk-nod 3s ease-in-out infinite; }
+.afk-badge b { font-size: 18px; }
+.afk-badge p { margin: 0; color: var(--muted); font-size: 14px; min-height: 20px; }
+.afk-badge small { opacity: 0.55; font-size: 12px; }
+@keyframes afk-nod { 0%, 100% { transform: rotate(-8deg) translateY(0); } 50% { transform: rotate(8deg) translateY(5px); } }
+@keyframes afk-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+
+/* ——— Modo baile: graves→pulso, medios→resplandor, agudos→destellos (vía JS) ——— */
 body.dancing .brand-logo { transform: scale(calc(1 + var(--beat, 0) * .1)) rotate(calc(var(--beat, 0) * 4deg - 2deg)) !important; }
-body.dancing .side { box-shadow: 0 0 calc(4px + var(--beat, 0) * 30px) rgba(255, 110, 40, .3); }
+body.dancing .side { box-shadow: 0 0 calc(4px + var(--melody, 0) * 34px) rgba(255, 110, 40, .35); }
 body.dancing .card { transform: scale(calc(1 - var(--beat, 0) * .09)); }
-body.dancing .grid { gap: calc(12px + var(--beat, 0) * 16px); }
+body.dancing .grid { gap: calc(12px + var(--spark, 0) * 18px); }
 
 .layout { display: grid; grid-template-columns: auto 1fr; height: 100vh; }
 
@@ -289,21 +315,7 @@ body.dancing .grid { gap: calc(12px + var(--beat, 0) * 16px); }
   filter: drop-shadow(0 12px 30px var(--glow2)) brightness(1.1);
 }
 
-/* ——— Intro: el logo vuela del splash al sidebar ——— */
-body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
-.intro-overlay {
-  position: fixed; inset: 0; z-index: 100;
-  display: flex; align-items: center; justify-content: center;
-  background: radial-gradient(420px 260px at 50% 30%, rgba(255,110,40,.25), transparent 70%), rgba(13, 9, 8, 0.92);
-}
-.intro-logo {
-  position: relative; width: 300px; aspect-ratio: 2030 / 701; height: auto; display: block;
-  filter: drop-shadow(0 12px 34px rgba(255, 120, 25, 0.5));
-}
-.intro-full { width: 100%; height: 100%; display: block; border-radius: 18px; }
-.intro-mini { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; border-radius: 18px; }
-.intro-trail { position: fixed; border-radius: 50%; background: radial-gradient(circle, #ffd166, rgba(255,110,30,0) 70%); pointer-events: none; z-index: 101; }
-.intro-ring { position: fixed; width: 120px; height: 120px; border-radius: 50%; border: 2px solid rgba(255,182,46,.8); box-shadow: 0 0 24px rgba(255,182,46,.5), inset 0 0 24px rgba(255,182,46,.3); pointer-events: none; z-index: 101; }
+/* ——— Sidebar ——— */
 .side button {
   display: flex;
   align-items: center;
@@ -388,11 +400,7 @@ body.intro-lock, body.intro-lock .main { overflow: hidden !important; }
 .main { padding: 14px 22px 22px 16px; overflow: auto; }
 .main > * { max-width: 1060px; margin-inline: auto; }
 .main > .card { margin-bottom: 14px; }
-.main > .card { animation: rise 0.35s ease both; }
-@keyframes rise {
-  from { opacity: 0; transform: translateY(10px) scale(0.99); }
-  to { opacity: 1; transform: none; }
-}
+/* Entrada con muelle desde el lado más cercano (WAAPI: springIn/bootEnter en App.jsx) */
 .card {
   background:
     linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.02) 22%, transparent 45%),

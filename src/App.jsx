@@ -83,12 +83,71 @@ function springNav() {
   } catch {}
 }
 
+// Muelle de entrada desde el lado más cercano (misma curva que --spring).
+const SPRING_EASE = 'cubic-bezier(.34,1.56,.64,1)';
+const SIDE_VEC = { l: [-1, 0], r: [1, 0], t: [0, -1], b: [0, 1] };
+// Lado del viewport más cercano a un punto (x, y).
+function nearestSide(x, y) {
+  const vw = window.innerWidth || 1100, vh = window.innerHeight || 700;
+  let best = 'l', bd = x;
+  if (vw - x < bd) { best = 'r'; bd = vw - x; }
+  if (y < bd) { best = 't'; bd = y; }
+  if (vh - y < bd) { best = 'b'; }
+  return best;
+}
+// Una ventana entra deslizándose desde su lado más cercano con rebote de muelle.
+function springIn(el, dist = 70, delay = 0) {
+  try {
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height) return;
+    try { el.getAnimations().forEach((a) => a.cancel()); } catch {}
+    const [vx, vy] = SIDE_VEC[nearestSide(r.left + r.width / 2, r.top + r.height / 2)];
+    el.animate([
+      { transform: `translate(${(vx * dist).toFixed(0)}px, ${(vy * dist).toFixed(0)}px) scale(.96)`, opacity: 0 },
+      { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+    ], { duration: 550, delay, easing: SPRING_EASE, fill: 'backwards' });
+  } catch {}
+}
+
+// Entrada con muelle para TODAS las categorías y ventanas: cada bloque (.card/.hero,
+// esté anidado o no) entra desde su lado más cercano con rebote. Un MutationObserver
+// caza los bloques nuevos (cambio de pestaña, listas que llegan async), así nada
+// queda sin animar. Cada elemento se anima una sola vez (WeakSet).
+const enteredEls = new WeakSet();
+function enterBatch(nodes) {
+  try {
+    const fresh = nodes.filter((el) => el instanceof Element && !enteredEls.has(el));
+    fresh.forEach((el) => enteredEls.add(el));
+    fresh.slice(0, 24).forEach((el, i) => springIn(el, 70, Math.min(i, 12) * 40));
+  } catch {}
+}
+function initEnter() {
+  try {
+    // Intro: la sidebar entra en cascada.
+    document.querySelectorAll('.side > button').forEach((b, i) => springIn(b, 40, i * 45));
+    const main = document.querySelector('.main');
+    if (main) enterBatch([...main.querySelectorAll('.card, .hero')]);
+    const target = main || document.body;
+    const mo = new MutationObserver((muts) => {
+      const added = [];
+      for (const m of muts) m.addedNodes.forEach((n) => {
+        if (!n || n.nodeType !== 1) return;
+        try {
+          if (n.matches && n.matches('.card, .hero')) added.push(n);
+          if (n.querySelectorAll) n.querySelectorAll('.card, .hero').forEach((c) => added.push(c));
+        } catch {}
+      });
+      if (added.length) enterBatch(added);
+    });
+    mo.observe(target, { childList: true, subtree: true });
+    return () => { try { mo.disconnect(); } catch {} };
+  } catch { return () => {}; }
+}
+
 // Resorte de Apple al hacer scroll: al llegar al tope, el contenido cede
 // con resistencia y vuelve con muelle. Un solo listener global.
+// Independiente de la configuración de Windows: siempre activo.
 function initSpringScroll() {
-  try {
-    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return () => {};
-  } catch {}
   const state = new WeakMap();
   const MAX = 130;
   const onWheel = (e) => {
@@ -146,22 +205,25 @@ function initSpringScroll() {
   return () => { try { document.removeEventListener('wheel', onWheel, { capture: true }); } catch {} };
 }
 
-// El recuadro del botón crece hasta convertirse en la ventana (morph ida y vuelta)
+// La ventana entra desde el lado más cercano al botón que la abrió, con rebote de muelle
 function MorphModal({ origin, closing, onClose, title, children }) {
   const boxRef = useRef(null);
   const ovRef = useRef(null);
   useLayoutEffect(() => {
     const box = boxRef.current;
-    if (!box || !origin) return;
-    const r = box.getBoundingClientRect();
-    const dx = origin.cx - (r.left + r.width / 2);
-    const dy = origin.cy - (r.top + r.height / 2);
-    const sx = Math.max(0.05, origin.w / r.width);
-    const sy = Math.max(0.05, origin.h / r.height);
+    if (!box) return;
+    let x = 0, y = 0;
+    try {
+      const r = box.getBoundingClientRect();
+      const px = origin ? origin.cx : r.left + r.width / 2;
+      const py = origin ? origin.cy : r.top + r.height / 2;
+      const [vx, vy] = SIDE_VEC[nearestSide(px, py)];
+      x = vx * 130; y = vy * 130;
+    } catch {}
     box.animate([
-      { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`, opacity: 1, borderRadius: '14px' },
-      { transform: 'none', opacity: 1, borderRadius: '22px' },
-    ], { duration: 700, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'backwards' });
+      { transform: `translate(${x}px, ${y}px) scale(.94)`, opacity: 0 },
+      { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+    ], { duration: 600, easing: SPRING_EASE, fill: 'backwards' });
   }, []);
   useEffect(() => {
     if (!closing) return;
@@ -197,6 +259,9 @@ export default function App() {
     return 'jugar';
   });
   useEffect(() => { try { localStorage.setItem('ferro-tab', tab); } catch {} }, [tab]);
+  // Intro + cualquier contenido nuevo: cada bloque entra desde su lado más cercano.
+  useEffect(() => initEnter(), []);
+
   const [sideOpen, setSideOpen] = useState(false);
   const [sidePinned, setSidePinned] = useState(() => { try { return localStorage.getItem('ferro-sidepin') === '1'; } catch { return false; } });
   const sideBig = sideOpen || sidePinned;
@@ -375,10 +440,7 @@ export default function App() {
   const [galOrigin, setGalOrigin] = useState(null);
   const [galClosing, setGalClosing] = useState(false);
   const [galShots, setGalShots] = useState([]);
-  const [intro, setIntro] = useState(true);
-  const introImgRef = useRef(null);
   const sideLogoRef = useRef(null);
-  const overlayRef = useRef(null);
   const pollRef = useRef(null);
   const [launchInstance, setLaunchInstance] = useState(() => { try { return localStorage.getItem('ferro-instance') || ''; } catch { return ''; } });
   useEffect(() => { try { localStorage.setItem('ferro-username', username); } catch {} }, [username]);
@@ -421,7 +483,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tourIdx, tab, lang]);
 
-  // Auto-arranque solo la primera vez (tras la intro)
+  // Auto-arranque solo la primera vez
   useEffect(() => {
     let ok = false;
     try { ok = !localStorage.getItem('ferro-tour-done-2'); } catch {}
@@ -543,6 +605,54 @@ export default function App() {
     };
     tick();
   };
+  // Modo AFK: 10 s sin tocar nada y el launcher cabecea (las brasas se alborotan).
+  // Cualquier actividad despierta; si la siesta fue larga (>=60 s) hay fiesta sorpresa.
+  // No cabecea mientras el juego está en marcha.
+  const [afk, setAfk] = useState(false);
+  const [afkSecs, setAfkSecs] = useState(0);
+  const afkRef = useRef({ idle: null, tick: null, t0: 0, on: false });
+  const runningRef = useRef(false);
+  useEffect(() => { runningRef.current = running; });
+  useEffect(() => {
+    const st = afkRef.current;
+    const arm = () => { clearTimeout(st.idle); st.idle = setTimeout(sleep, 10000); };
+    const sleep = () => {
+      if (runningRef.current) { arm(); return; }
+      st.on = true; st.t0 = Date.now();
+      setAfkSecs(0); setAfk(true);
+      try { document.body.classList.add('afk'); } catch {}
+      try { window.__ferroAfk = 1; } catch {}
+      setLog((l) => l + '[ferro] zzz…\n');
+      clearInterval(st.tick);
+      st.tick = setInterval(() => {
+        if (runningRef.current) { wake(); return; }
+        setAfkSecs(Math.round((Date.now() - st.t0) / 1000));
+      }, 1000);
+    };
+    const wake = () => {
+      arm();
+      if (!st.on) return;
+      st.on = false;
+      clearInterval(st.tick);
+      const s = Math.round((Date.now() - st.t0) / 1000);
+      setAfk(false);
+      try { document.body.classList.remove('afk'); } catch {}
+      try { window.__ferroAfk = 0; } catch {}
+      sfx.play('success');
+      pushToast('success', t('afk.back', { s }));
+      setLog((l) => l + `[ferro] ${t('afk.back', { s })}\n`);
+      if (s >= 60) { try { confettiBurst(window.innerWidth / 2, window.innerHeight * 0.4); } catch {} }
+    };
+    ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart'].forEach((ev) =>
+      window.addEventListener(ev, wake, { passive: true }));
+    arm();
+    return () => {
+      clearTimeout(st.idle); clearInterval(st.tick);
+      ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart'].forEach((ev) =>
+        window.removeEventListener(ev, wake));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Explosión de tarjeta: destello + metralla + humo con piezas DOM animadas
   // por el compositor (WAAPI): va fluido incluso sin aceleracion de canvas.
   const boomBurst = (rect) => {
@@ -990,102 +1100,6 @@ export default function App() {
   };
   useEffect(() => stopPoll, []);
 
-  // Intro: el logo vuela del centro (donde estaba el splash) al sidebar
-  useEffect(() => {
-    document.body.classList.add('intro-lock');
-    const unlock = () => document.body.classList.remove('intro-lock');
-    let done = false;
-    const fly = async () => {
-      if (done) return;
-      done = true;
-      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      const img = introImgRef.current, target = sideLogoRef.current, ov = overlayRef.current;
-      if (!img || !target) { unlock(); setIntro(false); return; }
-      const r1 = img.getBoundingClientRect(), r2 = target.getBoundingClientRect();
-      // Aterriza sobre el mini real (no sobre la caja): el fundido lo deja ya con su forma.
-      const tiny0 = img.querySelector('.intro-mini'), full0 = img.querySelector('.intro-full');
-      const land = (target.querySelector && target.querySelector('.brand-mini')) || target;
-      const rl = land.getBoundingClientRect();
-      const dx = rl.left + rl.width / 2 - (r1.left + r1.width / 2);
-      const dy = rl.top + rl.height / 2 - (r1.top + r1.height / 2);
-      const baseTiny = tiny0 ? tiny0.getBoundingClientRect() : r1;
-      // Escala por dibujo visible (contain), no por caja: el mini es cuadrado.
-      const glyph = (r) => Math.min(r.width, r.height);
-      const s = glyph(baseTiny) > 0 ? glyph(rl) / glyph(baseTiny) : r2.width / r1.width;
-      sfx.play('whoosh');
-      const trailTimer = setInterval(() => {
-        try {
-          const rr = img.getBoundingClientRect();
-          const d = document.createElement('div');
-          d.className = 'intro-trail';
-          const sz = 4 + Math.random() * 8;
-          d.style.width = d.style.height = sz.toFixed(0) + 'px';
-          d.style.left = (rr.left + rr.width / 2) + 'px';
-          d.style.top = (rr.top + rr.height / 2) + 'px';
-          (ov || document.body).appendChild(d);
-          d.animate([
-            { transform: 'translate(-50%,-50%) scale(1)', opacity: 0.9 },
-            { transform: 'translate(-50%,-50%) scale(0)', opacity: 0 },
-          ], { duration: 550, easing: 'ease-out' }).finished.catch(() => {}).finally(() => { try { d.remove(); } catch {} });
-        } catch {}
-      }, 80);
-      try {
-        const a1 = img.animate([
-          { transform: 'translate(0, 0) scale(1)' },
-          { transform: `translate(${dx}px, ${dy}px) scale(${s})` },
-        ], { duration: 1100, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'forwards' });
-        const jobs = [a1.finished];
-        if (full0) jobs.push(full0.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 450, easing: 'ease-in', fill: 'forwards' }).finished);
-        if (tiny0) jobs.push(tiny0.animate([
-          { opacity: 0, transform: 'scale(.5)' },
-          { opacity: 1, transform: 'scale(1.06)', offset: 0.7 },
-          { opacity: 1, transform: 'scale(1)' },
-        ], { duration: 900, delay: 300, easing: 'ease-out', fill: 'forwards' }).finished);
-        await Promise.all(jobs);
-      } catch {}
-      clearInterval(trailTimer);
-      // Aterrizaje: onda + punch cinematografico + campana
-      sfx.play('chime');
-      try {
-        document.querySelector('.layout')?.animate(
-          [{ transform: 'scale(.985)', opacity: 0.65 }, { transform: 'scale(1)', opacity: 1 }],
-          { duration: 550, easing: 'cubic-bezier(.2,1.2,.3,1)' });
-      } catch {}
-      try {
-        const ring = document.createElement('div');
-        ring.className = 'intro-ring';
-        const rt = target.getBoundingClientRect();
-        ring.style.left = (rt.left + rt.width / 2) + 'px';
-        ring.style.top = (rt.top + rt.height / 2) + 'px';
-        (ov || document.body).appendChild(ring);
-        await ring.animate([
-          { transform: 'translate(-50%,-50%) scale(.2)', opacity: 0.85 },
-          { transform: 'translate(-50%,-50%) scale(1)', opacity: 0 },
-        ], { duration: 650, easing: 'ease-out', fill: 'forwards' }).finished.catch(() => {});
-        ring.remove();
-      } catch {}
-      // Fundido del fondo: la overlay se disuelve sobre la app en vez de cortarse.
-      try {
-        if (ov) await ov.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 450, easing: 'ease-out', fill: 'forwards' }).finished;
-      } catch {}
-      unlock();
-      setIntro(false);
-    };
-    if (window.ferro?.onShown) {
-      let fallback;
-      // El vuelo arranca cuando la ventana deja de crecer (medidas ya estables)
-      window.ferro?.onSettled?.(() => fly());
-      window.ferro?.onShown(() => {
-        fallback = setTimeout(fly, 2000); // por si settled no llega
-      });
-      const isReload = (() => { try { return performance.getEntriesByType('navigation')[0]?.type === 'reload'; } catch { return false; } })();
-      const t = setTimeout(fly, isReload ? 1500 : 9000); // salvavidas (rapido tras recargar)
-      return () => { clearTimeout(t); clearTimeout(fallback); unlock(); };
-    }
-    const t = setTimeout(fly, 600); // fuera de Electron
-    return () => { clearTimeout(t); unlock(); };
-  }, []);
-
   useEffect(() => {
     window.ferro?.onAuthResult?.((err, data) => {
       setBrowserWaiting(false);
@@ -1160,25 +1174,43 @@ export default function App() {
     window.ferro?.status?.().then((s) => setRunning(!!s?.running)).catch(()=>{});
   }, []);
 
-  // Tilt 3D en tarjetas al pasar el ratón
+  // Tilt 3D en tarjetas al pasar el ratón: sutil en tarjetas anchas y nunca
+  // bajo menús/ventanas abiertas (se leen planos). Limpieza agresiva para
+  // que el tilt no quede clavado (scroll, blur, cambio de pestaña...).
   useEffect(() => {
     const clear = (except) => document.querySelectorAll('.grid .card.tilting').forEach((c) => {
       if (c !== except) { c.classList.remove('tilting'); c.style.transform = ''; }
     });
+    const clearAll = () => clear(null);
     const move = (e) => {
+      if (e.target.closest?.('.dots-menu, .morph-overlay, .tour-tip, .toasts')) { clearAll(); return; }
       const card = e.target.closest?.('.grid .card');
       clear(card);
       if (!card) return;
       const r = card.getBoundingClientRect();
       const px = (e.clientX - r.left) / r.width - 0.5;
       const py = (e.clientY - r.top) / r.height - 0.5;
+      // Las filas anchas apenas basculan: el ángulo se atenúa con el ancho.
+      const k = Math.min(1, 340 / Math.max(1, r.width));
       card.classList.add('tilting');
-      card.style.transform = `perspective(900px) rotateX(${(-py * 7).toFixed(2)}deg) rotateY(${(px * 7).toFixed(2)}deg) translateY(-3px)`;
+      card.style.transform = `perspective(900px) rotateX(${(-py * 7 * k).toFixed(2)}deg) rotateY(${(px * 7 * k).toFixed(2)}deg) translateY(-3px)`;
     };
-    const out = (e) => { if (!e.relatedTarget) clear(null); };
+    const out = (e) => { if (!e.relatedTarget) clearAll(); };
     document.addEventListener('mousemove', move);
     document.addEventListener('mouseout', out);
-    return () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseout', out); };
+    document.addEventListener('mouseleave', clearAll);
+    document.addEventListener('scroll', clearAll, true);
+    window.addEventListener('blur', clearAll);
+    document.addEventListener('visibilitychange', clearAll);
+    return () => {
+      clearAll();
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseout', out);
+      document.removeEventListener('mouseleave', clearAll);
+      document.removeEventListener('scroll', clearAll, true);
+      window.removeEventListener('blur', clearAll);
+      document.removeEventListener('visibilitychange', clearAll);
+    };
   }, [tab]);
 
   // Clics y hover globales en botones
@@ -1500,8 +1532,11 @@ export default function App() {
     try { danceCtx.current && danceCtx.current.close(); } catch {}
     danceCtx.current = null; danceAn.current = null;
     document.body.classList.remove('dancing');
-    try { document.documentElement.style.removeProperty('--beat'); } catch {}
-    try { window.__ferroBeat = 0; } catch {}
+    try {
+      const st = document.documentElement.style;
+      st.removeProperty('--beat'); st.removeProperty('--melody'); st.removeProperty('--spark');
+    } catch {}
+    try { window.__ferroBeat = 0; window.__ferroMelody = 0; window.__ferroSpark = 0; } catch {}
     try {
       document.querySelectorAll('.layout > .main .card').forEach((c) => { c.style.transition = ''; c.style.transform = ''; c.style.transformOrigin = ''; });
     } catch {}
@@ -1534,16 +1569,29 @@ export default function App() {
       const resume = () => { try { ctx.state === 'suspended' && ctx.resume(); } catch {} };
       if (ctx.state === 'suspended') { window.addEventListener('pointerdown', resume, { once: true }); window.addEventListener('keydown', resume, { once: true }); }
       const buf = new Uint8Array(an.frequencyBinCount);
-      let beat = 0;
+      // Tres bandas, tres cosas: graves→pulso, medios→resplandor, agudos→destellos.
+      const binHz = ctx.sampleRate / an.fftSize;
+      const avgBand = (loHz, hiHz) => {
+        const lo = Math.max(1, Math.floor(loHz / binHz));
+        const hi = Math.min(buf.length - 1, Math.ceil(hiHz / binHz));
+        let s = 0, n = 0;
+        for (let i = lo; i <= hi; i++) { s += buf[i] || 0; n++; }
+        return n ? s / n / 255 : 0;
+      };
+      let beat = 0, melody = 0, spark = 0;
       const loop = () => {
         try {
           an.getByteFrequencyData(buf);
-          let b = 0; for (let i = 1; i <= 3; i++) b += buf[i] || 0;
-          b = b / 3 / 255;
-          beat = Math.max(b, beat * 0.9);
-          const shaped = Math.pow(beat, 1.6);
-          document.documentElement.style.setProperty('--beat', shaped.toFixed(3));
-          try { window.__ferroBeat = shaped; } catch {}
+          // Graves: bombo (40-140 Hz) · Medios: voz/caja (350-2000 Hz) · Agudos: platos (2.8-9.5 kHz)
+          beat = Math.max(avgBand(40, 140), beat * 0.9);
+          melody = Math.max(avgBand(350, 2000), melody * 0.88);
+          spark = Math.max(avgBand(2800, 9500), spark * 0.82);
+          const b = Math.pow(beat, 1.6), m = Math.pow(melody, 1.4), s = Math.pow(spark, 1.3);
+          const root = document.documentElement.style;
+          root.setProperty('--beat', b.toFixed(3));
+          root.setProperty('--melody', m.toFixed(3));
+          root.setProperty('--spark', s.toFixed(3));
+          try { window.__ferroBeat = b; window.__ferroMelody = m; window.__ferroSpark = s; } catch {}
         } catch {}
         danceRaf.current = requestAnimationFrame(loop);
       };
@@ -2165,15 +2213,18 @@ export default function App() {
         )}
         </div>
       </div>
-      {intro && (
-      <div className="intro-overlay" ref={overlayRef}>
-        <div ref={introImgRef} className="intro-logo">
-            <img className="intro-full" src={brand} alt="" />
-            <img className="intro-mini" src={flMark} alt="FL" />
+      {flashKey > 0 && <div key={flashKey} className="vignette" />}
+      {afk && (
+        <div className="afk-overlay">
+          <div className="afk-badge">
+            <img src={flMark} alt="FL" />
+            <b>{t('afk.title')}</b>
+            <p>{t(`afk.j${(Math.floor(afkSecs / 4) % 6) + 1}`, { s: afkSecs })}</p>
+            <span className="pill">{afkSecs}s AFK</span>
+            <small>{t('afk.hint')}</small>
           </div>
         </div>
       )}
-      {flashKey > 0 && <div key={flashKey} className="vignette" />}
       {tourIdx !== null && (() => {
         const steps = tourSteps();
         const st = steps[tourIdx];

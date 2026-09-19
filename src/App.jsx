@@ -615,8 +615,8 @@ export default function App() {
   useEffect(() => { runningRef.current = running; });
   useEffect(() => {
     const st = afkRef.current;
-    const arm = () => { clearTimeout(st.idle); st.idle = setTimeout(sleep, 10000); };
-    const sleep = () => {
+    function arm() { clearTimeout(st.idle); st.idle = setTimeout(sleep, 10000); }
+    function sleep() {
       if (runningRef.current) { arm(); return; }
       st.on = true; st.t0 = Date.now();
       setAfkSecs(0); setAfk(true);
@@ -628,8 +628,8 @@ export default function App() {
         if (runningRef.current) { wake(); return; }
         setAfkSecs(Math.round((Date.now() - st.t0) / 1000));
       }, 1000);
-    };
-    const wake = () => {
+    }
+    function wake() {
       arm();
       if (!st.on) return;
       st.on = false;
@@ -642,7 +642,7 @@ export default function App() {
       pushToast('success', t('afk.back', { s }));
       setLog((l) => l + `[ferro] ${t('afk.back', { s })}\n`);
       if (s >= 60) { try { confettiBurst(window.innerWidth / 2, window.innerHeight * 0.4); } catch {} }
-    };
+    }
     ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart'].forEach((ev) =>
       window.addEventListener(ev, wake, { passive: true }));
     arm();

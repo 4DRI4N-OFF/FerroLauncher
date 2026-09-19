@@ -11,7 +11,7 @@
   <a href="https://www.youtube.com/@4dri4n-08"><img src="https://img.shields.io/badge/YouTube-@4dri4n--08-red?logo=youtube" alt="YouTube" /></a>
 </p>
 
-<p align="center"><b>Open-source Minecraft: Java Edition launcher for Windows.</b><br />Instances, loaders, mods and modpacks in one place — with a glassmorphism ember UI.</p>
+<p align="center"><b>Open-source Minecraft: Java Edition launcher for Windows — with personality.</b><br />Instances, loaders, mods and modpacks in one place, talking like a mate, not a manual.</p>
 
 ---
 
@@ -27,7 +27,11 @@
 | 👥 Friends | Friend list with live server presence + Essential Mod panel |
 | 📰 News | Live Mojang feed inside the launcher |
 | 💾 Backups | Manual + automatic (daily, weekly, before playing), auto/ kept apart |
-| 🎨 UI | 5 themes (Ember, Midnight, Forest, Sakura, Ancient City + Warden), ES/EN, 14 sound styles, toasts, dance mode |
+| 🌀 Motion | Spring entrance from the nearest edge, repaired 3D tilt, no-splash fast boot |
+| 😴 AFK mode | Nods off after 10 s idle with jokes + ember frenzy; confetti if you were gone 60 s+ |
+| 🎚️ Dance mode | Desktop audio in 3 bands: bass→pulse, mids→glow, highs→sparkle |
+| 🗣️ Voice | Ferro talks like a forge buddy (casual ES gamer + EN mirror), never like a manual |
+| 🎨 UI | 7 themes (Ember, Midnight, Forest, Sakura, Ancient City + Warden…), ES/EN, 14 sound styles, toasts |
 | ⌨️ Shortcuts | F5 play/stop, Ctrl+1..0 tabs, Ctrl+, settings |
 | ☕ Java | Auto-detects the required version, downloads Temurin when missing |
 | 🛡️ Safety | Premium-name anti-impersonation, download verification, backups |
@@ -79,8 +83,9 @@ Project layout: `core/` launcher engine (Mojang/Fabric/Modrinth/Xbox APIs) · `e
 
 - [x] Offline launch (all 5 loaders) · [x] Modrinth + CurseForge content · [x] Skins, backups, multi-account
 - [x] Auto-updater, icon, sounds, themes, Discord · [x] ES/EN · [x] Friends, datapacks, news, auto-backups
+- [x] v0.9.4: spring entrance, AFK mode, 3-band dance, human voice
 - [ ] Installer signing (`electron-builder` 26 ships `@electron/windows-sign`: worth a try before the custom `brand-exe` step)
-- [ ] Split `src/App.jsx` per tab + `React.lazy` (single 417 kB chunk today)
+- [ ] Split `src/App.jsx` per tab + `React.lazy` (single ~420 kB chunk today)
 - [x] CI (lint + `node --test` + Windows packaging smoke) · [x] tokens at rest via `safeStorage` · [x] Electron 44 · [x] zip extraction hardened
 
 ## 🤝 Contributing

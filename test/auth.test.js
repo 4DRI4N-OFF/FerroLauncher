@@ -123,6 +123,56 @@ test('getClientId: config de usuario > variable de entorno', (t) => {
   assert.equal(pub.masked.includes('id-del-entorno'), false, 'la API pública no devuelve el id completo');
 });
 
+// Sin esto, el launcher recien instalado no puede entrar en Microsoft y le pide
+// al usuario normal que registre su propia app en Azure.
+test('sin config ni entorno, cae al client ID de distribucion incluido', (t) => {
+  const base = tmpBase(t);
+  delete process.env.FERRO_CLIENT_ID;
+  const id = auth.getClientId(base);
+  assert.ok(id, 'deberia venir incluido en build/identity.json');
+  assert.match(id, /^[0-9a-f-]{36}$/i, 'un Application (client) ID de Azure es un GUID');
+  const pub = auth.getClientIdPublic(base);
+  assert.equal(pub.configured, true, 'la UI lo ve como listo y no pide nada');
+  assert.equal(pub.masked.includes(id), false, 'pero nunca enseña el id entero');
+});
+
+test('build/identity.json esta versionado y entra en el paquete', () => {
+  const raiz = path.join(__dirname, '..');
+  const id = JSON.parse(fs.readFileSync(path.join(raiz, 'build', 'identity.json'), 'utf8'));
+  assert.match(id.clientId, /^[0-9a-f-]{36}$/i);
+
+  // si este fichero no esta en build.files, el launcher publicado sale sin ID
+  const pkg = JSON.parse(fs.readFileSync(path.join(raiz, 'package.json'), 'utf8'));
+  assert.ok(pkg.build.files.includes('build/**/*'), 'build/**/* debe entrar en el paquete');
+  assert.ok(!pkg.build.files.includes('!build/identity.json'), 'y identity.json no debe excluirse');
+});
+
+test('precedencia: el override local de build/secrets.json gana al incluido', (t) => {
+  const base = tmpBase(t);
+  delete process.env.FERRO_CLIENT_ID;
+  const incluido = auth.getClientId(base);
+  const secretos = path.join(__dirname, '..', 'build', 'secrets.json');
+  fs.writeFileSync(secretos, JSON.stringify({ clientId: 'id-del-secrets-local' }));
+  t.after(() => fs.rmSync(secretos, { force: true }));
+  assert.equal(auth.getClientId(base), 'id-del-secrets-local');
+  fs.rmSync(secretos);
+  assert.equal(auth.getClientId(base), incluido, 'sin secrets.json vuelve al incluido');
+});
+
+test('getDiscord: mismo criterio que el client ID de Microsoft', (t) => {
+  const base = tmpBase(t);
+  const prev = process.env.FERRO_DISCORD_ID;
+  delete process.env.FERRO_DISCORD_ID;
+  t.after(() => { if (prev !== undefined) process.env.FERRO_DISCORD_ID = prev; });
+  // sin discordId en identity.json el launcher funciona igual, solo no hay presencia
+  assert.equal(typeof auth.getDiscord(base).clientId, 'string');
+  assert.equal(auth.getDiscord(base).enabled, true);
+  const secretos = path.join(__dirname, '..', 'build', 'secrets.json');
+  fs.writeFileSync(secretos, JSON.stringify({ discordId: 'discord-local' }));
+  t.after(() => fs.rmSync(secretos, { force: true }));
+  assert.equal(auth.getDiscord(base).clientId, 'discord-local', 'el override local gana');
+});
+
 test('ferro-config.json corrupto no tumba el launcher', (t) => {
   const base = tmpBase(t);
   fs.writeFileSync(path.join(base, 'ferro-config.json'), '{ esto no es json');

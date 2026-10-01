@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { swallow } = require('./ignore');
 
 function ensureDirs(d) {
   for (const p of Object.values(d)) fs.mkdirSync(p, { recursive: true });
@@ -104,7 +105,8 @@ module.exports = { ensureDirs, listInstances, createInstance, safeName, instance
 // Peso de una instancia (recursivo, sin seguir enlaces) + desglose por carpeta
 function walkSize(p, agg) {
   let st;
-  try { st = fs.lstatSync(p); } catch { return; }
+  // un archivo que no se puede leer no puede invalidar el contador entero
+  try { st = fs.lstatSync(p); } catch (e) { swallow(`instanceSize(${p})`, e); return; }
   if (st.isSymbolicLink()) return;
   if (st.isFile()) { agg.bytes += st.size; agg.files++; return; }
   if (!st.isDirectory()) return;
@@ -134,7 +136,7 @@ function cleanInstance(instanceDir) {
       const s = fs.statSync(p);
       if (!s.isFile()) return;
       freed += s.size; fs.unlinkSync(p); removed++;
-    } catch {}
+    } catch (e) { swallow('cleanInstance (log abierto por otro proceso)', e); }
   };
   try {
     const logs = path.join(instanceDir, 'logs');
@@ -194,6 +196,8 @@ function renameInstance(instancesDir, oldName, newName) {
   return safe;
 }
 
+// Si esto falla, el contador de partidas se queda congelado sin avisar: por eso
+// aqui no se traga en silencio sino que deja rastro con FERRO_DEBUG=1.
 function touchPlayed(instancesDir, name) {
   try {
     const cfgPath = path.join(instancesDir, safeName(name), 'ferro.json');
@@ -201,7 +205,7 @@ function touchPlayed(instancesDir, name) {
     cfg.lastPlayed = Date.now();
     cfg.plays = (cfg.plays || 0) + 1;
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
-  } catch {}
+  } catch (e) { swallow(`touchPlayed(${name})`, e); }
 }
 
 function addPlayTime(instancesDir, name, secs) {
@@ -212,7 +216,7 @@ function addPlayTime(instancesDir, name, secs) {
     cfg.playSecs = Math.round((cfg.playSecs || 0) + secs);
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
     return cfg.playSecs;
-  } catch { return null; }
+  } catch (e) { swallow(`addPlayTime(${name})`, e); return null; }
 }
 
 function setForgeProfile(instancesDir, name, patch) {

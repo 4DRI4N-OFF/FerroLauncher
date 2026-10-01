@@ -76,34 +76,63 @@ function listPrism(prismPath) {
 }
 
 const COPY_DIRS = ['saves', 'resourcepacks', 'shaderpacks', 'config', 'mods', 'screenshots'];
-function copyIfExists(src, dest) {
+
+// Un archivo que falla (bloqueado porque el juego esta abierto, permisos, disco
+// lleno, symlink colgado) NO puede abortar el resto del arbol. Antes el try
+// envolvia el bucle entero: un solo archivo problematico dejaba la instancia a
+// medias y se reportaba igual de importada, sin decir nada. Ahora se copia
+// archivo a archivo y se/devuelven los nombres de los que no se pudieron copiar.
+function copyIfExists(src, dest, skipped) {
+  const miss = skipped || [];
   try {
-    if (!fs.existsSync(src)) return;
+    if (!fs.existsSync(src)) return miss;
     fs.mkdirSync(dest, { recursive: true });
     for (const e of fs.readdirSync(src, { withFileTypes: true })) {
       const s = path.join(src, e.name), d = path.join(dest, e.name);
-      if (e.isDirectory()) copyIfExists(s, d);
-      else fs.copyFileSync(s, d);
+      try {
+        if (e.isDirectory()) copyIfExists(s, d, miss);
+        else fs.copyFileSync(s, d);
+      } catch {
+        miss.push(path.join(path.basename(dest), e.name));
+      }
     }
-  } catch {}
+  } catch {
+    // el directorio de origen no se pudo ni leer: se-avisa con su nombre
+    miss.push(path.basename(src));
+  }
+  return miss;
 }
 
-function importVanillaInstance(instancesDir, mcPath, versionId, asName) {
+// Lo que el usuario tiene que ver al final: cuantos quedaron fuera y cuales,
+// sin escupir una lista de 3000 lineas por consola.
+function reportSkipped(skipped, onLog) {
+  if (!skipped || !skipped.length) return 0;
+  const shown = skipped.slice(0, 5).join(', ');
+  const more = skipped.length > 5 ? ` (+${skipped.length - 5} más)` : '';
+  onLog && onLog(`[ferro] AVISO: ${skipped.length} archivo(s) no se pudieron copiar: ${shown}${more}\n`);
+  return skipped.length;
+}
+
+function importVanillaInstance(instancesDir, mcPath, versionId, asName, onLog) {
   const inst = createInstance(instancesDir, asName || versionId, versionId, { type: 'vanilla' });
   const src = mcPath;
+  const skipped = [];
   for (const d of ['saves', 'resourcepacks', 'shaderpacks', 'screenshots']) {
-    copyIfExists(path.join(src, d), path.join(inst.path, d));
+    copyIfExists(path.join(src, d), path.join(inst.path, d), skipped);
   }
   for (const f of ['options.txt', 'servers.dat']) {
     try {
       const s = path.join(src, f);
       if (fs.existsSync(s)) fs.copyFileSync(s, path.join(inst.path, f));
-    } catch {}
+    } catch { skipped.push(f); }
+  }
+  if (reportSkipped(skipped, onLog)) {
+    onLog && onLog('[ferro] revisa la instancia: puede estar incompleta\n');
   }
   return inst;
 }
 
-function importPrismInstance(instancesDir, prismInstPath, asName) {
+function importPrismInstance(instancesDir, prismInstPath, asName, onLog) {
   let info = { mc: null, loader: null };
   try {
     info = parseMmcPack(JSON.parse(fs.readFileSync(path.join(prismInstPath, 'mmc-pack.json'), 'utf8')));
@@ -114,14 +143,18 @@ function importPrismInstance(instancesDir, prismInstPath, asName) {
     type: info.loader ? info.loader.type : 'vanilla',
     loaderVersion: info.loader ? info.loader.version : undefined,
   });
-  for (const d of COPY_DIRS) copyIfExists(path.join(prismInstPath, d), path.join(inst.path, d));
+  const skipped = [];
+  for (const d of COPY_DIRS) copyIfExists(path.join(prismInstPath, d), path.join(inst.path, d), skipped);
   for (const f of ['options.txt', 'servers.dat']) {
     try {
       const s = path.join(prismInstPath, f);
       if (fs.existsSync(s)) fs.copyFileSync(s, path.join(inst.path, f));
-    } catch {}
+    } catch { skipped.push(f); }
+  }
+  if (reportSkipped(skipped, onLog)) {
+    onLog && onLog('[ferro] revisa la instancia: puede estar incompleta\n');
   }
   return { ...inst, mc: info.mc, loader: info.loader };
 }
 
-module.exports = { detectLaunchers, listVanilla, listPrism, parseMmcPack, importVanillaInstance, importPrismInstance };
+module.exports = { detectLaunchers, listVanilla, listPrism, parseMmcPack, importVanillaInstance, importPrismInstance, copyIfExists, reportSkipped };

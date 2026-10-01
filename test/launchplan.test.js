@@ -80,6 +80,24 @@ test('buildLaunchPlan: online usa el perfil de Microsoft', () => {
   assert.equal(p.uuid, '11111111222233334444555555555555');
 });
 
+test('buildLaunchPlan: auth_xuid manda el XUID real, no el uhs', () => {
+  // VERSION no declara --xuid (el fixture shared es mínimo), así que aquí va uno
+  // propio: los manifests reales de Mojang sí pasan --xuid ${auth_xuid}.
+  const conXuid = {
+    ...VERSION,
+    arguments: { ...VERSION.arguments, game: [...VERSION.arguments.game, '--xuid', '${auth_xuid}'] },
+  };
+  const online = { token: 't', uuid: 'u', username: 'A' };
+  const conReal = planFor({ versionDetails: conXuid, auth: { ...online, xuid: '2535412345678901' } });
+  assert.match(conReal.gameArgs.join(' '), /--xuid 2535412345678901/);
+
+  // XSTS no siempre devuelve xid: se cae al centinela '0' en vez de mandar el
+  // hash del uhs (que no es un XUID) donde el juego espera un número.
+  const sinXuid = planFor({ versionDetails: conXuid, auth: { ...online, uhs: 'HASH-OPACO' } });
+  assert.match(sinXuid.gameArgs.join(' '), /--xuid 0\b/);
+  assert.equal(sinXuid.gameArgs.join(' ').includes('HASH-OPACO'), false);
+});
+
 test('buildLaunchPlan: classpath con clientJar primero y separador ;', () => {
   const p = planFor({ extraClasspath: ['C:/mc/extra.jar'] });
   assert.equal(p.classpath.split(';')[0], 'C:/mc/versions/1.21.4/1.21.4.jar');
@@ -114,6 +132,17 @@ test('ruleAllows/flattenArgs: filtros de SO y de features', () => {
   assert.equal(ruleAllows([]), true);
   assert.equal(ruleAllows([{ action: 'allow', features: { is_demo_user: {} } }]), false, 'sin features: la regla no aplica');
   assert.deepEqual(flattenArgs(['a', { value: ['b'], rules: [{ action: 'allow', os: { name: 'linux' } }] }]), ['a']);
+});
+
+test('ruleAllows: una regla de otra arquitectura no aplica', () => {
+  const arch = process.arch;
+  // la comparación es directa contra process.arch, no una lista negra de x86
+  assert.equal(ruleAllows([{ action: 'allow', os: { arch } }]), true, 'nuestra propia arquitectura sí');
+  assert.equal(ruleAllows([{ action: 'allow', os: { arch: arch === 'x86' ? 'x64' : 'x86' } }]), false);
+  // en x64/arm64 no se cuela una regla de 32 bits (que es lo que manda Mojang)
+  if (arch === 'x64' || arch === 'arm64') {
+    assert.equal(ruleAllows([{ action: 'allow', os: { arch: 'x86' } }]), false);
+  }
 });
 
 test('splitArgs: no rompe las rutas con espacios y parte por flags --x', () => {

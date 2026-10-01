@@ -6,12 +6,19 @@ on:
     types: [created]
 jobs:
   opencode:
+    # Gate de autorización: el repo es público, así que sin esto CUALQUIER
+    # visitante puede escribir "/oc" en un comentario y disparar una corrida
+    # con ANTHROPIC_API_KEY expuesta en env. Solo quien ya colabora aquí.
     if: |
-      contains(github.event.comment.body, '/oc') ||
-      contains(github.event.comment.body, '/opencode')
+      github.event.comment.author_association in ('OWNER', 'MEMBER', 'COLLABORATOR') &&
+      (
+        contains(github.event.comment.body, '/oc') ||
+        contains(github.event.comment.body, '/opencode')
+      )
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
+    # El agente no llama a la API de GitHub: sin tokens. (antes pedía id-token
+    # para nada y de paso abría la puerta a OIDC injection)
+    permissions: {}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -20,7 +27,10 @@ jobs:
           persist-credentials: false
 
       - name: Run OpenCode
-        uses: anomalyco/opencode/github@latest
+        # Fijado al commit que hoy resuelve el tag `latest` de la action
+        # (2c14fc5 -> 77fc88c). Con @latest, quien controla ese repo decide
+        # qué corre aquí con tu API key; con un SHA hace falta un PR.
+        uses: anomalyco/opencode/github@77fc88c8ade8e5a620ebbe1197f3a572d29ae91a
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         with:

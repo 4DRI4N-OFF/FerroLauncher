@@ -50,7 +50,7 @@ export const sfx = {
         }
         // Sin archivo: cae al sintético de siempre (momentos de marca)
       }
-      (PACK[pack]?.[name] || PACK.cristal[name])?.(this.cfg.volume);
+      playSynth(name, pack, this.cfg.volume);
     } catch {}
   },
 };
@@ -302,3 +302,13 @@ function keyHit(master, { f = 210, bright = 0.5, deep = false, delay = 0 } = {})
 }
 
 const PACK = { cristal, asmr };
+
+// sfx.play() (línea ~53) necesita PACK, que está declarado 250 líneas más abajo.
+// Today no revienta porque play() solo corre en runtime, con el módulo ya
+// evaluado... pero es justo el TDZ que dejó el launcher en blanco en 0.9.3, y
+// el try/catch que lo envuelve lo convertiría en "los sonidos dejan de sonar"
+// sin un error en ninguna parte. playSynth es una function declaration, que sí
+// sube al inicio del módulo; la llamada sigue resolviendo PACK ya inicializado.
+function playSynth(name, pack, vol) {
+  (PACK[pack]?.[name] || PACK.cristal[name])?.(vol);
+}

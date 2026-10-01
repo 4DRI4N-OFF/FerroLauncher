@@ -10,7 +10,9 @@ function ruleAllows(rules) {
     let osOk = true;
     if (r.os) {
       if (r.os.name && r.os.name !== 'windows') osOk = false;
-      if (r.os.arch && r.os.arch === 'x86' && ['x64', 'arm64'].includes(process.arch)) osOk = false;
+      // Comparación directa con process.arch en vez de una lista negra de
+      // 'x86': en arm64 las reglas de x86/x64 no aplican (antes sí pasaban).
+      if (r.os.arch && r.os.arch !== process.arch) osOk = false;
     }
     if (r.features) continue; // is_demo_user / resolución custom -> se ignora
     if (r.action === 'allow' && osOk) allowed = true;

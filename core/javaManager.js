@@ -128,7 +128,15 @@ async function ensureJava(requiredMajor, runtimesDir, onProgress) {
   }
   const destDir = path.join(runtimesDir, `java-${requiredMajor}`);
   fs.mkdirSync(destDir, { recursive: true });
-  new AdmZip(zipDest).extractAllTo(destDir, true);
+  // Extractor propio y no extractAllTo de adm-zip: el zip de Temurin es el
+  // único que llega SIN checksum verificable (ver arriba), o sea el único
+  // donde no podemos confiar en el origen. safeRel + isInside evitan que una
+  // respuesta manipulada escriba fuera de destDir o cree symlinks.
+  const { extractZip } = require('./zipService');
+  const res = extractZip(zipDest, destDir, {
+    onSkip: (name, why) => onProgress && onProgress(`[ferro] zip de Java: entrada descartada (${name}${why ? ': ' + why : ''})\n`),
+  });
+  if (res.skipped) onProgress && onProgress(`[ferro] zip de Java: ${res.skipped} entrada(s) fuera del destino\n`);
   try { fs.unlinkSync(zipDest); } catch {}
   const javaExe = findRecursively(destDir, 'java.exe');
   if (!javaExe) throw new Error(`Temurin ${requiredMajor}: no se encontró java.exe tras extraer`);

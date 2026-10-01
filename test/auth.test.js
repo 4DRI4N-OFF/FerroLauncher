@@ -130,3 +130,52 @@ test('ferro-config.json corrupto no tumba el launcher', (t) => {
   assert.equal(auth.getClientIdPublic(base).configured, !!auth.getClientId(base));
   assert.deepEqual(auth.getDiscord(base), { clientId: auth.getDiscord(base).clientId, enabled: true });
 });
+
+const WEBHOOK = 'https://discord.com/api/webhooks/123456789/AbCdEfGhIjKlMnOpQrStUvWx';
+
+// El webhook es una credencial tipo bearer: con la URL cualquiera escribe en
+// el servidor del usuario. Por eso no puede vivir en claro en ferro-config.json.
+test('el webhook de Discord se cifra en disco igual que los tokens', (t) => {
+  const base = tmpBase(t);
+  auth.setSafeStorageForTest(fakeSafe());
+  t.after(() => auth.setSafeStorageForTest(null));
+
+  assert.equal(auth.writeWebhook(base, WEBHOOK), WEBHOOK);
+  const raw = fs.readFileSync(path.join(base, 'ferro-config.json'), 'utf8');
+  assert.equal(raw.includes(WEBHOOK), false, 'la URL no debería estar en claro');
+  assert.equal(raw.includes('discordWebhook'), false, 'ni la clave antigua');
+  assert.equal(auth.readWebhook(base), WEBHOOK, 'y se lee igual de vuelta');
+});
+
+test('un webhook ya existente en claro se sigue leyendo (no se pierde al actualizar)', (t) => {
+  const base = tmpBase(t);
+  fs.writeFileSync(path.join(base, 'ferro-config.json'), JSON.stringify({ discordWebhook: WEBHOOK, discordEnabled: true }));
+  auth.setSafeStorageForTest(fakeSafe());
+  t.after(() => auth.setSafeStorageForTest(null));
+  assert.equal(auth.readWebhook(base), WEBHOOK, 'el legacy en claro se lee tal cual');
+});
+
+test('sin safeStorage, el webhook se guarda en claro y no rompe', (t) => {
+  const base = tmpBase(t);
+  auth.setSafeStorageForTest(null);
+  auth.writeWebhook(base, WEBHOOK);
+  assert.equal(auth.readWebhook(base), WEBHOOK);
+});
+
+test('borrar el webhook limpia el valor guardado', (t) => {
+  const base = tmpBase(t);
+  auth.setSafeStorageForTest(fakeSafe());
+  t.after(() => auth.setSafeStorageForTest(null));
+  auth.writeWebhook(base, WEBHOOK);
+  auth.writeWebhook(base, '');
+  assert.equal(auth.readWebhook(base), '');
+  assert.equal(fs.readFileSync(path.join(base, 'ferro-config.json'), 'utf8').includes(WEBHOOK), false);
+});
+
+test('un webhook cifrado que no se puede descifrar se pierde en vez de romperse', (t) => {
+  const base = tmpBase(t);
+  fs.writeFileSync(path.join(base, 'ferro-config.json'), JSON.stringify({ webhookSecret: '!!!no-base64!!!' }));
+  auth.setSafeStorageForTest(fakeSafe());
+  t.after(() => auth.setSafeStorageForTest(null));
+  assert.equal(auth.readWebhook(base), '');
+});

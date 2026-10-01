@@ -116,6 +116,35 @@ function setDiscord(baseDir, patch) {
   return getDiscord(baseDir);
 }
 
+// El webhook de Discord es una credencial tipo bearer: con la URL cualquiera
+// escribe en el servidor del usuario. Antes vivía en claro en ferro-config.json;
+// ahora se cifra igual que los tokens de Microsoft.
+function readWebhook(baseDir) {
+  const cfg = readJson(authPaths(baseDir).config, {});
+  if (!cfg.webhookSecret) return cfg.discordWebhook || ''; // legacy en claro
+  const safe = getSafe();
+  if (!safe) return '';
+  try { return safe.decryptString(Buffer.from(String(cfg.webhookSecret), 'base64')) || ''; } catch { return ''; }
+}
+
+function writeWebhook(baseDir, webhook) {
+  const p = authPaths(baseDir).config;
+  const cfg = readJson(p, {});
+  const safe = getSafe();
+  const v = String(webhook || '').trim();
+  delete cfg.discordWebhook; // no dejamos el valor plano flotando junto al cifrado
+  delete cfg.webhookSecret;
+  // Sin safeStorage se guarda en claro, igual que los tokens: es una mejora
+  // progresiva, no un requisito. Si no, el webhook se perdería sin avisar.
+  if (v) {
+    if (safe) cfg.webhookSecret = safe.encryptString(v).toString('base64');
+    else cfg.discordWebhook = v;
+  }
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
+  return v;
+}
+
 async function form(url, params) {
   const res = await fetch(url, {
     method: 'POST',
@@ -185,7 +214,12 @@ async function xboxLogin(msAccessToken) {
   }
   const outUhs = d2.DisplayClaims?.xui?.[0]?.uhs || uhs;
   if (!outUhs || !d2.Token) throw new Error('Xbox no devolvió identidad completa (uhs)');
-  return { uhs: outUhs, xstsToken: d2.Token };
+  // OJO: uhs NO es el xuid. uhs es el hash opaco del usuario y xid es el XUID
+  // decimal, que es lo que espera ${auth_xuid}. Estos endpoints no siempre
+  // devuelven xid, así que se propaga tal cual y launcher.js cae a '0' (el
+  // centinela estándar) en vez de mandar un hash donde va un número.
+  const xuid = d2.DisplayClaims?.xui?.[0]?.xid || null;
+  return { uhs: outUhs, xstsToken: d2.Token, xuid };
 }
 
 async function minecraftLogin(uhs, xstsToken) {
@@ -297,12 +331,13 @@ function clearAccount(baseDir) {
 
 // Completa el login tras el device flow: Xbox -> Minecraft -> perfil -> guarda
 async function completeLogin(baseDir, msAccess, msRefresh) {
-  const { uhs, xstsToken } = await xboxLogin(msAccess);
+  const { uhs, xstsToken, xuid } = await xboxLogin(msAccess);
   const { mcToken, expiresIn } = await minecraftLogin(uhs, xstsToken);
   const profile = await fetchProfile(mcToken);
   const account = {
     mcToken, mcExpiry: Date.now() + (expiresIn || 86400) * 1000,
     msRefresh, uhs, profile,
+    ...(xuid ? { xuid: String(xuid) } : {}), // identificador, no credencial: va en claro
   };
   saveAccount(baseDir, account);
   return account;
@@ -327,6 +362,7 @@ module.exports = {
   setSafeStorageForTest, encryptAccount, decryptAccount,
   completeLogin, validAccount, loadAccount, saveAccount, clearAccount,
   listAccounts, setActive, removeAccount,
+  readWebhook, writeWebhook,
   exchangeCode, authorizeUrl, NATIVE_REDIRECT, SCOPE,
 };
 

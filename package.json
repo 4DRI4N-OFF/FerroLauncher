@@ -8,7 +8,7 @@
     "dev": "vite",
     "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build",
-    "lint": "eslint . --max-warnings 166",
+    "lint": "eslint . --max-warnings 162",
     "test": "node scripts/run-tests.js",
     "test:docs": "node scripts/docs-version.js --check",
     "check": "npm run lint && npm run test && npm run test:docs && npm run build",
@@ -54,6 +54,7 @@
       "core/**/*",
       "dist/**/*",
       "build/**/*",
+      "!build/secrets.json",
       "package.json"
     ],
     "win": {

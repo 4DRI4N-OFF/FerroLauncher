@@ -152,7 +152,22 @@ function boundsPath() { return path.join(getDirs().base, 'win-bounds.json'); }
 function loadBounds() { try { return JSON.parse(fs.readFileSync(boundsPath(), 'utf8')); } catch { return null; } }
 function saveBounds() { try { if (win && !win.isDestroyed()) fs.writeFileSync(boundsPath(), JSON.stringify(win.getBounds())); } catch {} }
 
+// Allowlist de destinos externos. Comparar por hostname (no con una regex
+// sobre la URL entera) cierra los truquitos de subdominio, y de paso arregla
+// un falso negativo del patrón anterior, que pedía barra final y por tanto
+// rechazaba "https://x.com":
+//   https://github.com.evil.com/  -> hostname github.com.evil.com  -> fuera
+//   https://x.com                 -> hostname x.com                 -> dentro
+const ALLOWED_HOSTS = new Set([
+  'x.com', 'www.reddit.com', 'wa.me', 't.me', 'github.com', 'discord.gg',
+  'discord.com', 'www.youtube.com', 'youtu.be', 'www.tiktok.com',
+  'essential.gg', 'minecraft.net', 'www.minecraft.net', 'help.minecraft.net',
+  'feedback.minecraft.net', 'modrinth.com', 'curseforge.com', 'www.curseforge.com',
+]);
+
 function createWindow() {
+  const dev = !app.isPackaged;
+  const appUrl = 'http://localhost:5173';
   win = new BrowserWindow({
     width: 1100, height: 700,
     autoHideMenuBar: true,
@@ -163,12 +178,25 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      // El preload solo usa contextBridge + ipcRenderer, que es justo el
+      // subconjunto que sigue funcionando con el renderer en sandbox.
+      sandbox: true,
       autoplayPolicy: 'no-user-gesture-required',
     },
   });
-  const dev = !app.isPackaged;
+  // Una ventana que abre el renderer hereda estas webPreferences, preload
+  // incluido, o sea la superficie IPC completa. El renderer no necesita abrir
+  // nada: los enlaces de fuera salen por ferro:openUrl, que tiene allowlist.
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // Tampoco debe navegar: en la app no hay navegación interna (todo entra por
+  // loadURL/loadFile). Se deja pasar solo la recarga del dev server, que Vite
+  // dispara con location.reload() en el full reload.
+  win.webContents.on('will-navigate', (event, url) => {
+    if (dev && url.startsWith(appUrl)) return;
+    event.preventDefault();
+  });
   win.on('close', () => saveBounds());
-  if (dev) win.loadURL('http://localhost:5173');
+  if (dev) win.loadURL(appUrl);
   else win.loadFile(path.join(__dirname, '../dist/index.html'));
   win.once('ready-to-show', () => {
     try {
@@ -390,9 +418,9 @@ ipcMain.handle('ferro:packInstall', async (_, { name, projectId, packVersionId, 
 ipcMain.handle('ferro:java', async () => (await findJava()) || null);
 
 ipcMain.handle('ferro:clientId', async () => auth.getClientIdPublic(getDirs().base));
-ipcMain.handle('ferro:discord', async () => ({ ...auth.getDiscord(getDirs().base), webhook: readWebhook(getDirs().base) }));
+ipcMain.handle('ferro:discord', async () => ({ ...auth.getDiscord(getDirs().base), webhook: auth.readWebhook(getDirs().base) }));
 ipcMain.handle('ferro:setDiscord', async (_, patch) => {
-  const d = writeWebhook(getDirs().base, patch || {});
+  const d = patch && patch.webhook !== undefined ? auth.writeWebhook(getDirs().base, patch.webhook) : auth.readWebhook(getDirs().base);
   const r = { ...auth.setDiscord(getDirs().base, patch || {}), webhook: d };
   try {
     if (r.enabled && r.clientId) discord.setIdle(r.clientId, idleInfo());
@@ -401,16 +429,18 @@ ipcMain.handle('ferro:setDiscord', async (_, patch) => {
   return r;
 });
 ipcMain.handle('ferro:testWebhook', async () => {
-  if (!readWebhook(getDirs().base)) throw new Error('Pega primero la URL del webhook (Ajustes → Discord)');
+  if (!auth.readWebhook(getDirs().base)) throw new Error('Pega primero la URL del webhook (Ajustes → Discord)');
   const ok = await notify(getDirs().base, 'ok', 'FerroLauncher conectado', 'Webhook funcionando. Avisaré de partidas, crashes e instalaciones.');
   if (!ok) throw new Error('Discord rechazó el envío (URL inválida o sin conexión)');
   return true;
 });
 ipcMain.handle('ferro:openUrl', async (_, data) => {
-  const url = typeof data === 'string' ? data : data?.url;
-  const u = String(url || '');
-  if (!/^https:\/\/(x\.com|www\.reddit\.com|wa\.me|t\.me|github\.com|discord\.gg|discord\.com|www\.youtube\.com|youtu\.be|www\.tiktok\.com|essential\.gg|minecraft\.net|www\.minecraft\.net|help\.minecraft\.net|feedback\.minecraft\.net|modrinth\.com|curseforge\.com|www\.curseforge\.com)\//.test(u)) throw new Error('URL no permitida');
-  await shell.openExternal(u);
+  const raw = typeof data === 'string' ? data : data?.url;
+  let u;
+  try { u = new URL(String(raw || '')); } catch { throw new Error('URL no permitida'); }
+  if (u.protocol !== 'https:') throw new Error('URL no permitida');
+  if (!ALLOWED_HOSTS.has(u.hostname.toLowerCase())) throw new Error('URL no permitida');
+  await shell.openExternal(u.href);
   return true;
 });
 ipcMain.handle('ferro:social', async () => ({
@@ -426,21 +456,9 @@ function readSocial(base) {
   }
   catch { return { discord: 'https://discord.gg/vTujTm3hE', youtube: 'https://www.youtube.com/@4dri4n-08' }; }
 }
-function readWebhook(base) {
-  try { return JSON.parse(require('fs').readFileSync(require('path').join(base, 'ferro-config.json'), 'utf8')).discordWebhook || ''; }
-  catch { return ''; }
-}
-function writeWebhook(base, patch) {
-  const fs = require('fs');
-  const path = require('path');
-  const p = path.join(base, 'ferro-config.json');
-  let cfg = {};
-  try { cfg = JSON.parse(fs.readFileSync(p, 'utf8')); } catch {}
-  if (patch.webhook !== undefined) cfg.discordWebhook = String(patch.webhook || '').trim();
-  fs.mkdirSync(base, { recursive: true });
-  fs.writeFileSync(p, JSON.stringify(cfg, null, 2));
-  return cfg.discordWebhook || '';
-}
+// El webhook vive cifrado en core/authService (readWebhook/writeWebhook), que
+// lo guarda con safeStorage igual que los tokens de Microsoft: la URL es una
+// credencial tipo bearer y no va en claro a ferro-config.json.
 ipcMain.handle('ferro:setClientId', async (_, { clientId }) => auth.setClientId(getDirs().base, clientId));
 ipcMain.handle('ferro:authStatus', async () => {
   const acc = auth.loadAccount(getDirs().base);
@@ -783,18 +801,20 @@ ipcMain.handle('ferro:importScan', async () => {
 });
 ipcMain.handle('ferro:importVanilla', async (_, { versionId, asName }) => {
   const d = getDirs();
+  const send = (t) => win && win.webContents.send('ferro:log', t);
   const found = imp.detectLaunchers();
   if (!found.vanilla) throw new Error('No se encontró launcher oficial');
-  return imp.importVanillaInstance(d.instances, found.vanilla, versionId, asName);
+  return imp.importVanillaInstance(d.instances, found.vanilla, versionId, asName, send);
 });
 ipcMain.handle('ferro:importPrism', async (_, { from, instPath, asName }) => {
   const d = getDirs();
+  const send = (t) => win && win.webContents.send('ferro:log', t);
   const found = imp.detectLaunchers();
   const base = found[from];
   if (!base) throw new Error('Launcher no encontrado');
   const full = path.join(base, 'instances', path.basename(instPath || ''));
   if (!full.startsWith(path.join(base, 'instances'))) throw new Error('Ruta no válida');
-  return imp.importPrismInstance(d.instances, full, asName);
+  return imp.importPrismInstance(d.instances, full, asName, send);
 });
 
 // Servidores favoritos + ping
@@ -928,7 +948,7 @@ ipcMain.handle('ferro:launch', async (event, { instanceName, username, ramMb, wi
   try {
     const acc = await auth.validAccount(d.base, auth.getClientId(d.base));
     if (acc) {
-      authArg = { uuid: acc.profile.uuid, token: acc.mcToken, username: acc.profile.name, xuid: acc.uhs };
+      authArg = { uuid: acc.profile.uuid, token: acc.mcToken, username: acc.profile.name, xuid: acc.xuid || null };
       send(`[ferro] cuenta online: ${acc.profile.name}\n`);
     } else {
       send('[ferro] sin cuenta: modo offline\n');

@@ -39,7 +39,9 @@
   },
   "allowScripts": {
     "electron@44.3.0": true,
-    "esbuild@0.25.12": true
+    "esbuild@0.25.12": true,
+    "electron-winstaller": false,
+    "github:devsnek/node-register-scheme": false
   },
   "build": {
     "appId": "com.ferro.launcher",

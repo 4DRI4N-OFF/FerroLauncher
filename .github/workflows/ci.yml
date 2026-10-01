@@ -73,6 +73,30 @@ jobs:
           node scripts/brand-exe.js
           node scripts/app-update-yml.js
 
+      - name: Smoke test (el exe arranca y trae el feed del updater)
+        shell: pwsh
+        run: |
+          # Hasta ahora este job comprobaba que el build NO estuviera roto, no que
+          # el launcher FUNCIONARA. Estas dos cosas son justamente las que se
+          # rompen en silencio: sin app-update.yml el updater revienta con ENOENT
+          # en runtime (justo lo que avisa scripts/app-update-yml.js), y un exe que
+          # muere al arrancar solo se ve probandolo.
+          $yml = 'release/win-unpacked/resources/app-update.yml'
+          if (-not (Test-Path $yml)) {
+            throw "falta $yml -> el auto-updater fallara con ENOENT en runtime"
+          }
+          Write-Host '  app-update.yml:'
+          Get-Content $yml | ForEach-Object { Write-Host "    $_" }
+
+          $exe = 'release/win-unpacked/FerroLauncher.exe'
+          $p = Start-Process -FilePath $exe -ArgumentList '--no-sandbox' -PassThru -ErrorAction Stop
+          Start-Sleep -Seconds 15
+          if ($p.HasExited) {
+            throw "FerroLauncher.exe muere al arrancar (codigo $($p.ExitCode))"
+          }
+          Write-Host "  FerroLauncher.exe sigue vivo tras 15 s (pid $($p.Id))"
+          Stop-Process -Id $p.Id -Force
+
       - name: Subir el exe como artefacto (aún sin firmar, solo para probar)
         uses: actions/upload-artifact@v7
         with:

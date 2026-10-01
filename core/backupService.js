@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const AdmZip = require('adm-zip');
 const { extractEntries } = require('./zipService');
+const { swallow } = require('./ignore');
 
 function backupsDir(baseDir, instanceName) {
   return path.join(baseDir, 'backups', instanceName);
@@ -49,7 +50,7 @@ function importPack(zipPath, instancesDir, onLog) {
     const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
     cfg.name = name;
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
-  } catch {}
+  } catch (e) { swallow(`importPack: ferro.json sin normalizar en ${name}`, e); }
   onLog && onLog(`[ferro] importada como ${name}\n`);
   return name;
 }
@@ -151,7 +152,9 @@ function pruneAuto(baseDir, instanceName, keep) {
     .sort((a, b) => b.m - a.m);
   let n = 0;
   for (const x of files.slice(Math.max(0, keep))) {
-    try { fs.unlinkSync(path.join(dir, x.f)); n++; } catch {}
+    // Si el borrado falla (antivirus, explorer abierto) la copia vieja se queda
+    // para siempre y la carpeta crece sin que se note: mejor que quede rastro.
+    try { fs.unlinkSync(path.join(dir, x.f)); n++; } catch (e) { swallow(`rotate: no se pudo borrar ${x.f}`, e); }
   }
   return n;
 }

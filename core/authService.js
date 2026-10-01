@@ -1,8 +1,12 @@
 const fs = require('fs');
 const path = require('path');
 
-// Sin IDs integrados a propósito: cada usuario usa su propia app Azure/Discord.
-// Se configuran en la UI (Cuenta / Ajustes → Discord) y se guardan en ferro-config.json.
+// IDs de distribucion. Son PUBLICOS y por eso pueden ir versionados: un
+// Application (client) ID de Azure y un Application ID de Discord no son
+// secretos (los lleva incrustados Prism, Modrinth App y cualquier otro
+// launcher). Lo que si es secreto son los tokens de la cuenta, y esos van
+// cifrados con safeStorage. El flujo tampoco da ventaja a un tercero: PKCE con
+// code_verifier por intento y device code, ambos de cliente publico.
 const DEFAULT_CLIENT_ID = '';
 const DEFAULT_DISCORD_ID = '';
 
@@ -68,16 +72,27 @@ function decryptAccount(acc, safe) {
   return out;
 }
 
-// IDs de distribución: build/secrets.json local (gitignored) para tus builds.
-// Nunca commitees IDs: rota en Azure/Discord si alguno se filtró al historial.
+// IDs locales del proyecto para tus builds (build/secrets.json, gitignored y
+// excluido del paquete). Si no esta, se usa el de distribucion de abajo.
 function localSecrets() {
   try {
     return JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'build', 'secrets.json'), 'utf8'));
   } catch { return {}; }
 }
 
+// IDs de distribucion: build/identity.json, versionado e incluido en el build.
+// Sin esto el launcher recien instalado no puede entrar en Microsoft y le pide
+// al usuario que registre su propia app en Azure.
+function bundledIdentity() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'build', 'identity.json'), 'utf8'));
+  } catch { return {}; }
+}
+
+// De mas especifico a mas generico: el override local gana sobre lo incluido.
 function getClientId(baseDir) {
-  return readJson(authPaths(baseDir).config, {}).clientId || process.env.FERRO_CLIENT_ID || localSecrets().clientId || DEFAULT_CLIENT_ID;
+  return readJson(authPaths(baseDir).config, {}).clientId || process.env.FERRO_CLIENT_ID
+    || localSecrets().clientId || bundledIdentity().clientId || DEFAULT_CLIENT_ID;
 }
 
 // Versión pública para la UI: nunca expone el ID completo
@@ -103,7 +118,11 @@ function setClientId(baseDir, clientId) {
 
 function getDiscord(baseDir) {
   const cfg = readJson(authPaths(baseDir).config, {});
-  return { clientId: cfg.discordClientId || process.env.FERRO_DISCORD_ID || localSecrets().discordId || DEFAULT_DISCORD_ID, enabled: cfg.discordEnabled !== false };
+  return {
+    clientId: cfg.discordClientId || process.env.FERRO_DISCORD_ID
+      || localSecrets().discordId || bundledIdentity().discordId || DEFAULT_DISCORD_ID,
+    enabled: cfg.discordEnabled !== false,
+  };
 }
 
 function setDiscord(baseDir, patch) {

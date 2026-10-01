@@ -1992,11 +1992,22 @@ export default function App() {
             <h2>{t('acct.title')}</h2>
             <p>{t('acct.desc')}</p>
             {idInfo.configured
-              ? <div className="row"><span className="pill green">✓ {t('acct.idOn')} {idInfo.masked}</span></div>
-              : (<div className="row">
-                <input value={clientId} onChange={(e)=>setClientId(e.target.value)} placeholder={t('acct.clientPh')} style={{minWidth:300}} />
-                <button className="ghost" onClick={async()=>{ if (!clientId.trim()) return; await window.ferro?.setClientId({ clientId }); setLog((l)=>l+'[ferro] client ID guardado\n'); loadAuth();}}>{t('acct.save')}</button>
-              </div>)}
+              ? <details>
+                  <summary className="ghost" style={{cursor:'pointer', opacity:.75}}>{t('acct.advanced')}</summary>
+                  <div className="row" style={{marginTop:10}}>
+                    <input value={clientId} onChange={(e)=>setClientId(e.target.value)} placeholder={t('acct.clientPh')} style={{minWidth:300}} />
+                    <button className="ghost" onClick={async()=>{ if (!clientId.trim()) return; await window.ferro?.setClientId({ clientId }); setLog((l)=>l+'[ferro] client ID guardado\n'); loadAuth();}}>{t('acct.save')}</button>
+                  </div>
+                  <p style={{opacity:.6, marginTop:8, fontSize:13}}>{t('acct.advancedHint')}</p>
+                </details>
+              : (<div className="card" style={{borderColor:'#b45309'}}>
+                  <p><b>{t('acct.noBundledTitle')}</b></p>
+                  <p style={{opacity:.8, marginTop:6}}>{t('acct.noBundledBody')}</p>
+                  <div className="row" style={{marginTop:10}}>
+                    <input value={clientId} onChange={(e)=>setClientId(e.target.value)} placeholder={t('acct.clientPh')} style={{minWidth:300}} />
+                    <button className="ghost" onClick={async()=>{ if (!clientId.trim()) return; await window.ferro?.setClientId({ clientId }); setLog((l)=>l+'[ferro] client ID guardado\n'); loadAuth();}}>{t('acct.save')}</button>
+                  </div>
+                </div>)}
             <h3>{t('acct.accounts')} ({accts.length})</h3>
             {accts.length===0 && <p style={{opacity:.6}}>{t('acct.noAccounts')}</p>}
             <div className="grid">

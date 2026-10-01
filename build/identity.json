@@ -1,0 +1,5 @@
+{
+  "_comment": "IDs de distribucion de FerroLauncher. Son PUBLICOS: un Application (client) ID de Azure y un Application ID de Discord no son secretos (los lleva incrustados Prism, Modrinth App y cualquier otro launcher). Lo que si es secreto son los tokens de la cuenta, y esos van cifrados con safeStorage/DPAPI. Este fichero se versiona a proposito y entra en el paquete; para tus pruebas en local, build/secrets.json lo sobreescribe.",
+  "clientId": "e38aa735-6b06-4111-9d58-5190f3d754db",
+  "discordId": ""
+}

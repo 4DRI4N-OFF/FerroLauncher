@@ -65,3 +65,4 @@ jobs:
           Copy-Item $exe.FullName "FerroLauncher-Tauri-Setup.exe"
           $tag = "v0.9.7-tauri-prueba${{ github.run_number }}"
           gh release create $tag FerroLauncher-Tauri-Setup.exe --repo ${{ github.repository }} --target ${{ github.sha }} --prerelease --title "FerroLauncher Tauri (prueba ${{ github.run_number }})" --notes "Version de prueba de la migracion a Tauri (PR en curso). Sin firmar: SmartScreen avisara. Es una base: faltan por portar el lanzamiento del juego, descargas, mods y login."
+# build: descargas y lanzamiento del juego

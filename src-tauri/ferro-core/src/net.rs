@@ -46,6 +46,11 @@ pub fn fetch_json(url: &str) -> Result<Value, String> {
     get_retry(url, 3)?.into_json::<Value>().map_err(|e| format!("Respuesta no válida de {}: {e}", host(url)))
 }
 
+/// Texto plano de un GET (p. ej. maven-metadata.xml de NeoForge).
+pub fn fetch_text(url: &str) -> Result<String, String> {
+    get_retry(url, 3)?.into_string().map_err(|e| format!("Respuesta no válida de {}: {e}", host(url)))
+}
+
 /// Código HTTP de un GET sin reintentos (para comprobaciones tipo "¿existe este nombre?").
 pub fn status_of(url: &str) -> Option<u16> {
     match agent().get(url).call() {

@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 pub mod instances;
 pub mod launch;
+pub mod loaders;
 pub mod net;
 pub mod zipx;
 pub mod mojang;
@@ -121,6 +122,7 @@ pub fn call(ctx: &Ctx, name: &str, data: Value) -> Result<Value, String> {
         "status" => Ok(launch::status()),
         "launch" => launch::launch(ctx, &data),
         "stop" => Ok(launch::stop(ctx)),
+        "loaders" => loaders::list(&s(&data, "mcVersion"), &s(&data, "type")),
         other => Err(format!(
             "'{other}' todavía no está disponible en la versión Tauri (en construcción)"
         )),

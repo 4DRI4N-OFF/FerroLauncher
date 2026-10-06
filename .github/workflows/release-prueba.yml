@@ -40,4 +40,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $files = Get-ChildItem release -Filter *.exe | ForEach-Object { $_.FullName }
-          gh release create v0.9.7-animaciones-prueba $files --repo ${{ github.repository }} --target ${{ github.sha }} --prerelease --title "FerroLauncher animaciones (prueba)" --notes "Version de prueba de la PR 15 (animaciones fluidas). Sin firmar: SmartScreen avisara, Mas informacion -> Ejecutar de todas formas. Si falla algo, se borra."
+          gh release create v0.9.7-animaciones-prueba2 $files --repo ${{ github.repository }} --target ${{ github.sha }} --prerelease --title "FerroLauncher animaciones (prueba 2)" --notes "Version de prueba de la PR 15 (animaciones fluidas). Sin firmar: SmartScreen avisara, Mas informacion -> Ejecutar de todas formas. Si falla algo, se borra."

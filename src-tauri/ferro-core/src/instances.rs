@@ -19,7 +19,7 @@ fn with_settings(mut cfg: Value) -> Value {
     cfg
 }
 
-fn read_cfg(path: &Path) -> Result<Value, String> {
+pub fn read_cfg(path: &Path) -> Result<Value, String> {
     let txt = fs::read_to_string(path).map_err(|e| e.to_string())?;
     serde_json::from_str(&txt).map_err(|e| e.to_string())
 }

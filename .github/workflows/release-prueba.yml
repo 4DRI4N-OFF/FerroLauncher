@@ -26,7 +26,9 @@ jobs:
         run: npm ci
 
       - name: Compilar instalador y portable
-        run: npm run dist
+        run: |
+          npm run build
+          npx electron-builder --win nsis portable --publish never
 
       - name: Listar resultado
         shell: pwsh

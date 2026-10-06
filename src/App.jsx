@@ -70,6 +70,7 @@ const rememberInstalled = (instanceName, scope, id) => {
 
 // Resortes al fijar/soltar la sidebar: los botones entran en cascada con muelle.
 function springNav() {
+  if (prefersReducedMotion()) return;
   try {
     document.querySelectorAll('.side > button').forEach((b, i) => {
       try {
@@ -85,6 +86,15 @@ function springNav() {
 
 // Muelle de entrada desde el lado más cercano (misma curva que --spring).
 const SPRING_EASE = 'cubic-bezier(.34,1.56,.64,1)';
+// Respeta prefers-reduced-motion: si el sistema pide menos movimiento,
+// las animaciones JS se cortan aquí (las CSS, con la media query de styles.css).
+const REDUCED_MOTION_Q = (() => {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)'); } catch { return null; }
+})();
+function prefersReducedMotion() {
+  try { return !!(REDUCED_MOTION_Q && REDUCED_MOTION_Q.matches); } catch { return false; }
+}
+
 const SIDE_VEC = { l: [-1, 0], r: [1, 0], t: [0, -1], b: [0, 1] };
 // Lado del viewport más cercano a un punto (x, y).
 function nearestSide(x, y) {
@@ -97,6 +107,7 @@ function nearestSide(x, y) {
 }
 // Una ventana entra deslizándose desde su lado más cercano con rebote de muelle.
 function springIn(el, dist = 70, delay = 0) {
+  if (prefersReducedMotion()) return;
   try {
     const r = el.getBoundingClientRect();
     if (!r.width && !r.height) return;
@@ -114,20 +125,44 @@ function springIn(el, dist = 70, delay = 0) {
 // caza los bloques nuevos (cambio de pestaña, listas que llegan async), así nada
 // queda sin animar. Cada elemento se anima una sola vez (WeakSet).
 const enteredEls = new WeakSet();
+// Entrada escalonada para las tarjetas de una lista de resultados (.grid):
+// cada una sube y aparece un poco después de la anterior. El retraso total
+// está acotado (STAGGER_MAX_MS) para que las listas largas no se sientan lentas.
+const STAGGER_STEP_MS = 45;
+const STAGGER_MAX_MS = 500;
+const STAGGER_MAX_ITEMS = 30;
+function riseIn(el, delay = 0) {
+  if (prefersReducedMotion()) return;
+  try {
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height) return;
+    try { el.getAnimations().forEach((a) => a.cancel()); } catch { /* sin Web Animations: se sigue */ }
+    el.animate([
+      { transform: 'translateY(16px) scale(.98)', opacity: 0 },
+      { transform: 'translateY(0) scale(1)', opacity: 1 },
+    ], { duration: 420, delay, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' });
+  } catch { /* la animacion es decorativa */ }
+}
 function enterBatch(nodes) {
   try {
     const fresh = nodes.filter((el) => el instanceof Element && !enteredEls.has(el));
     fresh.forEach((el) => enteredEls.add(el));
-    fresh.slice(0, 24).forEach((el, i) => springIn(el, 70, Math.min(i, 12) * 40));
+    const isRow = (el) => !!(el.parentElement && el.parentElement.classList.contains('grid'));
+    const rows = fresh.filter(isRow);
+    const step = Math.min(STAGGER_STEP_MS, STAGGER_MAX_MS / Math.max(rows.length, 1));
+    rows.slice(0, STAGGER_MAX_ITEMS).forEach((el, i) => riseIn(el, Math.round(i * step)));
+    fresh.filter((el) => !isRow(el)).slice(0, 24).forEach((el, i) => springIn(el, 70, Math.min(i, 12) * 40));
   } catch {}
 }
 function initEnter() {
+  if (prefersReducedMotion()) return () => {};
   try {
     // Intro: la sidebar entra en cascada.
     document.querySelectorAll('.side > button').forEach((b, i) => springIn(b, 40, i * 45));
     const main = document.querySelector('.main');
     if (main) enterBatch([...main.querySelectorAll('.card, .hero')]);
-    const target = main || document.body;
+    // .main se recrea en cada cambio de pestaña (key={tab}): se observa su contenedor.
+    const target = (main && main.parentElement) || document.body;
     const mo = new MutationObserver((muts) => {
       const added = [];
       for (const m of muts) m.addedNodes.forEach((n) => {
@@ -148,6 +183,7 @@ function initEnter() {
 // con resistencia y vuelve con muelle. Un solo listener global.
 // Independiente de la configuración de Windows: siempre activo.
 function initSpringScroll() {
+  if (prefersReducedMotion()) return () => {};
   const state = new WeakMap();
   const MAX = 130;
   const onWheel = (e) => {
@@ -211,7 +247,7 @@ function MorphModal({ origin, closing, onClose, title, children }) {
   const ovRef = useRef(null);
   useLayoutEffect(() => {
     const box = boxRef.current;
-    if (!box) return;
+    if (!box || prefersReducedMotion()) return;
     let x = 0, y = 0;
     try {
       const r = box.getBoundingClientRect();
@@ -229,7 +265,7 @@ function MorphModal({ origin, closing, onClose, title, children }) {
     if (!closing) return;
     const box = boxRef.current, ov = ovRef.current;
     if (ov) { ov.style.transition = 'opacity .25s ease'; ov.style.opacity = '0'; }
-    if (box && origin) {
+    if (box && origin && !prefersReducedMotion()) {
       const r = box.getBoundingClientRect();
       const dx = origin.cx - (r.left + r.width / 2);
       const dy = origin.cy - (r.top + r.height / 2);

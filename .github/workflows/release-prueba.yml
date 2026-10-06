@@ -1,0 +1,43 @@
+name: Release de prueba (Windows)
+
+# Solo para probar la rama de animaciones: compila en Windows y publica un pre-release.
+# Se dispara una vez al subir este archivo a la rama. No toca main.
+on:
+  push:
+    branches: [feat/animaciones-fluidas]
+    paths: [".github/workflows/release-prueba.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Compilar instalador y portable
+        run: |
+          npm run build
+          npx electron-builder --win nsis portable --publish never
+
+      - name: Listar resultado
+        shell: pwsh
+        run: Get-ChildItem release -Filter *.exe | Select-Object Name, Length
+
+      - name: Publicar pre-release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $files = Get-ChildItem release -Filter *.exe | ForEach-Object { $_.FullName }
+          gh release create v0.9.7-animaciones-prueba3 $files --repo ${{ github.repository }} --target ${{ github.sha }} --prerelease --title "FerroLauncher animaciones (prueba 3)" --notes "Version de prueba de la PR 15 (animaciones fluidas). Sin firmar: SmartScreen avisara, Mas informacion -> Ejecutar de todas formas. Si falla algo, se borra."

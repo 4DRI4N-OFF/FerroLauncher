@@ -7,6 +7,9 @@ export default function Embers({ count = 55 }) {
     const cv = ref.current;
     if (!cv) return;
     const ctx = cv.getContext('2d');
+    // Movimiento reducido: un solo fotograma quieto, sin bucle ni destellos.
+    let still = false;
+    try { still = !!window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { /* sin matchMedia: animación normal */ }
     let w = 0;
     let h = 0;
     let raf = 0;
@@ -28,6 +31,18 @@ export default function Embers({ count = 55 }) {
     const loop = () => {
       if (!visible) return;
       ctx.clearRect(0, 0, w, h);
+      if (still) {
+        for (const p of P) {
+          const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 4);
+          g.addColorStop(0, `rgba(255,190,90,${(p.a * 0.7).toFixed(3)})`);
+          g.addColorStop(1, 'rgba(255,110,30,0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.r * 4, 0, 7);
+          ctx.fill();
+        }
+        return;
+      }
       // Graves: ascenso · Medios: vaivén lateral · Agudos: destellos · AFK: frenesí
       const beat = window.__ferroBeat || 0;
       const melody = window.__ferroMelody || 0;

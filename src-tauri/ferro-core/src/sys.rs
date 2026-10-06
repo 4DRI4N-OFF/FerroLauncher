@@ -3,12 +3,12 @@ use std::path::PathBuf;
 use std::process::Command;
 
 #[cfg(windows)]
-fn quiet(c: &mut Command) -> &mut Command {
+pub fn quiet(c: &mut Command) -> &mut Command {
     use std::os::windows::process::CommandExt;
     c.creation_flags(0x0800_0000) // CREATE_NO_WINDOW
 }
 #[cfg(not(windows))]
-fn quiet(c: &mut Command) -> &mut Command { c }
+pub fn quiet(c: &mut Command) -> &mut Command { c }
 
 pub fn major_of(version: &str) -> Option<u32> {
     if version.starts_with("1.8") { return Some(8); }
@@ -25,7 +25,7 @@ pub fn parse_java_version(out: &str) -> Option<String> {
     None
 }
 
-fn check_java(path: &str) -> Option<Value> {
+pub fn check_java(path: &str) -> Option<Value> {
     let out = quiet(&mut Command::new(path).arg("-version")).output().ok()?;
     let text = format!("{}\n{}", String::from_utf8_lossy(&out.stdout), String::from_utf8_lossy(&out.stderr));
     let version = parse_java_version(&text)?;
@@ -33,7 +33,7 @@ fn check_java(path: &str) -> Option<Value> {
     Some(json!({ "path": path, "version": version, "major": major }))
 }
 
-fn candidates() -> Vec<String> {
+pub fn candidates() -> Vec<String> {
     let mut list = Vec::new();
     if let Ok(h) = std::env::var("JAVA_HOME") {
         list.push(PathBuf::from(h).join("bin").join("java.exe").to_string_lossy().to_string());

@@ -6,7 +6,7 @@ name: Tauri (prueba Windows)
 on:
   push:
     branches: [feat/tauri]
-    paths: ["bundle/ferro-tauri.tar.gz"]
+    paths: ["bundle/*.tar.gz", ".github/workflows/tauri-build.yml"]
   workflow_dispatch:
 
 permissions:
@@ -19,13 +19,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Desempaquetar el código del bundle
+      - name: Desempaquetar el codigo del bundle
         shell: bash
         run: |
-          if [ -f bundle/ferro-tauri.tar.gz ]; then
-            tar -xzf bundle/ferro-tauri.tar.gz
-            git rm -q --cached bundle/ferro-tauri.tar.gz
-            rm -f bundle/ferro-tauri.tar.gz
+          for f in bundle/*.tar.gz; do
+            [ -f "$f" ] || continue
+            tar -xzf "$f"
+            git rm -q --cached "$f"
+            rm -f "$f"
+            CHANGED=1
+          done
+          if [ -n "$CHANGED" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add -A

@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 pub mod instances;
 pub mod launch;
+pub mod auth;
 pub mod loaders;
 pub mod net;
 pub mod zipx;
@@ -123,6 +124,17 @@ pub fn call(ctx: &Ctx, name: &str, data: Value) -> Result<Value, String> {
         "launch" => launch::launch(ctx, &data),
         "stop" => Ok(launch::stop(ctx)),
         "loaders" => loaders::list(&s(&data, "mcVersion"), &s(&data, "type")),
+        "clientId" => Ok(auth::client_id_public(&ctx.base)),
+        "setClientId" => auth::set_client_id(&ctx.base, &s(&data, "clientId")).map(|id| json!(id)),
+        "authStatus" => Ok(auth::status(&ctx.base)),
+        "authStart" => auth::device_start(&ctx.base),
+        "authPoll" => auth::device_poll_once(&ctx.base, &s(&data, "deviceCode")),
+        "authLogout" => auth::logout(&ctx.base),
+        "accounts" => Ok(auth::list_accounts(&ctx.base)),
+        "authSelect" => auth::set_active(&ctx.base, &s(&data, "uuid")),
+        "authRemove" => auth::remove_account(&ctx.base, &s(&data, "uuid")),
+        "nameCheck" => Ok(auth::name_check(&s(&data, "name"))),
+        "nameSuggest" => Ok(auth::name_suggest(&s(&data, "base"))),
         other => Err(format!(
             "'{other}' todavía no está disponible en la versión Tauri (en construcción)"
         )),

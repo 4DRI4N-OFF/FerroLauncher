@@ -70,6 +70,7 @@ const rememberInstalled = (instanceName, scope, id) => {
 
 // Resortes al fijar/soltar la sidebar: los botones entran en cascada con muelle.
 function springNav() {
+  if (prefersReducedMotion()) return;
   try {
     document.querySelectorAll('.side > button').forEach((b, i) => {
       try {
@@ -85,6 +86,15 @@ function springNav() {
 
 // Muelle de entrada desde el lado más cercano (misma curva que --spring).
 const SPRING_EASE = 'cubic-bezier(.34,1.56,.64,1)';
+// Respeta prefers-reduced-motion: si el sistema pide menos movimiento,
+// las animaciones JS se cortan aquí (las CSS, con la media query de styles.css).
+const REDUCED_MOTION_Q = (() => {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)'); } catch { return null; }
+})();
+function prefersReducedMotion() {
+  try { return !!(REDUCED_MOTION_Q && REDUCED_MOTION_Q.matches); } catch { return false; }
+}
+
 const SIDE_VEC = { l: [-1, 0], r: [1, 0], t: [0, -1], b: [0, 1] };
 // Lado del viewport más cercano a un punto (x, y).
 function nearestSide(x, y) {
@@ -97,6 +107,7 @@ function nearestSide(x, y) {
 }
 // Una ventana entra deslizándose desde su lado más cercano con rebote de muelle.
 function springIn(el, dist = 70, delay = 0) {
+  if (prefersReducedMotion()) return;
   try {
     const r = el.getBoundingClientRect();
     if (!r.width && !r.height) return;
@@ -122,6 +133,7 @@ function enterBatch(nodes) {
   } catch {}
 }
 function initEnter() {
+  if (prefersReducedMotion()) return () => {};
   try {
     // Intro: la sidebar entra en cascada.
     document.querySelectorAll('.side > button').forEach((b, i) => springIn(b, 40, i * 45));
@@ -148,6 +160,7 @@ function initEnter() {
 // con resistencia y vuelve con muelle. Un solo listener global.
 // Independiente de la configuración de Windows: siempre activo.
 function initSpringScroll() {
+  if (prefersReducedMotion()) return () => {};
   const state = new WeakMap();
   const MAX = 130;
   const onWheel = (e) => {
@@ -211,7 +224,7 @@ function MorphModal({ origin, closing, onClose, title, children }) {
   const ovRef = useRef(null);
   useLayoutEffect(() => {
     const box = boxRef.current;
-    if (!box) return;
+    if (!box || prefersReducedMotion()) return;
     let x = 0, y = 0;
     try {
       const r = box.getBoundingClientRect();
@@ -229,7 +242,7 @@ function MorphModal({ origin, closing, onClose, title, children }) {
     if (!closing) return;
     const box = boxRef.current, ov = ovRef.current;
     if (ov) { ov.style.transition = 'opacity .25s ease'; ov.style.opacity = '0'; }
-    if (box && origin) {
+    if (box && origin && !prefersReducedMotion()) {
       const r = box.getBoundingClientRect();
       const dx = origin.cx - (r.left + r.width / 2);
       const dy = origin.cy - (r.top + r.height / 2);
@@ -2423,4 +2436,4 @@ export default function App() {
       )}
     </div>
   );
-}
+    }

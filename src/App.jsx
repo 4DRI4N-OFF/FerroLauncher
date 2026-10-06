@@ -136,12 +136,12 @@ function riseIn(el, delay = 0) {
   try {
     const r = el.getBoundingClientRect();
     if (!r.width && !r.height) return;
-    try { el.getAnimations().forEach((a) => a.cancel()); } catch {}
+    try { el.getAnimations().forEach((a) => a.cancel()); } catch { /* sin Web Animations: se sigue */ }
     el.animate([
       { transform: 'translateY(16px) scale(.98)', opacity: 0 },
       { transform: 'translateY(0) scale(1)', opacity: 1 },
     ], { duration: 420, delay, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' });
-  } catch {}
+  } catch { /* la animacion es decorativa */ }
 }
 function enterBatch(nodes) {
   try {
@@ -161,7 +161,8 @@ function initEnter() {
     document.querySelectorAll('.side > button').forEach((b, i) => springIn(b, 40, i * 45));
     const main = document.querySelector('.main');
     if (main) enterBatch([...main.querySelectorAll('.card, .hero')]);
-    const target = main || document.body;
+    // .main se recrea en cada cambio de pestaña (key={tab}): se observa su contenedor.
+    const target = (main && main.parentElement) || document.body;
     const mo = new MutationObserver((muts) => {
       const added = [];
       for (const m of muts) m.addedNodes.forEach((n) => {

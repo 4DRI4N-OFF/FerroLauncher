@@ -10,6 +10,9 @@ ureq = { version = "2", features = ["json"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 sysinfo = { version = "0.30", default-features = false }
 opener = "0.7"
+sha1 = "0.10"
+md5 = "0.7"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 trash = "5"
 
 [dev-dependencies]

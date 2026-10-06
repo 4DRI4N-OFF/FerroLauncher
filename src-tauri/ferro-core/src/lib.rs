@@ -6,6 +6,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 pub mod instances;
+pub mod launch;
+pub mod net;
+pub mod zipx;
 pub mod mojang;
 pub mod sys;
 
@@ -115,7 +118,9 @@ pub fn call(ctx: &Ctx, name: &str, data: Value) -> Result<Value, String> {
             opener::open(&raw).map_err(|e| e.to_string())?;
             Ok(json!(true))
         }
-        "status" => Ok(json!({ "running": false, "instance": Value::Null })),
+        "status" => Ok(launch::status()),
+        "launch" => launch::launch(ctx, &data),
+        "stop" => Ok(launch::stop(ctx)),
         other => Err(format!(
             "'{other}' todavía no está disponible en la versión Tauri (en construcción)"
         )),
@@ -140,7 +145,7 @@ mod tests {
     #[test]
     fn unknown_command_is_an_error_not_a_crash() {
         let d = tempfile::tempdir().unwrap();
-        assert!(call(&ctx(d.path()), "launch", json!({})).is_err());
+        assert!(call(&ctx(d.path()), "modrinthSearch", json!({})).is_err());
         assert_eq!(call(&ctx(d.path()), "appVersion", json!({})).unwrap(), json!("0.9.6"));
         assert!(call(&ctx(d.path()), "openUrl", json!({"url": "https://evil.example/"})).is_err());
     }

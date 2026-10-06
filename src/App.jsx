@@ -125,11 +125,33 @@ function springIn(el, dist = 70, delay = 0) {
 // caza los bloques nuevos (cambio de pestaña, listas que llegan async), así nada
 // queda sin animar. Cada elemento se anima una sola vez (WeakSet).
 const enteredEls = new WeakSet();
+// Entrada escalonada para las tarjetas de una lista de resultados (.grid):
+// cada una sube y aparece un poco después de la anterior. El retraso total
+// está acotado (STAGGER_MAX_MS) para que las listas largas no se sientan lentas.
+const STAGGER_STEP_MS = 45;
+const STAGGER_MAX_MS = 500;
+const STAGGER_MAX_ITEMS = 30;
+function riseIn(el, delay = 0) {
+  if (prefersReducedMotion()) return;
+  try {
+    const r = el.getBoundingClientRect();
+    if (!r.width && !r.height) return;
+    try { el.getAnimations().forEach((a) => a.cancel()); } catch {}
+    el.animate([
+      { transform: 'translateY(16px) scale(.98)', opacity: 0 },
+      { transform: 'translateY(0) scale(1)', opacity: 1 },
+    ], { duration: 420, delay, easing: 'cubic-bezier(.22,1,.36,1)', fill: 'backwards' });
+  } catch {}
+}
 function enterBatch(nodes) {
   try {
     const fresh = nodes.filter((el) => el instanceof Element && !enteredEls.has(el));
     fresh.forEach((el) => enteredEls.add(el));
-    fresh.slice(0, 24).forEach((el, i) => springIn(el, 70, Math.min(i, 12) * 40));
+    const isRow = (el) => !!(el.parentElement && el.parentElement.classList.contains('grid'));
+    const rows = fresh.filter(isRow);
+    const step = Math.min(STAGGER_STEP_MS, STAGGER_MAX_MS / Math.max(rows.length, 1));
+    rows.slice(0, STAGGER_MAX_ITEMS).forEach((el, i) => riseIn(el, Math.round(i * step)));
+    fresh.filter((el) => !isRow(el)).slice(0, 24).forEach((el, i) => springIn(el, 70, Math.min(i, 12) * 40));
   } catch {}
 }
 function initEnter() {

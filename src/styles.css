@@ -863,3 +863,31 @@ pre {
   45% { transform: translateX(-3px) scale(1.06); opacity: 1; filter: brightness(3.2); }
   100% { transform: scale(1.18) translateY(14px); opacity: 0; filter: brightness(3.2) blur(8px); }
 }
+
+/* ——— Animaciones fluidas ——— */
+/* Transición de pestaña: el contenido entra suave al cambiar de sección. */
+.main { animation: view-in 0.32s ease both; }
+@keyframes view-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* Diálogos de confirmación: el fondo funde y la tarjeta aparece con muelle. */
+.confirm-overlay { animation: fade-in 0.22s ease both; }
+.confirm-overlay > .card { animation: dlg-pop 0.4s var(--spring) both; }
+@keyframes dlg-pop { from { opacity: 0; transform: translateY(14px) scale(.92); } to { opacity: 1; transform: none; } }
+
+/* Menú de acciones (···): sale del botón con un pop rápido. */
+.dots-menu { animation: menu-pop 0.24s var(--spring-soft) both; transform-origin: top right; }
+@keyframes menu-pop { from { opacity: 0; transform: scale(.88) translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* Filas de listas: hover con desplazamiento suave, a juego con las tarjetas. */
+.subrow { transition: transform 0.2s var(--spring-soft), background 0.2s, border-color 0.2s; }
+.subrow:hover { transform: translateX(3px); background: rgba(255, 255, 255, 0.075); border-color: var(--stroke); }
+
+/* Movimiento reducido: si el sistema pide menos movimiento, la interfaz obedece. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .hero-title, .premium-shine, .hero-play .primary, .scare-title, .player-chip .dot.on, .afk-badge, .afk-badge img { animation: none !important; }
+}

@@ -790,13 +790,14 @@ export default function App() {
       if (galName && !names.includes(galName)) closeGallery();
       if (instModal === 'mods' && modsFor && !names.includes(modsFor)) closeInstalled();
       if (instModal === 'datapacks' && dpFor && !names.includes(dpFor)) closeInstalled();
-      setJava(await window.ferro?.java());
-      try { setAbCfg(await window.ferro?.autoBackupGet()); } catch {}
+      const jv = await window.ferro?.java();
+      if (jv) setJava(jv);
+      try { const ab = await window.ferro?.autoBackupGet(); if (ab) setAbCfg(ab); } catch {}
       try {
         const r = await window.ferro?.autoBackupRun();
         if (r?.due) setLog((l) => l + `[ferro] ${t('ab.done', { n: (r.done || []).length })}\n`);
       } catch {}
-      try { setAccount(await window.ferro?.authStatus()); } catch {}
+      try { const ac = await window.ferro?.authStatus(); if (ac !== undefined) setAccount(ac); } catch {}
     } catch (e) {
       setLog((l) => l + `[error] ${e.message}\n`);
     }
@@ -805,7 +806,8 @@ export default function App() {
   const loadVers = async (k) => {
     try {
       setVerKind(k);
-      setVersions(await window.ferro?.versions({ kind: k }));
+      const v = await window.ferro?.versions({ kind: k });
+      if (v) setVersions(v);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 

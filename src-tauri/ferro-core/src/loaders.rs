@@ -98,6 +98,65 @@ pub fn list(mc: &str, kind: &str) -> Result<Value, String> {
     }
 }
 
+/// Compara versiones por tramos numéricos (sufijos ignorados). Igual que Electron.
+pub fn cmp_ver(a: &str, b: &str) -> i32 {
+    fn parts(s: &str) -> Vec<u64> {
+        s.split(|c: char| !c.is_ascii_digit()).filter(|p| !p.is_empty()).map(|p| p.parse().unwrap_or(0)).collect()
+    }
+    let (pa, pb) = (parts(a), parts(b));
+    for i in 0..pa.len().max(pb.len()) {
+        let (x, y) = (*pa.get(i).unwrap_or(&0), *pb.get(i).unwrap_or(&0));
+        if x != y {
+            return if x < y { -1 } else { 1 };
+        }
+    }
+    0
+}
+
+fn latest_for(mc: &str, kind: &str) -> Result<Option<String>, String> {
+    let arr = list(mc, kind)?;
+    Ok(arr.as_array().and_then(|a| a.first()).and_then(|e| e.get("loader")).and_then(|x| x.as_str()).map(String::from))
+}
+
+/// {current, latest, outdated} para una instancia. Igual que `ferro:loaderCheck`.
+pub fn check(inst_dir: &std::path::Path, name: &str) -> Result<Value, String> {
+    let dir = crate::instances::find(inst_dir, name)?;
+    let cfg = crate::instances::read_cfg(&dir.join("ferro.json"))?;
+    let typ = cfg.get("type").and_then(|x| x.as_str()).unwrap_or("vanilla");
+    if typ == "vanilla" {
+        return Ok(json!({ "current": null, "latest": null, "outdated": false }));
+    }
+    let mc = cfg.get("versionId").and_then(|x| x.as_str()).unwrap_or("");
+    let latest = latest_for(mc, typ)?;
+    let cur = cfg.get("loaderVersion").and_then(|x| x.as_str()).map(String::from);
+    let outdated = match (&latest, &cur) {
+        (Some(l), Some(c)) => cmp_ver(l, c) > 0,
+        (Some(_), None) => true,
+        _ => false,
+    };
+    Ok(json!({ "current": cur, "latest": latest, "outdated": outdated }))
+}
+
+/// Actualiza `loaderVersion` al último. Igual que `ferro:loaderUpdate`.
+pub fn update(inst_dir: &std::path::Path, name: &str) -> Result<Value, String> {
+    let dir = crate::instances::find(inst_dir, name)?;
+    let cfg = crate::instances::read_cfg(&dir.join("ferro.json"))?;
+    let typ = cfg.get("type").and_then(|x| x.as_str()).unwrap_or("vanilla");
+    if typ == "vanilla" {
+        return Err("Es vanilla: no tiene loader".into());
+    }
+    let mc = cfg.get("versionId").and_then(|x| x.as_str()).unwrap_or("");
+    let latest = latest_for(mc, typ)?.ok_or("Sin versiones de loader para este MC")?;
+    let cur = cfg.get("loaderVersion").and_then(|x| x.as_str()).map(String::from);
+    if let Some(c) = &cur {
+        if cmp_ver(&latest, c) <= 0 {
+            return Ok(json!({ "updated": false, "current": cur, "latest": latest }));
+        }
+    }
+    crate::instances::update_settings(inst_dir, name, &json!({ "loaderVersion": latest }))?;
+    Ok(json!({ "updated": true, "previous": cur, "latest": latest }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,5 +197,20 @@ mod tests {
         let out = neo_parse(xml, "1.21.1");
         assert_eq!(out.len(), 2);
         assert_eq!(out[0]["loader"], "21.1.5");
+    }
+
+    #[test]
+    fn cmp_ver_numerico() {
+        assert_eq!(cmp_ver("47.4.26", "47.4.10"), 1);
+        assert_eq!(cmp_ver("0.16.9", "0.16.9"), 0);
+        assert_eq!(cmp_ver("0.15.0", "0.16.9"), -1);
+    }
+
+    #[test]
+    fn check_vanilla_sin_red() {
+        let d = tempfile::tempdir().unwrap();
+        crate::instances::create(d.path(), "V", "1.20.1", "vanilla", &Value::Null).unwrap();
+        let r = check(d.path(), "V").unwrap();
+        assert_eq!(r["outdated"], false);
     }
 }

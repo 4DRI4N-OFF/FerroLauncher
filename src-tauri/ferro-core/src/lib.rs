@@ -124,6 +124,8 @@ pub fn call(ctx: &Ctx, name: &str, data: Value) -> Result<Value, String> {
         "launch" => launch::launch(ctx, &data),
         "stop" => Ok(launch::stop(ctx)),
         "loaders" => loaders::list(&s(&data, "mcVersion"), &s(&data, "type")),
+        "loaderCheck" => loaders::check(&inst_dir, &s(&data, "instanceName")),
+        "loaderUpdate" => loaders::update(&inst_dir, &s(&data, "instanceName")),
         "clientId" => Ok(auth::client_id_public(&ctx.base)),
         "setClientId" => auth::set_client_id(&ctx.base, &s(&data, "clientId")).map(|id| json!(id)),
         "authStatus" => Ok(auth::status(&ctx.base)),

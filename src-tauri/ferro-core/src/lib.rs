@@ -8,6 +8,7 @@ use std::sync::Arc;
 pub mod instances;
 pub mod launch;
 pub mod auth;
+pub mod forge;
 pub mod loaders;
 pub mod net;
 pub mod zipx;

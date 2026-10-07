@@ -1,6 +1,6 @@
 //! Lanzar el juego: Java, librerías, natives, assets, argumentos y proceso.
 //! Soporta vanilla, Fabric y Quilt. Forge/NeoForge y la cuenta Microsoft llegan después.
-use crate::{instances, mojang, net, sys, zipx, Ctx};
+use crate::{forge, instances, mojang, net, sys, zipx, Ctx};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
@@ -497,34 +497,60 @@ pub fn launch(ctx: &Ctx, data: &Value) -> Result<Value, String> {
     let cfg = instances::read_cfg(&idir.join("ferro.json")).map_err(|_| "Instancia no encontrada".to_string())?;
     let version_id = st(&cfg, "versionId");
     let typ = { let t = st(&cfg, "type"); if t.is_empty() { "vanilla".to_string() } else { t } };
-    if typ == "forge" || typ == "neoforge" { return Err(format!("{typ} todavía no está disponible en la versión Tauri (en construcción). Vanilla, Fabric y Quilt sí.")); }
     let settings = cfg.get("settings").cloned().unwrap_or(json!({}));
+    let custom_java = st(&settings, "javaMode") == "custom" && !st(&settings, "javaPath").is_empty();
 
     ctx.log(&format!("[ferro] resolviendo {version_id}...\n"));
-    let details = version_details(ctx, &version_id)?;
-    let req = details.pointer("/javaVersion/majorVersion").and_then(|x| x.as_u64());
-    if let Some(r) = req { ctx.log(&format!("[ferro] esta versión pide Java {r}\n")); }
+    let vanilla = version_details(ctx, &version_id)?;
+    let req_vanilla = vanilla.pointer("/javaVersion/majorVersion").and_then(|x| x.as_u64());
+    if let Some(r) = req_vanilla { ctx.log(&format!("[ferro] esta versión pide Java {r}\n")); }
 
-    let java = if st(&settings, "javaMode") == "custom" && !st(&settings, "javaPath").is_empty() {
+    let mut java = if custom_java {
         sys::check_java(&st(&settings, "javaPath")).ok_or(format!("Java personalizado no válido: {}", st(&settings, "javaPath")))?
-    } else { ensure_java(ctx, req)? };
-    let java_bin = st(&java, "path");
-    let java_major = java["major"].as_u64().unwrap_or(0) as u32;
+    } else { ensure_java(ctx, req_vanilla)? };
+    let mut java_bin = st(&java, "path");
+    let mut java_major = java["major"].as_u64().unwrap_or(0) as u32;
     ctx.log(&format!("[ferro] Java {} (major {}) en {}{}\n", st(&java, "version"), java_major, java_bin, if java["managed"] == true { " [gestionado]" } else { "" }));
 
-    let (main_override, extra_cp) = if typ == "fabric" || typ == "quilt" {
-        let (m, c) = loader_libs(ctx, &version_id, &typ, cfg["loaderVersion"].as_str().unwrap_or(""))?;
-        (Some(m), c)
-    } else { (None, vec![]) };
+    // Perfil efectivo: vanilla, modloader ligero, o el generado por el instalador Forge/NeoForge
+    let (details, profile_dir, main_override, extra_cp): (Value, PathBuf, Option<String>, Vec<PathBuf>) =
+        if typ == "forge" || typ == "neoforge" {
+            let ver = cfg.get("loaderVersion").and_then(|x| x.as_str()).unwrap_or("");
+            if ver.is_empty() { return Err(format!("Crea la instancia eligiendo versión de {typ}")); }
+            let (prof, pid) = forge::ensure_profile(ctx, &java_bin, &idir, &name, &typ, &version_id, ver)?;
+            // El perfil efectivo puede pedir un Java más nuevo que el de vanilla
+            let req_prof = prof.pointer("/javaVersion/majorVersion").and_then(|x| x.as_u64()).unwrap_or(0);
+            if !custom_java && req_prof > 8 && (java_major as u64) < req_prof {
+                ctx.log(&format!("[ferro] el perfil pide Java {req_prof} y el actual es {java_major}: resolviendo...\n"));
+                match ensure_java(ctx, Some(req_prof)) {
+                    Ok(better) if better["major"].as_u64().unwrap_or(0) >= req_prof => {
+                        java = better;
+                        java_bin = st(&java, "path");
+                        java_major = java["major"].as_u64().unwrap_or(0) as u32;
+                        ctx.log(&format!("[ferro] Java {} (major {}) en {}\n", st(&java, "version"), java_major, java_bin));
+                    }
+                    _ => ctx.log(&format!("[ferro] no hay Java {req_prof}: se lanza con {java_major}, puede fallar\n")),
+                }
+            }
+            let dir = ctx.base.join("versions").join(pid);
+            (prof, dir, None, vec![])
+        } else if typ == "fabric" || typ == "quilt" {
+            let (m, c) = loader_libs(ctx, &version_id, &typ, cfg["loaderVersion"].as_str().unwrap_or(""))?;
+            (vanilla.clone(), ctx.base.join("versions").join(&version_id), Some(m), c)
+        } else {
+            (vanilla.clone(), ctx.base.join("versions").join(&version_id), None, vec![])
+        };
 
-    let jar = client_jar(ctx, &details)?;
+    // El client jar sale del perfil efectivo si trae client, si no del vanilla
+    let for_client = if details.pointer("/downloads/client/url").and_then(|x| x.as_str()).is_some() { &details } else { &vanilla };
+    let jar = client_jar(ctx, for_client)?;
     prog(ctx, "client", 1.0, 1.0, "");
     let cp = resolve_libraries(ctx, &details)?;
-    let natives = ctx.base.join("versions").join(&version_id).join("natives-windows");
+    let natives = profile_dir.join("natives-windows");
     resolve_natives(ctx, &details, &natives)?;
     download_assets(ctx, &details)?;
     let logging = details.pointer("/logging/client/file").and_then(|c| {
-        let dest = ctx.base.join("versions").join(&version_id).join(c["id"].as_str()?);
+        let dest = profile_dir.join(c["id"].as_str()?);
         net::download_file(c["url"].as_str()?, &dest, c["size"].as_u64(), c["sha1"].as_str(), None).ok()
     });
     ctx.log("[ferro] lanzando...\n");

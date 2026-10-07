@@ -5,16 +5,16 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-pub mod instances;
-pub mod launch;
 pub mod auth;
 pub mod forge;
+pub mod instances;
+pub mod launch;
 pub mod loaders;
 pub mod mods;
-pub mod net;
-pub mod zipx;
 pub mod mojang;
+pub mod net;
 pub mod sys;
+pub mod zipx;
 
 pub type Emit = Arc<dyn Fn(&str, Value) + Send + Sync>;
 
@@ -125,18 +125,20 @@ pub fn call(ctx: &Ctx, name: &str, data: Value) -> Result<Value, String> {
         "status" => Ok(launch::status()),
         "launch" => launch::launch(ctx, &data),
         "stop" => Ok(launch::stop(ctx)),
+        "clientId" => Ok(auth::client_id_public(&ctx.base)),
+        "setClientId" => auth::set_client_id(&ctx.base, &s(&data, "clientId")),
+        "authStatus" => Ok(auth::status(&ctx.base)),
+        "authStart" => auth::device_start(&ctx.base),
+        "authPoll" => auth::device_poll(&ctx.base, &s(&data, "deviceCode")),
+        "authLogout" => auth::logout(&ctx.base),
+        "accounts" => Ok(auth::list(&ctx.base)),
+        "authSelect" => auth::set_active(&ctx.base, &s(&data, "uuid")),
+        "authRemove" => auth::remove(&ctx.base, &s(&data, "uuid")),
+        "authWindowCancel" => Ok(json!(true)),
+        "authWindow" => Err("La ventana de Microsoft aún no está en la versión Tauri: usa el código de dispositivo (microsoft.com/link)".into()),
         "loaders" => loaders::list(&s(&data, "mcVersion"), &s(&data, "type")),
         "loaderCheck" => loaders::check(&inst_dir, &s(&data, "instanceName")),
         "loaderUpdate" => loaders::update(&inst_dir, &s(&data, "instanceName")),
-        "clientId" => Ok(auth::client_id_public(&ctx.base)),
-        "setClientId" => auth::set_client_id(&ctx.base, &s(&data, "clientId")).map(|id| json!(id)),
-        "authStatus" => Ok(auth::status(&ctx.base)),
-        "authStart" => auth::device_start(&ctx.base),
-        "authPoll" => auth::device_poll_once(&ctx.base, &s(&data, "deviceCode")),
-        "authLogout" => auth::logout(&ctx.base),
-        "accounts" => Ok(auth::list_accounts(&ctx.base)),
-        "authSelect" => auth::set_active(&ctx.base, &s(&data, "uuid")),
-        "authRemove" => auth::remove_account(&ctx.base, &s(&data, "uuid")),
         "nameCheck" => Ok(auth::name_check(&s(&data, "name"))),
         "nameSuggest" => Ok(auth::name_suggest(&s(&data, "base"))),
         "modSearch" => mods::search(&s(&data, "query"), &s(&data, "mcVersion"), &s(&data, "loader"), &s(&data, "sort"), &s(&data, "kind"), data.get("offset").and_then(|x| x.as_u64()).unwrap_or(0)),

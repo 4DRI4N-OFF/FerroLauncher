@@ -64,5 +64,5 @@ jobs:
           $exe = Get-ChildItem src-tauri/target/release/bundle/nsis -Filter *.exe | Select-Object -First 1
           Copy-Item $exe.FullName "FerroLauncher-Tauri-Setup.exe"
           $tag = "v0.9.7-tauri-prueba${{ github.run_number }}"
-<          gh release create $tag FerroLauncher-Tauri-Setup.exe --repo ${{ github.repository }} --target ${{ github.sha }} --prerelease --title "FerroLauncher Tauri (prueba ${{ github.run_number }})" --notes "Version de prueba de la migracion a Tauri (PR en curso). Sin firmar: SmartScreen avisara. Incluye: loaders (los 4), login Microsoft multicuenta (codigo de dispositivo), launch online, Forge/NeoForge y Modrinth basico. Cuentas en accounts-tauri.json separado. Pendiente: auto-updater, backups y mas."
+          gh release create $tag FerroLauncher-Tauri-Setup.exe --repo ${{ github.repository }} --target ${{ github.sha }} --prerelease --title "FerroLauncher Tauri (prueba ${{ github.run_number }})" --notes "Version de prueba de la migracion a Tauri (PR en curso). Sin firmar: SmartScreen avisara. Incluye: loaders (los 4), login Microsoft multicuenta (codigo de dispositivo), launch online, Forge/NeoForge y Modrinth basico. Cuentas en accounts-tauri.json separado. Pendiente: auto-updater, backups y mas."
 # build: descargas y lanzamiento del juego

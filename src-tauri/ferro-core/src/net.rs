@@ -125,3 +125,24 @@ pub fn download_file(
     fs::rename(&part, dest).map_err(|e| e.to_string())?;
     Ok(dest.to_path_buf())
 }
+
+fn read_any(r: Result<ureq::Response, ureq::Error>) -> Result<(u16, Value), String> {
+    match r {
+        Ok(resp) => { let s = resp.status(); Ok((s, resp.into_json::<Value>().unwrap_or(Value::Null))) }
+        Err(ureq::Error::Status(code, resp)) => Ok((code, resp.into_json::<Value>().unwrap_or(Value::Null))),
+        Err(e) => Err(format!("Sin conexión: {e}")),
+    }
+}
+
+/// POST formulario; devuelve (código, json) también cuando el servidor responde 4xx.
+pub fn post_form(url: &str, params: &[(&str, &str)]) -> Result<(u16, Value), String> {
+    read_any(agent().post(url).send_form(params))
+}
+
+pub fn post_json(url: &str, body: &Value) -> Result<(u16, Value), String> {
+    read_any(agent().post(url).set("Accept", "application/json").send_json(body.clone()))
+}
+
+pub fn get_bearer(url: &str, token: &str) -> Result<(u16, Value), String> {
+    read_any(agent().get(url).set("Authorization", &format!("Bearer {token}")).call())
+}

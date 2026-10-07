@@ -1,6 +1,6 @@
 //! Lanzar el juego: Java, librerías, natives, assets, argumentos y proceso.
 //! Soporta vanilla, Fabric y Quilt. Forge/NeoForge y la cuenta Microsoft llegan después.
-use crate::{instances, mojang, net, sys, zipx, Ctx};
+use crate::{auth, instances, mojang, net, sys, zipx, Ctx};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
@@ -127,6 +127,7 @@ pub struct PlanIn<'a> {
     pub preset: &'a str,
     pub java_major: u32,
     pub launcher_version: &'a str,
+    pub auth: Option<&'a Value>,
 }
 
 pub struct Plan { pub jvm: Vec<String>, pub game: Vec<String>, pub main_class: String }
@@ -135,12 +136,14 @@ fn p(x: &Path) -> String { x.to_string_lossy().to_string() }
 
 pub fn build_plan(i: &PlanIn) -> Plan {
     let d = i.details;
-    let uuid = offline_uuid(i.username).replace('-', "");
+    let online = i.auth.map_or(false, |a| a["mcToken"].as_str().is_some() && a["profile"]["uuid"].as_str().is_some());
+    let eff_name = if online { st(&i.auth.unwrap()["profile"], "name") } else { i.username.to_string() };
+    let uuid = if online { st(&i.auth.unwrap()["profile"], "uuid").replace('-', "") } else { offline_uuid(i.username).replace('-', "") };
     let cp: Vec<String> = std::iter::once(i.client_jar).chain(i.extra_cp.iter().map(|x| x.as_path())).chain(i.libs_cp.iter().map(|x| x.as_path())).map(p).collect();
     let classpath = cp.join(";");
     let asset_index = d.pointer("/assetIndex/id").and_then(|x| x.as_str()).unwrap_or("legacy").to_string();
     let mut map: HashMap<&str, String> = HashMap::new();
-    map.insert("auth_player_name", i.username.to_string());
+    map.insert("auth_player_name", eff_name);
     map.insert("version_name", st(d, "id"));
     map.insert("game_directory", p(i.instance_dir));
     map.insert("game_directory_raw", p(i.instance_dir));
@@ -148,10 +151,10 @@ pub fn build_plan(i: &PlanIn) -> Plan {
     map.insert("assets_root_raw", p(i.assets_dir));
     map.insert("assets_index_name", asset_index);
     map.insert("auth_uuid", uuid);
-    map.insert("auth_access_token", "0".into());
+    map.insert("auth_access_token", if online { st(i.auth.unwrap(), "mcToken") } else { "0".into() });
     map.insert("clientid", "ferro".into());
-    map.insert("auth_xuid", "0".into());
-    map.insert("user_type", "legacy".into());
+    map.insert("auth_xuid", if online { i.auth.unwrap()["xuid"].as_str().unwrap_or("0").to_string() } else { "0".into() });
+    map.insert("user_type", if online { "msa".into() } else { "legacy".into() });
     map.insert("version_type", { let t = st(d, "type"); if t.is_empty() { "release".into() } else { t } });
     map.insert("natives_directory", p(i.natives_dir));
     map.insert("natives_directory_raw", p(i.natives_dir));
@@ -521,15 +524,21 @@ pub fn launch(ctx: &Ctx, data: &Value) -> Result<Value, String> {
     ctx.log("[ferro] lanzando...\n");
 
     let username = { let u = st(data, "username"); let u = u.trim().to_string(); if u.is_empty() { "Ferro".to_string() } else { u } };
-    ctx.log("[ferro] sin cuenta Microsoft en esta versión: modo offline\n");
-    match premium_check(&username) {
-        Some(true) => {
-            ctx.log(&format!("[ferro] !! NOMBRE PREMIUM DETECTADO: {username} !!\n"));
-            ctx.log("[ferro] Acceso DENEGADO en offline. Usa otro nombre (el inicio de sesión Microsoft aún no está en la versión Tauri).\n");
-            return Err(format!("\"{username}\" es un nombre premium. En offline usa otro nombre."));
+    let account = match auth::valid_account(&ctx.base) {
+        Ok(Some(a)) => { ctx.log(&format!("[ferro] cuenta online: {}\n", st(&a["profile"], "name"))); Some(a) }
+        Ok(None) => { ctx.log("[ferro] sin cuenta: modo offline\n"); None }
+        Err(e) => { ctx.log(&format!("[ferro] refresh falló, modo offline ({e})\n")); None }
+    };
+    if account.is_none() {
+        match premium_check(&username) {
+            Some(true) => {
+                ctx.log(&format!("[ferro] !! NOMBRE PREMIUM DETECTADO: {username} !!\n"));
+                ctx.log("[ferro] Acceso DENEGADO en offline. Usa tu propia cuenta (inicia sesión con Microsoft) u otro nombre.\n");
+                return Err(format!("\"{username}\" es un nombre premium. Inicia sesión con Microsoft o usa otro nombre."));
+            }
+            None => ctx.log("[ferro] aviso: no se pudo verificar si el nombre es premium\n"),
+            Some(false) => {}
         }
-        None => ctx.log("[ferro] aviso: no se pudo verificar si el nombre es premium\n"),
-        Some(false) => {}
     }
 
     let ram = data["ramMb"].as_u64().or(settings["ramMb"].as_u64()).unwrap_or(2048);
@@ -542,7 +551,7 @@ pub fn launch(ctx: &Ctx, data: &Value) -> Result<Value, String> {
     let plan = build_plan(&PlanIn {
         details: &details, client_jar: &jar, libs_cp: &cp, extra_cp: &extra_cp, natives_dir: &natives, logging: logging.as_deref(),
         instance_dir: &idir, assets_dir: &assets_dir, libraries_dir: &libraries_dir, username: &username, ram_mb: ram, width, height, server,
-        main_class: main_override, preset: &preset, java_major, launcher_version: &ctx.version,
+        main_class: main_override, preset: &preset, java_major, launcher_version: &ctx.version, auth: account.as_ref(),
     });
     let mut args = plan.jvm.clone();
     args.push(plan.main_class.clone());
@@ -645,7 +654,7 @@ mod tests {
                        "game":["--username","${auth_player_name}","--gameDir","${game_directory}",{"rules":[{"action":"allow","features":{"is_demo_user":true}}],"value":"--demo"}]}});
         let jar = PathBuf::from("c.jar"); let libs = vec![PathBuf::from("l1.jar")]; let nat = PathBuf::from("nat"); let id = PathBuf::from("inst"); let ad = PathBuf::from("assets"); let ld = PathBuf::from("libs");
         let plan = build_plan(&PlanIn { details: &d, client_jar: &jar, libs_cp: &libs, extra_cp: &[], natives_dir: &nat, logging: None, instance_dir: &id, assets_dir: &ad, libraries_dir: &ld,
-            username: "Ferro", ram_mb: 2048, width: Some(854), height: Some(480), server: Some(("h".into(), Some("25565".into()))), main_class: None, preset: "patata", java_major: 17, launcher_version: "1" });
+            username: "Ferro", ram_mb: 2048, width: Some(854), height: Some(480), server: Some(("h".into(), Some("25565".into()))), main_class: None, preset: "patata", java_major: 17, launcher_version: "1", auth: None });
         assert_eq!(&plan.jvm[..3], &["-Xmx2048M", "-Xms512M", "-Dminecraft.client.jar=c.jar"]);
         assert!(plan.jvm.contains(&"-Djava.library.path=nat".to_string()));
         assert!(!plan.jvm.contains(&"-XstartOnFirstThread".to_string()));
@@ -653,5 +662,15 @@ mod tests {
         assert!(plan.jvm.contains(&"-XX:+UseSerialGC".to_string()));
         assert_eq!(plan.game, vec!["--username","Ferro","--gameDir","inst","--width","854","--height","480","--server","h","--port","25565"]);
         assert_eq!(plan.main_class, "net.minecraft.client.main.Main");
+    }
+
+    #[test]
+    fn online_plan_uses_account() {
+        let d = json!({"id":"1.20.1","mainClass":"M","minecraftArguments":"--username ${auth_player_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userType ${user_type}"});
+        let acc = json!({"mcToken":"TOK","xuid":"7","profile":{"uuid":"aa-bb","name":"Real"}});
+        let jar = PathBuf::from("c.jar"); let nat = PathBuf::from("n"); let id = PathBuf::from("i"); let ad = PathBuf::from("a"); let ld = PathBuf::from("l");
+        let plan = build_plan(&PlanIn { details: &d, client_jar: &jar, libs_cp: &[], extra_cp: &[], natives_dir: &nat, logging: None, instance_dir: &id, assets_dir: &ad, libraries_dir: &ld,
+            username: "Off", ram_mb: 1024, width: None, height: None, server: None, main_class: None, preset: "equilibrado", java_major: 17, launcher_version: "1", auth: Some(&acc) });
+        assert_eq!(plan.game, vec!["--username","Real","--uuid","aabb","--accessToken","TOK","--userType","msa"]);
     }
 }

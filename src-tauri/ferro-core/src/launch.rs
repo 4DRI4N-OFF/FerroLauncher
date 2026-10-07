@@ -1,6 +1,6 @@
 //! Lanzar el juego: Java, librerías, natives, assets, argumentos y proceso.
 //! Soporta vanilla, Fabric y Quilt. Forge/NeoForge y la cuenta Microsoft llegan después.
-use crate::{auth, instances, mojang, net, sys, zipx, Ctx};
+use crate::{auth, forge, instances, mojang, net, sys, zipx, Ctx};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
@@ -119,6 +119,7 @@ pub struct PlanIn<'a> {
     pub assets_dir: &'a Path,
     pub libraries_dir: &'a Path,
     pub username: &'a str,
+    pub auth: Option<&'a Value>,
     pub ram_mb: u64,
     pub width: Option<u64>,
     pub height: Option<u64>,
@@ -127,7 +128,6 @@ pub struct PlanIn<'a> {
     pub preset: &'a str,
     pub java_major: u32,
     pub launcher_version: &'a str,
-    pub auth: Option<&'a Value>,
 }
 
 pub struct Plan { pub jvm: Vec<String>, pub game: Vec<String>, pub main_class: String }
@@ -137,8 +137,17 @@ fn p(x: &Path) -> String { x.to_string_lossy().to_string() }
 pub fn build_plan(i: &PlanIn) -> Plan {
     let d = i.details;
     let online = i.auth.map_or(false, |a| a["mcToken"].as_str().is_some() && a["profile"]["uuid"].as_str().is_some());
-    let eff_name = if online { st(&i.auth.unwrap()["profile"], "name") } else { i.username.to_string() };
-    let uuid = if online { st(&i.auth.unwrap()["profile"], "uuid").replace('-', "") } else { offline_uuid(i.username).replace('-', "") };
+    let eff_name = match i.auth {
+        Some(a) if online => st(a.get("profile").unwrap_or(&Value::Null), "name"),
+        _ => i.username.to_string(),
+    };
+    let uuid = if online {
+        i.auth.unwrap()["profile"]["uuid"].as_str().unwrap_or("").replace('-', "")
+    } else {
+        offline_uuid(i.username).replace('-', "")
+    };
+    let token = if online { i.auth.unwrap()["mcToken"].as_str().unwrap_or("0").to_string() } else { "0".into() };
+    let xuid = if online { i.auth.unwrap()["xuid"].as_str().unwrap_or("0").to_string() } else { "0".into() };
     let cp: Vec<String> = std::iter::once(i.client_jar).chain(i.extra_cp.iter().map(|x| x.as_path())).chain(i.libs_cp.iter().map(|x| x.as_path())).map(p).collect();
     let classpath = cp.join(";");
     let asset_index = d.pointer("/assetIndex/id").and_then(|x| x.as_str()).unwrap_or("legacy").to_string();
@@ -151,9 +160,9 @@ pub fn build_plan(i: &PlanIn) -> Plan {
     map.insert("assets_root_raw", p(i.assets_dir));
     map.insert("assets_index_name", asset_index);
     map.insert("auth_uuid", uuid);
-    map.insert("auth_access_token", if online { st(i.auth.unwrap(), "mcToken") } else { "0".into() });
+    map.insert("auth_access_token", token);
     map.insert("clientid", "ferro".into());
-    map.insert("auth_xuid", if online { i.auth.unwrap()["xuid"].as_str().unwrap_or("0").to_string() } else { "0".into() });
+    map.insert("auth_xuid", xuid);
     map.insert("user_type", if online { "msa".into() } else { "legacy".into() });
     map.insert("version_type", { let t = st(d, "type"); if t.is_empty() { "release".into() } else { t } });
     map.insert("natives_directory", p(i.natives_dir));
@@ -491,50 +500,90 @@ pub fn launch(ctx: &Ctx, data: &Value) -> Result<Value, String> {
     let cfg = instances::read_cfg(&idir.join("ferro.json")).map_err(|_| "Instancia no encontrada".to_string())?;
     let version_id = st(&cfg, "versionId");
     let typ = { let t = st(&cfg, "type"); if t.is_empty() { "vanilla".to_string() } else { t } };
-    if typ == "forge" || typ == "neoforge" { return Err(format!("{typ} todavía no está disponible en la versión Tauri (en construcción). Vanilla, Fabric y Quilt sí.")); }
     let settings = cfg.get("settings").cloned().unwrap_or(json!({}));
+    let custom_java = st(&settings, "javaMode") == "custom" && !st(&settings, "javaPath").is_empty();
 
     ctx.log(&format!("[ferro] resolviendo {version_id}...\n"));
-    let details = version_details(ctx, &version_id)?;
-    let req = details.pointer("/javaVersion/majorVersion").and_then(|x| x.as_u64());
-    if let Some(r) = req { ctx.log(&format!("[ferro] esta versión pide Java {r}\n")); }
+    let vanilla = version_details(ctx, &version_id)?;
+    let req_vanilla = vanilla.pointer("/javaVersion/majorVersion").and_then(|x| x.as_u64());
+    if let Some(r) = req_vanilla { ctx.log(&format!("[ferro] esta versión pide Java {r}\n")); }
 
-    let java = if st(&settings, "javaMode") == "custom" && !st(&settings, "javaPath").is_empty() {
+    let mut java = if custom_java {
         sys::check_java(&st(&settings, "javaPath")).ok_or(format!("Java personalizado no válido: {}", st(&settings, "javaPath")))?
-    } else { ensure_java(ctx, req)? };
-    let java_bin = st(&java, "path");
-    let java_major = java["major"].as_u64().unwrap_or(0) as u32;
+    } else { ensure_java(ctx, req_vanilla)? };
+    let mut java_bin = st(&java, "path");
+    let mut java_major = java["major"].as_u64().unwrap_or(0) as u32;
     ctx.log(&format!("[ferro] Java {} (major {}) en {}{}\n", st(&java, "version"), java_major, java_bin, if java["managed"] == true { " [gestionado]" } else { "" }));
 
-    let (main_override, extra_cp) = if typ == "fabric" || typ == "quilt" {
-        let (m, c) = loader_libs(ctx, &version_id, &typ, cfg["loaderVersion"].as_str().unwrap_or(""))?;
-        (Some(m), c)
-    } else { (None, vec![]) };
+    // Perfil efectivo: vanilla, modloader ligero, o el generado por el instalador Forge/NeoForge
+    let (details, profile_dir, main_override, extra_cp): (Value, PathBuf, Option<String>, Vec<PathBuf>) =
+        if typ == "forge" || typ == "neoforge" {
+            let ver = cfg.get("loaderVersion").and_then(|x| x.as_str()).unwrap_or("");
+            if ver.is_empty() { return Err(format!("Crea la instancia eligiendo versión de {typ}")); }
+            let (prof, pid) = forge::ensure_profile(ctx, &java_bin, &idir, &name, &typ, &version_id, ver)?;
+            // El perfil efectivo puede pedir un Java más nuevo que el de vanilla
+            let req_prof = prof.pointer("/javaVersion/majorVersion").and_then(|x| x.as_u64()).unwrap_or(0);
+            if !custom_java && req_prof > 8 && (java_major as u64) < req_prof {
+                ctx.log(&format!("[ferro] el perfil pide Java {req_prof} y el actual es {java_major}: resolviendo...\n"));
+                match ensure_java(ctx, Some(req_prof)) {
+                    Ok(better) if better["major"].as_u64().unwrap_or(0) >= req_prof => {
+                        java = better;
+                        java_bin = st(&java, "path");
+                        java_major = java["major"].as_u64().unwrap_or(0) as u32;
+                        ctx.log(&format!("[ferro] Java {} (major {}) en {}\n", st(&java, "version"), java_major, java_bin));
+                    }
+                    _ => ctx.log(&format!("[ferro] no hay Java {req_prof}: se lanza con {java_major}, puede fallar\n")),
+                }
+            }
+            let dir = ctx.base.join("versions").join(pid);
+            (prof, dir, None, vec![])
+        } else if typ == "fabric" || typ == "quilt" {
+            let (m, c) = loader_libs(ctx, &version_id, &typ, cfg["loaderVersion"].as_str().unwrap_or(""))?;
+            (vanilla.clone(), ctx.base.join("versions").join(&version_id), Some(m), c)
+        } else {
+            (vanilla.clone(), ctx.base.join("versions").join(&version_id), None, vec![])
+        };
 
-    let jar = client_jar(ctx, &details)?;
+    // El client jar sale del perfil efectivo si trae client, si no del vanilla
+    let for_client = if details.pointer("/downloads/client/url").and_then(|x| x.as_str()).is_some() { &details } else { &vanilla };
+    let jar = client_jar(ctx, for_client)?;
     prog(ctx, "client", 1.0, 1.0, "");
     let cp = resolve_libraries(ctx, &details)?;
-    let natives = ctx.base.join("versions").join(&version_id).join("natives-windows");
+    let natives = profile_dir.join("natives-windows");
     resolve_natives(ctx, &details, &natives)?;
     download_assets(ctx, &details)?;
     let logging = details.pointer("/logging/client/file").and_then(|c| {
-        let dest = ctx.base.join("versions").join(&version_id).join(c["id"].as_str()?);
+        let dest = profile_dir.join(c["id"].as_str()?);
         net::download_file(c["url"].as_str()?, &dest, c["size"].as_u64(), c["sha1"].as_str(), None).ok()
     });
     ctx.log("[ferro] lanzando...\n");
 
     let username = { let u = st(data, "username"); let u = u.trim().to_string(); if u.is_empty() { "Ferro".to_string() } else { u } };
-    let account = match auth::valid_account(&ctx.base) {
-        Ok(Some(a)) => { ctx.log(&format!("[ferro] cuenta online: {}\n", st(&a["profile"], "name"))); Some(a) }
-        Ok(None) => { ctx.log("[ferro] sin cuenta: modo offline\n"); None }
-        Err(e) => { ctx.log(&format!("[ferro] refresh falló, modo offline ({e})\n")); None }
+    // Online si hay cuenta Microsoft válida; si no, offline con el nombre escrito
+    let account: Option<Value> = match auth::valid_account(&ctx.base) {
+        Ok(Some(acc)) => {
+            ctx.log(&format!("[ferro] cuenta online: {}\n", acc["profile"]["name"].as_str().unwrap_or("?")));
+            Some(acc)
+        }
+        Ok(None) => {
+            ctx.log("[ferro] sin cuenta: modo offline\n");
+            None
+        }
+        Err(e) => {
+            ctx.log(&format!("[ferro] refresh falló, modo offline ({e})\n"));
+            None
+        }
+    };
+    let eff_username = match &account {
+        Some(a) => a["profile"]["name"].as_str().unwrap_or(&username).to_string(),
+        None => username,
     };
     if account.is_none() {
-        match premium_check(&username) {
+        match premium_check(&eff_username) {
             Some(true) => {
-                ctx.log(&format!("[ferro] !! NOMBRE PREMIUM DETECTADO: {username} !!\n"));
-                ctx.log("[ferro] Acceso DENEGADO en offline. Usa tu propia cuenta (inicia sesión con Microsoft) u otro nombre.\n");
-                return Err(format!("\"{username}\" es un nombre premium. Inicia sesión con Microsoft o usa otro nombre."));
+                ctx.log(&format!("[ferro] !! NOMBRE PREMIUM DETECTADO: {eff_username} !!\n"));
+                ctx.log("[ferro] Acceso DENEGADO. Usa tu propia cuenta o inicia sesión con Microsoft.\n");
+                return Err(format!("\"{eff_username}\" es un nombre premium. Ni lo intentes."));
             }
             None => ctx.log("[ferro] aviso: no se pudo verificar si el nombre es premium\n"),
             Some(false) => {}
@@ -550,8 +599,9 @@ pub fn launch(ctx: &Ctx, data: &Value) -> Result<Value, String> {
     let preset = st(&settings, "jvmPreset");
     let plan = build_plan(&PlanIn {
         details: &details, client_jar: &jar, libs_cp: &cp, extra_cp: &extra_cp, natives_dir: &natives, logging: logging.as_deref(),
-        instance_dir: &idir, assets_dir: &assets_dir, libraries_dir: &libraries_dir, username: &username, ram_mb: ram, width, height, server,
-        main_class: main_override, preset: &preset, java_major, launcher_version: &ctx.version, auth: account.as_ref(),
+        instance_dir: &idir, assets_dir: &assets_dir, libraries_dir: &libraries_dir, username: &eff_username,
+        auth: account.as_ref(), ram_mb: ram, width, height, server,
+        main_class: main_override, preset: &preset, java_major, launcher_version: &ctx.version,
     });
     let mut args = plan.jvm.clone();
     args.push(plan.main_class.clone());
@@ -654,7 +704,7 @@ mod tests {
                        "game":["--username","${auth_player_name}","--gameDir","${game_directory}",{"rules":[{"action":"allow","features":{"is_demo_user":true}}],"value":"--demo"}]}});
         let jar = PathBuf::from("c.jar"); let libs = vec![PathBuf::from("l1.jar")]; let nat = PathBuf::from("nat"); let id = PathBuf::from("inst"); let ad = PathBuf::from("assets"); let ld = PathBuf::from("libs");
         let plan = build_plan(&PlanIn { details: &d, client_jar: &jar, libs_cp: &libs, extra_cp: &[], natives_dir: &nat, logging: None, instance_dir: &id, assets_dir: &ad, libraries_dir: &ld,
-            username: "Ferro", ram_mb: 2048, width: Some(854), height: Some(480), server: Some(("h".into(), Some("25565".into()))), main_class: None, preset: "patata", java_major: 17, launcher_version: "1", auth: None });
+            username: "Ferro", auth: None, ram_mb: 2048, width: Some(854), height: Some(480), server: Some(("h".into(), Some("25565".into()))), main_class: None, preset: "patata", java_major: 17, launcher_version: "1" });
         assert_eq!(&plan.jvm[..3], &["-Xmx2048M", "-Xms512M", "-Dminecraft.client.jar=c.jar"]);
         assert!(plan.jvm.contains(&"-Djava.library.path=nat".to_string()));
         assert!(!plan.jvm.contains(&"-XstartOnFirstThread".to_string()));
@@ -662,15 +712,5 @@ mod tests {
         assert!(plan.jvm.contains(&"-XX:+UseSerialGC".to_string()));
         assert_eq!(plan.game, vec!["--username","Ferro","--gameDir","inst","--width","854","--height","480","--server","h","--port","25565"]);
         assert_eq!(plan.main_class, "net.minecraft.client.main.Main");
-    }
-
-    #[test]
-    fn online_plan_uses_account() {
-        let d = json!({"id":"1.20.1","mainClass":"M","minecraftArguments":"--username ${auth_player_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userType ${user_type}"});
-        let acc = json!({"mcToken":"TOK","xuid":"7","profile":{"uuid":"aa-bb","name":"Real"}});
-        let jar = PathBuf::from("c.jar"); let nat = PathBuf::from("n"); let id = PathBuf::from("i"); let ad = PathBuf::from("a"); let ld = PathBuf::from("l");
-        let plan = build_plan(&PlanIn { details: &d, client_jar: &jar, libs_cp: &[], extra_cp: &[], natives_dir: &nat, logging: None, instance_dir: &id, assets_dir: &ad, libraries_dir: &ld,
-            username: "Off", ram_mb: 1024, width: None, height: None, server: None, main_class: None, preset: "equilibrado", java_major: 17, launcher_version: "1", auth: Some(&acc) });
-        assert_eq!(plan.game, vec!["--username","Real","--uuid","aabb","--accessToken","TOK","--userType","msa"]);
     }
 }

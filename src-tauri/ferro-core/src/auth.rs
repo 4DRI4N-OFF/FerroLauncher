@@ -187,6 +187,53 @@ pub fn valid_account(base: &Path) -> Result<Option<Value>, String> {
     complete_login(base, &at, &rt).map(Some)
 }
 
+fn valid_name(name: &str) -> bool {
+    let n = name.trim();
+    (3..=16).contains(&n.len()) && n.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// {name, valid, premium, unknown} — igual que Electron.
+pub fn name_check(name: &str) -> Value {
+    let clean = name.trim().to_string();
+    if !valid_name(&clean) {
+        return json!({ "name": clean, "valid": false });
+    }
+    match net::status_of(&format!("https://api.mojang.com/users/profiles/minecraft/{clean}")) {
+        Some(200) => json!({ "name": clean, "valid": true, "premium": true, "unknown": false }),
+        Some(404) | Some(204) | Some(400) => json!({ "name": clean, "valid": true, "premium": false, "unknown": false }),
+        _ => json!({ "name": clean, "valid": true, "premium": false, "unknown": true }),
+    }
+}
+
+/// Hasta 4 alternativas libres. Igual que Electron.
+pub fn name_suggest(base: &str) -> Value {
+    let b: String = base.trim().chars().filter(|c| c.is_ascii_alphanumeric() || *c == '_').take(12).collect();
+    let b = if b.is_empty() { "Ferro".to_string() } else { b };
+    let cap = {
+        let mut c = b.clone();
+        if let Some(f) = c.get_mut(..1) {
+            f.make_ascii_uppercase();
+        }
+        c
+    };
+    let n: u64 = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(7);
+    let r2 = (n % 90 + 10).to_string();
+    let raw = [format!("{b}_"), format!("_{b}"), format!("{b}{r2}"), format!("{b}HD"), format!("{b}YT"), format!("{b}MC"), format!("{b}GG"), format!("{b}Pro"), format!("The{cap}"), format!("{b}x")];
+    let mut out = vec![];
+    for cand in raw.into_iter().collect::<std::collections::HashSet<_>>() {
+        if out.len() >= 4 {
+            break;
+        }
+        if !valid_name(&cand) || cand.to_lowercase() == b.to_lowercase() {
+            continue;
+        }
+        if net::status_of(&format!("https://api.mojang.com/users/profiles/minecraft/{cand}")) == Some(404) {
+            out.push(cand);
+        }
+    }
+    Value::Array(out.into_iter().map(Value::String).collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

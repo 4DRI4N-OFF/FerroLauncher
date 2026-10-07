@@ -6,12 +6,15 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 pub mod auth;
+pub mod forge;
 pub mod instances;
 pub mod launch;
-pub mod net;
-pub mod zipx;
+pub mod loaders;
+pub mod mods;
 pub mod mojang;
+pub mod net;
 pub mod sys;
+pub mod zipx;
 
 pub type Emit = Arc<dyn Fn(&str, Value) + Send + Sync>;
 
@@ -120,6 +123,8 @@ pub fn call(ctx: &Ctx, name: &str, data: Value) -> Result<Value, String> {
             Ok(json!(true))
         }
         "status" => Ok(launch::status()),
+        "launch" => launch::launch(ctx, &data),
+        "stop" => Ok(launch::stop(ctx)),
         "clientId" => Ok(auth::client_id_public(&ctx.base)),
         "setClientId" => auth::set_client_id(&ctx.base, &s(&data, "clientId")),
         "authStatus" => Ok(auth::status(&ctx.base)),
@@ -131,8 +136,25 @@ pub fn call(ctx: &Ctx, name: &str, data: Value) -> Result<Value, String> {
         "authRemove" => auth::remove(&ctx.base, &s(&data, "uuid")),
         "authWindowCancel" => Ok(json!(true)),
         "authWindow" => Err("La ventana de Microsoft aún no está en la versión Tauri: usa el código de dispositivo (microsoft.com/link)".into()),
-        "launch" => launch::launch(ctx, &data),
-        "stop" => Ok(launch::stop(ctx)),
+        "loaders" => loaders::list(&s(&data, "mcVersion"), &s(&data, "type")),
+        "loaderCheck" => loaders::check(&inst_dir, &s(&data, "instanceName")),
+        "loaderUpdate" => loaders::update(&inst_dir, &s(&data, "instanceName")),
+        "nameCheck" => Ok(auth::name_check(&s(&data, "name"))),
+        "nameSuggest" => Ok(auth::name_suggest(&s(&data, "base"))),
+        "modSearch" => mods::search(&s(&data, "query"), &s(&data, "mcVersion"), &s(&data, "loader"), &s(&data, "sort"), &s(&data, "kind"), data.get("offset").and_then(|x| x.as_u64()).unwrap_or(0)),
+        "mods" => mods::resolve(&inst_dir, &s(&data, "instanceName")).and_then(|(p, _)| mods::list(&p, &s(&data, "kind"), data.get("world").and_then(|x| x.as_str()))),
+        "worlds" => mods::resolve(&inst_dir, &s(&data, "instanceName")).map(|(p, _)| mods::worlds(&p)),
+        "modInstall" => mods::resolve(&inst_dir, &s(&data, "instanceName")).and_then(|(p, cfg)| {
+            let kind = s(&data, "kind");
+            let kind = if ["shader", "resourcepack", "datapack"].contains(&kind.as_str()) { kind } else { "mod".to_string() };
+            let typ = cfg.get("type").and_then(|x| x.as_str()).unwrap_or("vanilla");
+            if kind == "mod" && typ == "vanilla" {
+                return Err("Los mods requieren instancia con loader".into());
+            }
+            mods::install(&p, &s(&data, "projectId"), &cfg.get("versionId").and_then(|x| x.as_str()).unwrap_or("").to_string(), typ, &kind, data.get("world").and_then(|x| x.as_str()))
+        }),
+        "modRemove" => mods::resolve(&inst_dir, &s(&data, "instanceName")).and_then(|(p, _)| mods::remove(&p, &s(&data, "file"), &s(&data, "kind"), data.get("world").and_then(|x| x.as_str()))),
+        "modToggle" => mods::resolve(&inst_dir, &s(&data, "instanceName")).and_then(|(p, _)| mods::toggle(&p, &s(&data, "file"), data.get("disable").and_then(|x| x.as_bool()).unwrap_or(false), &s(&data, "kind"), data.get("world").and_then(|x| x.as_str()))),
         other => Err(format!(
             "'{other}' todavía no está disponible en la versión Tauri (en construcción)"
         )),

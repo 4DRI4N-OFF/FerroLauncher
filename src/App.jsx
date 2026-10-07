@@ -763,7 +763,7 @@ export default function App() {
 
   const refresh = async () => {
     try {
-      const vers = await window.ferro?.versions();
+      const vers = (await window.ferro?.versions()) ?? [];
       setVersions(vers);
       // Predeterminada: la última release del manifiesto (vale para futuras versiones)
       const latest = vers[0]?.id;
@@ -772,7 +772,7 @@ export default function App() {
         if (!touchedVer.current.filter) setFVersion(latest);
         if (!touchedVer.current.pack) setPackMc(latest);
       }
-      const inst = await window.ferro?.instances();
+      const inst = (await window.ferro?.instances()) ?? [];
       inst.sort((a, b) => ((b.settings?.pinned ? 1 : 0) - (a.settings?.pinned ? 1 : 0)));
       setInstances(inst);
       // Saneado global: ninguna referencia puede apuntar a una instancia que ya no existe
@@ -1268,8 +1268,8 @@ export default function App() {
   useEffect(() => {
     if (instanceType === 'vanilla') return;
     window.ferro?.loaders({ mcVersion: versionId, type: instanceType }).then((l) => {
-      setLoaders(l);
-      if (l[0]) setLoaderVersion(l[0].loader);
+      setLoaders(l ?? []);
+      if (l?.[0]) setLoaderVersion(l[0].loader);
     }).catch((e) => setLog((x) => x + `[error ${instanceType}] ${e.message}\n`));
   }, [instanceType, versionId]);
 

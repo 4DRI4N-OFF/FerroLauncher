@@ -5,6 +5,7 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::Arc;
 
+pub mod auth;
 pub mod instances;
 pub mod launch;
 pub mod net;
@@ -119,6 +120,17 @@ pub fn call(ctx: &Ctx, name: &str, data: Value) -> Result<Value, String> {
             Ok(json!(true))
         }
         "status" => Ok(launch::status()),
+        "clientId" => Ok(auth::client_id_public(&ctx.base)),
+        "setClientId" => auth::set_client_id(&ctx.base, &s(&data, "clientId")),
+        "authStatus" => Ok(auth::status(&ctx.base)),
+        "authStart" => auth::device_start(&ctx.base),
+        "authPoll" => auth::device_poll(&ctx.base, &s(&data, "deviceCode")),
+        "authLogout" => auth::logout(&ctx.base),
+        "accounts" => Ok(auth::list(&ctx.base)),
+        "authSelect" => auth::set_active(&ctx.base, &s(&data, "uuid")),
+        "authRemove" => auth::remove(&ctx.base, &s(&data, "uuid")),
+        "authWindowCancel" => Ok(json!(true)),
+        "authWindow" => Err("La ventana de Microsoft aún no está en la versión Tauri: usa el código de dispositivo (microsoft.com/link)".into()),
         "launch" => launch::launch(ctx, &data),
         "stop" => Ok(launch::stop(ctx)),
         other => Err(format!(

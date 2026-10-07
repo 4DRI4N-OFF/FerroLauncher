@@ -8,6 +8,8 @@
     "dev": "vite",
     "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "vite build",
+    "build:tauri": "node scripts/build-tauri-ui.js",
+    "tauri": "tauri",
     "lint": "eslint . --max-warnings 155",
     "test": "node scripts/run-tests.js",
     "test:docs": "node scripts/docs-version.js --check",
@@ -27,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@tauri-apps/cli": "^2.12.1",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
     "electron": "^44.3.0",

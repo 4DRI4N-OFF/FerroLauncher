@@ -763,7 +763,7 @@ export default function App() {
 
   const refresh = async () => {
     try {
-      const vers = await window.ferro?.versions();
+      const vers = (await window.ferro?.versions()) ?? [];
       setVersions(vers);
       // Predeterminada: la última release del manifiesto (vale para futuras versiones)
       const latest = vers[0]?.id;
@@ -772,7 +772,7 @@ export default function App() {
         if (!touchedVer.current.filter) setFVersion(latest);
         if (!touchedVer.current.pack) setPackMc(latest);
       }
-      const inst = await window.ferro?.instances();
+      const inst = (await window.ferro?.instances()) ?? [];
       inst.sort((a, b) => ((b.settings?.pinned ? 1 : 0) - (a.settings?.pinned ? 1 : 0)));
       setInstances(inst);
       // Saneado global: ninguna referencia puede apuntar a una instancia que ya no existe
@@ -790,13 +790,14 @@ export default function App() {
       if (galName && !names.includes(galName)) closeGallery();
       if (instModal === 'mods' && modsFor && !names.includes(modsFor)) closeInstalled();
       if (instModal === 'datapacks' && dpFor && !names.includes(dpFor)) closeInstalled();
-      setJava(await window.ferro?.java());
-      try { setAbCfg(await window.ferro?.autoBackupGet()); } catch {}
+      const jv = await window.ferro?.java();
+      if (jv) setJava(jv);
+      try { const ab = await window.ferro?.autoBackupGet(); if (ab) setAbCfg(ab); } catch {}
       try {
         const r = await window.ferro?.autoBackupRun();
         if (r?.due) setLog((l) => l + `[ferro] ${t('ab.done', { n: (r.done || []).length })}\n`);
       } catch {}
-      try { setAccount(await window.ferro?.authStatus()); } catch {}
+      try { const ac = await window.ferro?.authStatus(); if (ac !== undefined) setAccount(ac); } catch {}
     } catch (e) {
       setLog((l) => l + `[error] ${e.message}\n`);
     }
@@ -805,7 +806,8 @@ export default function App() {
   const loadVers = async (k) => {
     try {
       setVerKind(k);
-      setVersions(await window.ferro?.versions({ kind: k }));
+      const v = await window.ferro?.versions({ kind: k });
+      if (v) setVersions(v);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -813,13 +815,13 @@ export default function App() {
     if (!name) return;
     const kk = k || kind;
     try {
-      setMods(await window.ferro?.mods({ instanceName: name, kind: kk }));
+      setMods((await window.ferro?.mods({ instanceName: name, kind: kk })) ?? []);
       if (kk === 'resourcepack') {
         try { const r = await window.ferro?.rp({ instanceName: name }); setRpOn(r.enabled); }
         catch { setRpOn(null); }
       }
       if (kk === 'shader') {
-        try { setShaderCur(await window.ferro?.shader({ instanceName: name })); }
+        try { const sh = await window.ferro?.shader({ instanceName: name }); if (sh !== undefined) setShaderCur(sh); }
         catch { setShaderCur(null); }
       }
     }
@@ -837,7 +839,7 @@ export default function App() {
 
   const loadDpList = async (name, world) => {
     if (!name || !world) { setDpList([]); return; }
-    try { setDpList(await window.ferro?.mods({ instanceName: name, kind: 'datapack', world })); }
+    try { setDpList((await window.ferro?.mods({ instanceName: name, kind: 'datapack', world })) ?? []); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -914,14 +916,14 @@ export default function App() {
 
   const loadBackups = async (name) => {
     if (!name) return;
-    try { setBkList(await window.ferro?.backups({ instanceName: name })); }
+    try { setBkList((await window.ferro?.backups({ instanceName: name })) ?? []); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
   const loadCrashes = async (name) => {
     if (!name) return;
     setCrOpen(null);
-    try { setCrList(await window.ferro?.crashes({ instanceName: name })); }
+    try { setCrList((await window.ferro?.crashes({ instanceName: name })) ?? []); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -1102,8 +1104,9 @@ export default function App() {
       const ci = await window.ferro?.clientId().catch(() => null);
       setIdInfo(ci || { masked: '', configured: false });
       setClientId('');
-      setAccount(await window.ferro?.authStatus());
-      setAccts(await window.ferro?.accounts());
+      const ac = await window.ferro?.authStatus();
+      if (ac !== undefined) setAccount(ac);
+      setAccts((await window.ferro?.accounts()) ?? []);
       const dc = await window.ferro?.discord().catch(()=>({clientId:'',enabled:true}));
       setDcId(dc.clientId || ''); setDcOn(dc.enabled !== false); setDcHook(dc.webhook || '');
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -1112,7 +1115,7 @@ export default function App() {
   const stopPoll = () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
 
   const loadSkin = async (name) => {
-    try { setSkinInfo(await window.ferro?.skin({ name: name ?? skinName ?? username ?? 'Ferro' })); }
+    try { const si = await window.ferro?.skin({ name: name ?? skinName ?? username ?? 'Ferro' }); if (si !== undefined) setSkinInfo(si); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -1268,8 +1271,8 @@ export default function App() {
   useEffect(() => {
     if (instanceType === 'vanilla') return;
     window.ferro?.loaders({ mcVersion: versionId, type: instanceType }).then((l) => {
-      setLoaders(l);
-      if (l[0]) setLoaderVersion(l[0].loader);
+      setLoaders(l ?? []);
+      if (l?.[0]) setLoaderVersion(l[0].loader);
     }).catch((e) => setLog((x) => x + `[error ${instanceType}] ${e.message}\n`));
   }, [instanceType, versionId]);
 
@@ -1312,7 +1315,7 @@ export default function App() {
 
   const loadServers = async () => {
     try {
-      const list = await window.ferro?.servers();
+      const list = (await window.ferro?.servers()) ?? [];
       setServers(list);
       list.forEach((s) => pingServer(s));
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -1377,7 +1380,7 @@ export default function App() {
   const addServer = async () => {
     if (!srvHost.trim()) return;
     try {
-      setServers(await window.ferro?.serverAdd({ name: srvName.trim() || srvHost.trim(), host: srvHost.trim(), port: srvPort }));
+      setServers((await window.ferro?.serverAdd({ name: srvName.trim() || srvHost.trim(), host: srvHost.trim(), port: srvPort })) ?? []);
       setSrvName(''); setSrvHost(''); setSrvPort('25565');
       setLog((l) => l + `[ferro] ${t('srv.added')}\n`);
     } catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
@@ -1390,7 +1393,7 @@ export default function App() {
   };
 
   const loadFriends = async () => {
-    try { setFriends(await window.ferro?.friendsPresence()); }
+    try { setFriends((await window.ferro?.friendsPresence()) ?? []); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -1410,7 +1413,7 @@ export default function App() {
   };
 
   const removeFriend = async (name) => {
-    try { setFriends(await window.ferro?.friendRemove({ name })); }
+    try { setFriends((await window.ferro?.friendRemove({ name })) ?? []); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -1423,7 +1426,7 @@ export default function App() {
   const scanEssential = async () => {
     const name = essInst || launchInstance || (instances[0] && instances[0].name);
     if (!name) return;
-    try { setEssJars(await window.ferro?.essentialScan({ instanceName: name })); }
+    try { const ej = await window.ferro?.essentialScan({ instanceName: name }); if (ej !== undefined) setEssJars(ej); }
     catch (e) { setLog((l) => l + `[error] ${e.message}\n`); }
   };
 
@@ -2120,7 +2123,7 @@ export default function App() {
               <button className="primary" onClick={addServer}><Plus size={14} /> {t('srv.add')}</button>
             </div>
             <div className="grid" style={{marginTop:10}}>
-              {servers.map((s)=>{const k=`${s.host}:${s.port}`; const p=srvPing[k]; return (<div key={k} className="card"><div className="card-title">{p?.favicon && <img src={p.favicon} alt="" style={{width:34,height:34,borderRadius:8,marginRight:8,verticalAlign:'middle'}} />}{s.name}</div><div className="meta"><span className="pill">{s.host}:{s.port}</span>{p ? (p.online ? <><span className="pill green">● {p.latencyMs} ms</span><span className="pill">{p.players.online}/{p.players.max}</span><span className="pill">{p.version}</span></> : <span className="pill">{t('srv.offline')}</span>) : <span className="pill"><span className="spinner" /></span>}</div>{p?.motd && <p style={{opacity:.7}}>{p.motd}</p>}<div className="actions"><button className="mini" onClick={()=>pingServer(s)}><RefreshCw size={12} /></button><button className="ghost" onClick={()=>playOn(s)} disabled={!launchInstance}><Play size={14} /> {t('srv.play')}</button><button className="mini" onClick={()=>{try{navigator.clipboard.writeText(`${s.host}:${s.port}`); setLog((l)=>l+`[ferro] IP copiada: ${s.host}:${s.port}\n`);}catch{}}} title={t('srv.copy')}><Copy size={12} /></button><button className="ghost danger" onClick={async()=>{setServers(await window.ferro?.serverRemove({host:s.host, port:s.port}));}}><Trash2 size={12} /></button></div></div>);})}
+              {servers.map((s)=>{const k=`${s.host}:${s.port}`; const p=srvPing[k]; return (<div key={k} className="card"><div className="card-title">{p?.favicon && <img src={p.favicon} alt="" style={{width:34,height:34,borderRadius:8,marginRight:8,verticalAlign:'middle'}} />}{s.name}</div><div className="meta"><span className="pill">{s.host}:{s.port}</span>{p ? (p.online ? <><span className="pill green">● {p.latencyMs} ms</span><span className="pill">{p.players.online}/{p.players.max}</span><span className="pill">{p.version}</span></> : <span className="pill">{t('srv.offline')}</span>) : <span className="pill"><span className="spinner" /></span>}</div>{p?.motd && <p style={{opacity:.7}}>{p.motd}</p>}<div className="actions"><button className="mini" onClick={()=>pingServer(s)}><RefreshCw size={12} /></button><button className="ghost" onClick={()=>playOn(s)} disabled={!launchInstance}><Play size={14} /> {t('srv.play')}</button><button className="mini" onClick={()=>{try{navigator.clipboard.writeText(`${s.host}:${s.port}`); setLog((l)=>l+`[ferro] IP copiada: ${s.host}:${s.port}\n`);}catch{}}} title={t('srv.copy')}><Copy size={12} /></button><button className="ghost danger" onClick={async()=>{setServers((await window.ferro?.serverRemove({host:s.host, port:s.port})) ?? []);}}><Trash2 size={12} /></button></div></div>);})}
             </div>
             {servers.length===0 && <p style={{opacity:.6}}>{t('srv.none')}</p>}
           </div>
@@ -2200,13 +2203,13 @@ export default function App() {
           <div className="card">
             <h2>{t('ab.title')}</h2>
             <div className="row">
-              <select value={abCfg.mode} onChange={async(e)=>{try{setAbCfg(await window.ferro?.autoBackupSet({mode:e.target.value}));}catch(er){setLog((l)=>l+`[error] ${er.message}\n`);}}}>
+              <select value={abCfg.mode} onChange={async(e)=>{try{const r=await window.ferro?.autoBackupSet({mode:e.target.value}); if(r!==undefined) setAbCfg(r);}catch(er){setLog((l)=>l+`[error] ${er.message}\n`);}}}>
                 <option value="off">{t('ab.off')}</option>
                 <option value="beforePlay">{t('ab.beforePlay')}</option>
                 <option value="daily">{t('ab.daily')}</option>
                 <option value="weekly">{t('ab.weekly')}</option>
               </select>
-              <label>{t('ab.keep')} <input type="number" min={1} max={20} value={abCfg.keep} onChange={async(e)=>{const v=Math.min(20,Math.max(1,Number(e.target.value)||3)); try{setAbCfg(await window.ferro?.autoBackupSet({keep:v}));}catch(er){setLog((l)=>l+`[error] ${er.message}\n`);}}} style={{width:70}} /></label>
+              <label>{t('ab.keep')} <input type="number" min={1} max={20} value={abCfg.keep} onChange={async(e)=>{const v=Math.min(20,Math.max(1,Number(e.target.value)||3)); try{const r=await window.ferro?.autoBackupSet({keep:v}); if(r!==undefined) setAbCfg(r);}catch(er){setLog((l)=>l+`[error] ${er.message}\n`);}}} style={{width:70}} /></label>
               <button className="ghost" onClick={async()=>{try{const r=await window.ferro?.autoBackupRun({force:true}); setLog((l)=>l+`[ferro] ${t('ab.done',{n:(r.done||[]).length})}\n`);}catch(e){setLog((l)=>l+`[error] ${e.message}\n`);}}}>{t('ab.now')}</button>
             </div>
             <p style={{opacity:.7}}>{t('ab.hint')}</p>

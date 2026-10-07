@@ -1,0 +1,25 @@
+[package]
+name = "ferro-launcher"
+version = "0.9.6"
+description = "FerroLauncher - Launcher de Minecraft hecho desde 0"
+authors = ["Adrian Garcia Martinez"]
+edition = "2021"
+
+[lib]
+name = "ferro_launcher_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde_json = "1"
+ferro-core = { path = "ferro-core" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

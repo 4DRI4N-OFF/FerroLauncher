@@ -1,0 +1,68 @@
+name: Tauri (prueba Windows)
+
+# Rama de la migración Electron -> Tauri. Al subir bundle/ferro-tauri.tar.gz:
+# 1) lo desempaqueta sobre la rama y lo commitea, 2) compila el instalador de
+# Windows y 3) publica un pre-release para probarlo. No toca main.
+on:
+  push:
+    branches: [feat/tauri]
+    paths: ["bundle/*.tar.gz", ".github/workflows/tauri-build.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Desempaquetar el codigo del bundle
+        shell: bash
+        run: |
+          for f in bundle/*.tar.gz; do
+            [ -f "$f" ] || continue
+            tar -xzf "$f"
+            git rm -q --cached "$f"
+            rm -f "$f"
+            CHANGED=1
+          done
+          if [ -n "$CHANGED" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Tauri: codigo desempaquetado del bundle" || true
+            git push || true
+          fi
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Tests del motor Rust
+        working-directory: src-tauri/ferro-core
+        run: cargo test
+
+      - name: Compilar instalador Tauri
+        run: npx tauri build --ci
+
+      - name: Listar resultado
+        shell: pwsh
+        run: Get-ChildItem src-tauri/target/release/bundle/nsis -Filter *.exe | Select-Object Name, Length
+
+      - name: Publicar pre-release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $exe = Get-ChildItem src-tauri/target/release/bundle/nsis -Filter *.exe | Select-Object -First 1
+          Copy-Item $exe.FullName "FerroLauncher-Tauri-Setup.exe"
+          $tag = "v0.9.7-tauri-prueba${{ github.run_number }}"
+          gh release create $tag FerroLauncher-Tauri-Setup.exe --repo ${{ github.repository }} --target ${{ github.sha }} --prerelease --title "FerroLauncher Tauri (prueba ${{ github.run_number }})" --notes "Version de prueba de la migracion a Tauri (PR en curso). Sin firmar: SmartScreen avisara. Incluye: loaders (los 4), login Microsoft multicuenta (codigo de dispositivo), launch online, Forge/NeoForge y Modrinth basico. Cuentas en accounts-tauri.json separado. Pendiente: auto-updater, backups y mas."
+# build: descargas y lanzamiento del juego

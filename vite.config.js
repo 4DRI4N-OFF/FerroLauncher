@@ -10,6 +10,7 @@ import react from '@vitejs/plugin-react';
 // de que una inyección se lleve nada a la red. img/media quedan abiertos a
 // propósito: los iconos de Modrinth/CurseForge y las skins son remotos, y el
 // documento se sirve desde file://, donde 'self' no resuelve del todo.
+const TAURI = !!process.env.FERRO_TAURI;
 const CSP = [
   "default-src 'self' file: data:",
   "script-src 'self' file:",
@@ -17,7 +18,7 @@ const CSP = [
   "img-src 'self' file: data: blob: https:",
   "media-src 'self' file: data: blob:",
   "font-src 'self' data:",
-  "connect-src 'none'",
+  TAURI ? "connect-src 'self' ipc: http://ipc.localhost" : "connect-src 'none'",
   "object-src 'none'",
   "base-uri 'none'",
   "frame-src 'none'",
